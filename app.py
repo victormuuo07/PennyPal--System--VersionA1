@@ -1,14 +1,14 @@
 import streamlit as st
-import os
-from storage import save_record
 from validator import validate_record
+from supabase_client import save_record, get_all_records
 from datetime import date
 
-st.set_page_config(page_title="SpiseUp Field Bookkeeper", layout="centered")
+st.set_page_config(page_title="🌶️ SpiseUp Field Bookkeeper", layout="centered")
+st.title("🌶️ SpiseUp Field Bookkeeper (Supabase Live)")
 
-st.title("🌶️ SpiseUp Field Bookkeeper (No AI Mode)")
-st.write("Fill the form after visiting a shop. Data will be saved automatically.")
+st.write("Fill the form after visiting a shop. Data will be saved live to Supabase.")
 
+# ----- FORM -----
 with st.form("sales_form"):
     sale_date = st.date_input("Date", value=date.today())
     name = st.text_input("Shop / Contact Name")
@@ -22,9 +22,9 @@ with st.form("sales_form"):
 
     submitted = st.form_submit_button("💾 Save Record")
 
+# ----- HANDLE FORM SUBMISSION -----
 if submitted:
     total = quantity * price
-
     record = {
         "Date": str(sale_date),
         "Name": name,
@@ -42,7 +42,17 @@ if submitted:
     if missing:
         st.warning(f"❗ Missing fields: {', '.join(missing)}")
     else:
-        save_record(record)
-        st.success("✅ Record saved!")
-        st.json(record)
-        st.caption(f"📁 Saved to: {os.path.abspath('spiseup_sales.csv')}")
+        try:
+            save_record(record)
+            st.success("✅ Record saved live to Supabase!")
+            st.json(record)
+        except Exception as e:
+            st.error(f"❌ Error saving record: {e}")
+
+# ----- SHOW LIVE TABLE -----
+st.subheader("📊 All Sales Records")
+records = get_all_records()
+if records:
+    st.dataframe(records)
+else:
+    st.info("No records yet.")
