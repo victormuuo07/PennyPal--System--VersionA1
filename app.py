@@ -1,14 +1,14 @@
+# app.py
 import streamlit as st
+from datetime import date
 from validator import validate_record
 from supabase_client import save_record, get_all_records
-from datetime import date
 
 st.set_page_config(page_title="🌶️ SpiseUp Field Bookkeeper", layout="centered")
-st.title("🌶️ SpiseUp Field Bookkeeper (Supabase Live)")
 
+st.title("🌶️ SpiseUp Field Bookkeeper (Supabase Version)")
 st.write("Fill the form after visiting a shop. Data will be saved live to Supabase.")
 
-# ----- FORM -----
 with st.form("sales_form"):
     sale_date = st.date_input("Date", value=date.today())
     name = st.text_input("Shop / Contact Name")
@@ -22,7 +22,6 @@ with st.form("sales_form"):
 
     submitted = st.form_submit_button("💾 Save Record")
 
-# ----- HANDLE FORM SUBMISSION -----
 if submitted:
     total = quantity * price
     record = {
@@ -44,15 +43,12 @@ if submitted:
     else:
         try:
             save_record(record)
-            st.success("✅ Record saved live to Supabase!")
+            st.success("✅ Record saved successfully!")
             st.json(record)
         except Exception as e:
-            st.error(f"❌ Error saving record: {e}")
+            st.error(f"❌ Failed to save record: {e}")
 
-# ----- SHOW LIVE TABLE -----
-st.subheader("📊 All Sales Records")
-records = get_all_records()
-if records:
-    st.dataframe(records)
-else:
-    st.info("No records yet.")
+# Optional: show all records in a table
+if st.checkbox("Show all records"):
+    all_records = get_all_records()
+    st.write(all_records)
