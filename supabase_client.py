@@ -1,27 +1,70 @@
-# supabase_client.py
+import os
+import uuid
 from supabase import create_client, Client
-import streamlit as st
+from datetime import datetime
 
-# Get secrets from Streamlit
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_SERVICE_KEY"]
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Supabase URL or Key not set! Check Streamlit secrets.")
+# ---------------- SECRETS / ENV ----------------
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") or st.secrets["SUPABASE_SERVICE_KEY"]
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def save_record(record: dict):
-    """Insert a record into the Supabase 'SALES' table."""
-    response = supabase.table("SALES").insert(record).execute()
-    if response.data:
-        return True
-    else:
-        raise Exception(f"Failed to insert record: {response}")
+# ---------------- SALES FUNCTIONS ----------------
+def save_sale(record: dict) -> bool:
+    """
+    Save a sale record to the SALES table
+    """
+    if "id" not in record:
+        record["id"] = str(uuid.uuid4())
+    try:
+        response = supabase.table("SALES").insert(record).execute()
+        if response.status_code in [200, 201]:
+            return True
+        else:
+            print("Error saving sale:", response.data)
+            return False
+    except Exception as e:
+        print("Exception saving sale:", e)
+        return False
 
-def get_all_records():
-    """Fetch all records from Supabase 'SALES' table."""
-    response = supabase.table("SALES").select("*").execute()
-    if response.data:
-        return response.data
-    return []
+def get_sales_summary() -> list:
+    """
+    Fetch all sales from the SALES table
+    """
+    try:
+        response = supabase.table("SALES").select("*").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        print("Exception fetching sales:", e)
+        return []
+
+# ---------------- EXPENSES FUNCTIONS ----------------
+def save_expense(record: dict) -> bool:
+    """
+    Save an expense record to the EXPENSES table
+    """
+    if "id" not in record:
+        record["id"] = str(uuid.uuid4())
+    if "status" not in record:
+        record["status"] = "Paid"  # default
+    try:
+        response = supabase.table("EXPENSES").insert(record).execute()
+        if response.status_code in [200, 201]:
+            return True
+        else:
+            print("Error saving expense:", response.data)
+            return False
+    except Exception as e:
+        print("Exception saving expense:", e)
+        return False
+
+def get_expenses_summary() -> list:
+    """
+    Fetch all expenses from the EXPENSES table
+    """
+    try:
+        response = supabase.table("EXPENSES").select("*").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        print("Exception fetching expenses:", e)
+        return []
