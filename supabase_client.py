@@ -46,23 +46,18 @@ def get_sales_summary():
 # -------------------------------
 # EXPENSE FUNCTIONS
 # -------------------------------
-def save_expense(record: dict):
-    """Save an expense to the EXPENSES table"""
-    # Ensure ID for uniqueness
-    if "id" not in record or not record["id"]:
-        record["id"] = str(uuid.uuid4())
-
+def save_expense(record):
     expense_data = {
-        "id": record.get("id"),
-        "date": record.get("Date"),
-        "category": record.get("Category"),
-        "description": record.get("Description") or record.get("Notes"),
-        "amount": float(record.get("Amount", 0)),
-        "payment_method": record.get("Payment_Method", "Cash"),
-        "paid_by": record.get("Paid_By", ""),
-        "receipt": record.get("Receipt", ""),
-        "status": record.get("Status", "Paid")
+        "date": record["date"],
+        "category": record["category"],
+        "description": record.get("description", ""),
+        "amount": record["amount"],
+        "payment_method": record["payment_method"],
+        "paid_by": record["paid_by"],
+        "receipt": record.get("receipt", ""),
+        "status": record["status"],
     }
+
     supabase.table("EXPENSES").insert(expense_data).execute()
 
 def get_expenses_summary():
