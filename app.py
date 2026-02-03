@@ -48,7 +48,7 @@ with st.form("expense_form"):
     expense_date = st.date_input("Date", value=date.today(), key="exp_date")
     category = st.text_input("Category (e.g., Supplies, Transport)")
     amount = st.number_input("Amount (KES)", min_value=0, step=1)
-    notes = st.text_area("Notes / Details")
+    description = st.text_area("Notes / Details")
     payment_method = st.selectbox("Payment Method", ["Cash", "Bank Transfer", "Mobile Money"])
     paid_by = st.text_input("Paid By")
     status = st.selectbox("Status", ["Paid", "Pending"])
@@ -56,14 +56,14 @@ with st.form("expense_form"):
 
 if submitted_expense:
     expense_record = {
-        "Date": str(expense_date),
-        "Category": category,
-        "Amount": amount,
-        "Description": notes,
-        "Payment_Method": payment_method,
-        "Paid_By": paid_by,
-        "Receipt": "",
-        "Status": status
+        "date": str(expense_date),
+        "category": category,
+        "description": description,
+        "amount": amount,
+        "payment_method": payment_method,
+        "paid_by": paid_by,
+        "receipt": "",
+        "status": status
     }
     save_expense(expense_record)
     st.success(f"✅ Expense saved! Amount: KES {amount}")
@@ -75,26 +75,28 @@ st.header("📊 Finance Summary & Charts")
 sales_data = get_sales_summary()
 expense_data = get_expenses_summary()
 
-# Convert to DataFrames
+# Convert to DataFrames with proper column casing
 sales_df = pd.DataFrame(sales_data)
 expenses_df = pd.DataFrame(expense_data)
 
-# Ensure numeric types
-if not sales_df.empty:
-    sales_df['Total'] = pd.to_numeric(sales_df['Total'])
-else:
-    sales_df = pd.DataFrame(columns=["Date", "Total", "Payment_Status"])
+# Handle missing columns safely
+for col in ["Total", "Payment_Status"]:
+    if col not in sales_df.columns:
+        sales_df[col] = 0 if col == "Total" else ""
 
-if not expenses_df.empty:
-    expenses_df['Amount'] = pd.to_numeric(expenses_df['Amount'])
-else:
-    expenses_df = pd.DataFrame(columns=["Date", "Amount", "Category"])
+for col in ["amount", "category"]:
+    if col not in expenses_df.columns:
+        expenses_df[col] = 0 if col == "amount" else ""
+
+# Convert numeric columns
+sales_df['Total'] = pd.to_numeric(sales_df['Total'], errors='coerce').fillna(0)
+expenses_df['amount'] = pd.to_numeric(expenses_df['amount'], errors='coerce').fillna(0)
 
 # Totals
-total_sales = sales_df['Total'].sum() if not sales_df.empty else 0
-total_cash = sales_df[sales_df['Payment_Status'] == "Cash"]['Total'].sum() if not sales_df.empty else 0
-total_credit = sales_df[sales_df['Payment_Status'] != "Cash"]['Total'].sum() if not sales_df.empty else 0
-total_expenses = expenses_df['Amount'].sum() if not expenses_df.empty else 0
+total_sales = sales_df['Total'].sum()
+total_cash = sales_df[sales_df['Payment_Status'] == "Cash"]['Total'].sum()
+total_credit = sales_df[sales_df['Payment_Status'] != "Cash"]['Total'].sum()
+total_expenses = expenses_df['amount'].sum()
 net_profit = total_sales - total_expenses
 running_balance = total_cash - total_expenses
 
@@ -111,34 +113,24 @@ col6.metric("Running Cash Balance (KES)", running_balance)
 st.subheader("📈 Visualizations")
 
 # Sales over time
-if not sales_df.empty:
-    sales_df_grouped = sales_df.groupby("Date")['Total'].sum().reset_index()
-else:
-    sales_df_grouped = pd.DataFrame(columns=["Date", "Total"])
-    
-fig_sales = px.line(sales_df_grouped, x='Date', y='Total', title="Total Sales Over Time") if not sales_df_grouped.empty else None
-if fig_sales:
+sales_df_grouped = sales_df.groupby("Date")['Total'].sum().reset_index() if not sales_df.empty else pd.DataFrame(columns=["Date","Total"])
+if not sales_df_grouped.empty:
+    fig_sales = px.line(sales_df_grouped, x='Date', y='Total', title="Total Sales Over Time")
     st.plotly_chart(fig_sales, use_container_width=True)
 
 # Expenses over time
-if not expenses_df.empty:
-    expenses_df_grouped = expenses_df.groupby("Date")['Amount'].sum().reset_index()
-else:
-    expenses_df_grouped = pd.DataFrame(columns=["Date", "Amount"])
-
-fig_expenses = px.line(expenses_df_grouped, x='Date', y='Amount', title="Total Expenses Over Time", color_discrete_sequence=["red"]) if not expenses_df_grouped.empty else None
-if fig_expenses:
+expenses_df_grouped = expenses_df.groupby("date")['amount'].sum().reset_index() if not expenses_df.empty else pd.DataFrame(columns=["date","amount"])
+if not expenses_df_grouped.empty:
+    fig_expenses = px.line(expenses_df_grouped, x='date', y='amount', title="Total Expenses Over Time", color_discrete_sequence=["red"])
     st.plotly_chart(fig_expenses, use_container_width=True)
 
 # Net profit over time
-combined_df = pd.merge(
-    sales_df_grouped.rename(columns={"Total": "Sales"}),
-    expenses_df_grouped.rename(columns={"Amount": "Expenses"}),
-    on="Date",
-    how="outer"
-).fillna(0)
-
-if not combined_df.empty:
+if not sales_df_grouped.empty or not expenses_df_grouped.empty:
+    combined_df = pd.merge(
+        sales_df_grouped.rename(columns={"Total":"Sales"}),
+        expenses_df_grouped.rename(columns={"amount":"Expenses", "date":"Date"}),
+        on="Date", how="outer"
+    ).fillna(0)
     combined_df['Net_Profit'] = combined_df['Sales'] - combined_df['Expenses']
     fig_profit = px.line(combined_df, x='Date', y='Net_Profit', title="Net Profit Over Time", color_discrete_sequence=["green"])
     st.plotly_chart(fig_profit, use_container_width=True)
@@ -155,8 +147,8 @@ if not sales_df.empty:
 # ---------- EXPENSES BY CATEGORY ----------
 if not expenses_df.empty:
     st.subheader("💼 Expenses by Category")
-    category_summary = expenses_df.groupby("Category")['Amount'].sum().reset_index()
-    fig_category = px.pie(category_summary, names="Category", values="Amount", title="Expenses by Category")
+    category_summary = expenses_df.groupby("category")['amount'].sum().reset_index()
+    fig_category = px.pie(category_summary, names="category", values="amount", title="Expenses by Category")
     st.plotly_chart(fig_category, use_container_width=True)
 
 # ---------- EXPORT DATA ----------
