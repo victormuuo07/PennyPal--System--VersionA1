@@ -113,23 +113,32 @@ st.subheader("📈 Visualizations")
 # Sales over time
 if not sales_df.empty:
     sales_df_grouped = sales_df.groupby("Date")['Total'].sum().reset_index()
-    fig_sales = px.line(sales_df_grouped, x='Date', y='Total', title="Total Sales Over Time")
+else:
+    sales_df_grouped = pd.DataFrame(columns=["Date", "Total"])
+    
+fig_sales = px.line(sales_df_grouped, x='Date', y='Total', title="Total Sales Over Time") if not sales_df_grouped.empty else None
+if fig_sales:
     st.plotly_chart(fig_sales, use_container_width=True)
 
 # Expenses over time
 if not expenses_df.empty:
     expenses_df_grouped = expenses_df.groupby("Date")['Amount'].sum().reset_index()
-    fig_expenses = px.line(expenses_df_grouped, x='Date', y='Amount', title="Total Expenses Over Time", color_discrete_sequence=["red"])
+else:
+    expenses_df_grouped = pd.DataFrame(columns=["Date", "Amount"])
+
+fig_expenses = px.line(expenses_df_grouped, x='Date', y='Amount', title="Total Expenses Over Time", color_discrete_sequence=["red"]) if not expenses_df_grouped.empty else None
+if fig_expenses:
     st.plotly_chart(fig_expenses, use_container_width=True)
 
 # Net profit over time
-if not sales_df.empty or not expenses_df.empty:
-    combined_df = pd.merge(
-        sales_df_grouped.rename(columns={"Total": "Sales"}),
-        expenses_df_grouped.rename(columns={"Amount": "Expenses"}),
-        on="Date",
-        how="outer"
-    ).fillna(0)
+combined_df = pd.merge(
+    sales_df_grouped.rename(columns={"Total": "Sales"}),
+    expenses_df_grouped.rename(columns={"Amount": "Expenses"}),
+    on="Date",
+    how="outer"
+).fillna(0)
+
+if not combined_df.empty:
     combined_df['Net_Profit'] = combined_df['Sales'] - combined_df['Expenses']
     fig_profit = px.line(combined_df, x='Date', y='Net_Profit', title="Net Profit Over Time", color_discrete_sequence=["green"])
     st.plotly_chart(fig_profit, use_container_width=True)
