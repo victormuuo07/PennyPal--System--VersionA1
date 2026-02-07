@@ -148,20 +148,26 @@ def save_sales_person(full_name: str, phone: str, role: str, location: str, stat
 # -------------------------------
 # DISTRIBUTION FUNCTIONS
 # -------------------------------
-def save_distribution(record: dict):
+def save_distribution(sale_id: str, sales_person_id: str, quantity: int, sale_date: str, price: float, sale_data: dict = None):
     """Save a distribution record linking a sale to a salesperson"""
     try:
-        if "id" not in record or not record["id"]:
-            record["id"] = str(uuid.uuid4())
+        distribution_record = {
+            "id": str(uuid.uuid4()),
+            "date": sale_date,
+            "sales_person_id": sales_person_id,
+            "sale_id": sale_id,  # NEW: Link to sale
+            "distributor_type": "Sales Rep",
+            "location": sale_data.get("Location", "") if sale_data else "",
+            "product": sale_data.get("Product", "SpiseUp Chilli Sachet") if sale_data else "SpiseUp Chilli Sachet",
+            "quantity_distributed": quantity,
+            "unit_price": price,
+            "expected_amount": quantity * price,
+            "distribution_type": "Direct Sale",
+            "status": "Completed",
+            "notes": f"Auto-linked to sale {sale_id}"
+        }
         
-        # Ensure all required fields are present
-        required_fields = ["sale_id", "sales_person_id", "quantity", "date"]
-        for field in required_fields:
-            if field not in record:
-                st.error(f"Missing required field for distribution: {field}")
-                return False
-        
-        response = supabase.table("DISTRIBUTION").insert(record).execute()
+        response = supabase.table("DISTRIBUTION").insert(distribution_record).execute()
         error = getattr(response, "error", None)
         if error:
             st.error(f"Error saving distribution: {error.message}")
