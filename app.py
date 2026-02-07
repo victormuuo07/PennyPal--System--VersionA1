@@ -1220,7 +1220,7 @@ with tab5:
             st.markdown("### 🏆 Salespeople Performance Leaderboard")
             
             dist_merged = dist_df.merge(sp_df, left_on="sales_person_id", right_on="id")
-            dist_merged['Total_Value'] = dist_merged['quantity_distributed'] * dist_merged['price_per_unit']
+            dist_merged['Total_Value'] = dist_merged['quantity_distributed'] * dist_merged['unit_price']
             
             # Top performers by value
             sp_summary_value = dist_merged.groupby("full_name").agg({
