@@ -730,24 +730,32 @@ with tab2:
     if submitted_sale:
         if not shop_name.strip():
             st.error("Please enter a Shop/Contact Name!")
-        else:
-            total = quantity * price
-            sale_record = {
-                "Date": str(sale_date),
-                "Name": shop_name,
-                "Phone": phone,
-                "Location": location,
-                "Product": product,
-                "Quantity": quantity,
-                "Price_per_Unit": price,
-                "Total": total,
-                "Payment_Status": payment_status,
-                "Feedback": feedback,
-                "Follow_Up": follow_up
-            }
-            sale_id = save_sale(sale_record)
+    elif sales_person_name == "Select...":
+        st.error("Please select a salesperson!")
+    else:
+        total = quantity * price
+        sale_record = {
+            "Date": str(sale_date),
+            "Name": shop_name,
+            "Phone": phone,
+            "Location": location,
+            "Product": product,
+            "Quantity": quantity,
+            "Price_per_Unit": price,
+            "Total": total,
+            "Payment_Status": payment_status,
+            "Feedback": feedback,
+            "Follow_Up": follow_up
+        }
+        
+        # Save the sale first
+        sale_id = save_sale(sale_record)
+        
+        if sale_id:
+            st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
             
-            if sale_id and sales_person_name != "Select..." and sales_person_name != "N/A":
+            # Only save distribution if a salesperson is selected (not "N/A" or "Select...")
+            if sales_person_name not in ["Select...", "N/A"] and sales_person_name in sales_person_options:
                 distribution_record = {
                     "sale_id": sale_id,
                     "sales_person_id": sales_person_options[sales_person_name],
@@ -755,11 +763,18 @@ with tab2:
                     "date": str(sale_date),
                     "price_per_unit": price
                 }
-                save_distribution(distribution_record)
-            
-            st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
-            if sales_person_name not in ["Select...", "N/A"]:
-                st.info(f"👤 Assigned to: **{sales_person_name}**")
+                
+                # Try to save distribution, but don't fail if it doesn't work
+                try:
+                    dist_success = save_distribution(distribution_record)
+                    if dist_success:
+                        st.info(f"👤 Successfully assigned to: **{sales_person_name}**")
+                    else:
+                        st.warning(f"⚠️ Sale saved but could not assign to {sales_person_name}. Distribution record skipped.")
+                except Exception as e:
+                    st.warning(f"⚠️ Sale saved but distribution failed. You can assign later. Error: {str(e)[:100]}...")
+        else:
+            st.error("❌ Failed to save sale. Please check your input and try again.")
     
     # Recent Sales Table
     st.markdown('<div class="section-header">📋 Recent Sales</div>', unsafe_allow_html=True)

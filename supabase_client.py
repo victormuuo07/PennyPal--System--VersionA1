@@ -14,33 +14,66 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # SALES FUNCTIONS
 # -------------------------------
 def save_sale(record: dict):
-    """Save a sale to the SALES table"""
-    if "id" not in record or not record["id"]:
-        record["id"] = str(uuid.uuid4())
+    """Save a sale to the SALES table - returns sale_id if successful, None if failed"""
+    try:
+        if "id" not in record or not record["id"]:
+            record["id"] = str(uuid.uuid4())
 
-    sale_data = {
-        "Date": record.get("Date"),
-        "Name": record.get("Name") or record.get("Shop_Name"),
-        "Phone": int(record.get("Phone", 0)) if record.get("Phone") else None,
-        "Location": record.get("Location"),
-        "Product": record.get("Product"),
-        "Quantity": int(record.get("Quantity", 0)),
-        "Price_per_Unit": int(record.get("Price_per_Unit", 0)),
-        "Total": int(record.get("Total", 0)),
-        "Payment_Status": record.get("Payment_Status"),
-        "Feedback": record.get("Feedback"),
-        "Follow_Up": record.get("Follow_Up"),
-        "id": record.get("id")
-    }
+        sale_data = {
+            "id": record.get("id"),
+            "Date": record.get("Date"),
+            "Name": record.get("Name") or record.get("Shop_Name"),
+            "Phone": record.get("Phone"),
+            "Location": record.get("Location"),
+            "Product": record.get("Product"),
+            "Quantity": int(record.get("Quantity", 0)),
+            "Price_per_Unit": int(record.get("Price_per_Unit", 0)),
+            "Total": int(record.get("Total", 0)),
+            "Payment_Status": record.get("Payment_Status"),
+            "Feedback": record.get("Feedback", ""),
+            "Follow_Up": record.get("Follow_Up", "")
+        }
 
-    response = supabase.table("SALES").insert(sale_data).execute()
-    error = getattr(response, "error", None)
-    if error:
-        st.error(f"Error saving sale: {error}")
+        response = supabase.table("SALES").insert(sale_data).execute()
+        
+        if hasattr(response, 'error') and response.error:
+            st.error(f"Database error saving sale: {response.error.message}")
+            return None
+            
+        if hasattr(response, 'data') and response.data and len(response.data) > 0:
+            return response.data[0].get('id', record["id"])
+        else:
+            return record["id"]
+            
+    except Exception as e:
+        st.error(f"Error saving sale: {str(e)}")
         return None
 
-    data = getattr(response, "data", [])
-    return record["id"] if data else None  # Return ID for linking to distribution
+def save_distribution(record: dict):
+    """Save a distribution record linking a sale to a salesperson - returns True if successful"""
+    try:
+        if "id" not in record or not record["id"]:
+            record["id"] = str(uuid.uuid4())
+        
+        # Ensure all required fields are present
+        required_fields = ["sale_id", "sales_person_id", "quantity", "date", "price_per_unit"]
+        missing_fields = [field for field in required_fields if field not in record]
+        
+        if missing_fields:
+            st.error(f"Missing required fields for distribution: {', '.join(missing_fields)}")
+            return False
+        
+        response = supabase.table("DISTRIBUTION").insert(record).execute()
+        
+        if hasattr(response, 'error') and response.error:
+            st.error(f"Database error saving distribution: {response.error.message}")
+            return False
+            
+        return True
+        
+    except Exception as e:
+        st.error(f"Error saving distribution: {str(e)}")
+        return False
 
 def get_sales_summary():
     """Fetch all sales from Supabase"""
@@ -117,11 +150,28 @@ def save_sales_person(full_name: str, phone: str, role: str, location: str, stat
 # -------------------------------
 def save_distribution(record: dict):
     """Save a distribution record linking a sale to a salesperson"""
-    record["id"] = str(uuid.uuid4())
-    response = supabase.table("DISTRIBUTION").insert(record).execute()
-    error = getattr(response, "error", None)
-    if error:
-        st.error(f"Error saving distribution: {error}")
+    try:
+        if "id" not in record or not record["id"]:
+            record["id"] = str(uuid.uuid4())
+        
+        # Ensure all required fields are present
+        required_fields = ["sale_id", "sales_person_id", "quantity", "date"]
+        for field in required_fields:
+            if field not in record:
+                st.error(f"Missing required field for distribution: {field}")
+                return False
+        
+        response = supabase.table("DISTRIBUTION").insert(record).execute()
+        error = getattr(response, "error", None)
+        if error:
+            st.error(f"Error saving distribution: {error.message}")
+            return False
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"Exception while saving distribution: {str(e)}")
+        return False
 
 def get_distribution_data(start_date=None, end_date=None):
     """Fetch distribution records with optional date filtering"""
