@@ -753,28 +753,24 @@ with tab2:
         
         if sale_id:
             st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
-            
-            # Only save distribution if a salesperson is selected (not "N/A" or "Select...")
+    
+    # Only save distribution if a salesperson is selected
             if sales_person_name not in ["Select...", "N/A"] and sales_person_name in sales_person_options:
-                distribution_record = {
-                    "sale_id": sale_id,
-                    "sales_person_id": sales_person_options[sales_person_name],
-                    "quantity": quantity,
-                    "date": str(sale_date),
-                    "price_per_unit": price
-                }
-                
-                # Try to save distribution, but don't fail if it doesn't work
-                try:
-                    dist_success = save_distribution(distribution_record)
-                    if dist_success:
-                        st.info(f"👤 Successfully assigned to: **{sales_person_name}**")
-                    else:
-                        st.warning(f"⚠️ Sale saved but could not assign to {sales_person_name}. Distribution record skipped.")
-                except Exception as e:
-                    st.warning(f"⚠️ Sale saved but distribution failed. You can assign later. Error: {str(e)[:100]}...")
+        # Pass the sale record to get location and product
+                success = save_distribution(
+            sale_id=sale_id,
+            sales_person_id=sales_person_options[sales_person_name],
+            quantity=quantity,
+            sale_date=str(sale_date),
+            price=price,
+            sale_data=sale_record  # Pass the sale record for additional info
+        )
+        
+        if success:
+            st.info(f"👤 Successfully assigned to: **{sales_person_name}**")
         else:
-            st.error("❌ Failed to save sale. Please check your input and try again.")
+            st.warning(f"⚠️ Sale saved but could not assign to {sales_person_name}.")
+    
     
     # Recent Sales Table
     st.markdown('<div class="section-header">📋 Recent Sales</div>', unsafe_allow_html=True)
