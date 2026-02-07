@@ -33,7 +33,10 @@ def save_sale(record: dict):
         "id": record.get("id")
     }
 
-    supabase.table("SALES").insert(sale_data).execute()
+    response = supabase.table("SALES").insert(sale_data).execute()
+    if response.error:
+        st.error(f"Error saving sale: {response.error.message}")
+        return None
     return record["id"]  # Return ID for linking to distribution
 
 def get_sales_summary():
@@ -55,7 +58,9 @@ def save_expense(record: dict):
         "receipt": record.get("receipt", ""),
         "status": record["status"],
     }
-    supabase.table("EXPENSES").insert(expense_data).execute()
+    response = supabase.table("EXPENSES").insert(expense_data).execute()
+    if response.error:
+        st.error(f"Error saving expense: {response.error.message}")
 
 def get_expenses_summary():
     """Fetch all expenses from Supabase"""
@@ -87,7 +92,6 @@ def save_sales_person(full_name: str, phone: str, role: str, location: str, stat
         return None
     return response.data[0]["id"]  # Returns the generated UUID
 
-
 # -------------------------------
 # DISTRIBUTION FUNCTIONS
 # -------------------------------
@@ -102,4 +106,6 @@ def save_distribution(record: dict):
     }
     """
     record["id"] = str(uuid.uuid4())
-    supabase.table("DISTRIBUTION").insert(record).execute()
+    response = supabase.table("DISTRIBUTION").insert(record).execute()
+    if response.error:
+        st.error(f"Error saving distribution: {response.error.message}")
