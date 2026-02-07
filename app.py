@@ -29,7 +29,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS for better styling with improved visibility
 st.markdown("""
 <style>
     /* Main container */
@@ -37,30 +37,41 @@ st.markdown("""
         background-color: #f8f9fa;
     }
     
-    /* Header styling */
+    /* Header styling - Improved for visibility */
     .main-header {
         font-size: 2.8rem !important;
         font-weight: 700;
-        background: linear-gradient(90deg, #FF4B4B 0%, #FF8C42 100%);
+        background: linear-gradient(90deg, #D32F2F 0%, #F57C00 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 0.5rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .sub-header {
-        color: #666;
+        color: #333333;
         font-size: 1.1rem;
         margin-bottom: 2rem;
+        font-weight: 400;
     }
     
-    /* Metric cards */
+    /* Metric cards - Improved text contrast */
     .metric-card {
         background: white;
         border-radius: 12px;
         padding: 1.5rem;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 5px solid #FF4B4B;
+        border-left: 5px solid #D32F2F;
         transition: transform 0.3s ease;
+    }
+    
+    .metric-card h3 {
+        color: #333333 !important;
+        font-weight: 600;
+    }
+    
+    .metric-card .st-emotion-cache-1fcdlhc {
+        color: #333333 !important;
     }
     
     .metric-card:hover {
@@ -68,18 +79,56 @@ st.markdown("""
         box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
     }
     
-    /* Section headers */
+            // Fix metric text colors
+document.addEventListener('DOMContentLoaded', function() {
+    // Fix all metric values
+    const metrics = document.querySelectorAll('[data-testid="stMetricValue"]');
+    metrics.forEach(metric => {
+        metric.style.color = '#333333';
+        metric.style.fontWeight = 'bold';
+    });
+    
+    // Fix metric labels
+    const labels = document.querySelectorAll('[data-testid="stMetricLabel"]');
+    labels.forEach(label => {
+        label.style.color = '#666666';
+    });
+            
+            // Detect dark mode
+const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+if (isDarkMode) {
+    // Add dark mode specific overrides
+    const style = document.createElement('style');
+    style.textContent = `
+        .main-header {
+            background: linear-gradient(90deg, #FF8A80 0%, #FFD180 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stMetric div[data-testid="stMetricValue"] {
+            color: #FFFFFF !important;
+        }
+        .stMarkdown, .stText, .stTitle, .stHeader {
+            color: #FFFFFF !important;
+        }
+    `;
+    document.head.appendChild(style);
+}
+            
+    /* Section headers - Better contrast */
     .section-header {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(90deg, #1565C0 0%, #1976D2 100%);
         color: white;
         padding: 1rem 1.5rem;
         border-radius: 10px;
         margin: 1.5rem 0 1rem 0;
         font-weight: 600;
         font-size: 1.2rem;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.2);
     }
     
-    /* Custom tabs styling */
+    /* Custom tabs styling - Better visibility */
     .stTabs [data-baseweb="tab-list"] {
         gap: 0px;
         background-color: #f0f2f6;
@@ -93,15 +142,20 @@ st.markdown("""
         background-color: #f0f2f6;
         border-radius: 10px 10px 0 0;
         font-weight: 500;
-        color: #666;
+        color: #555555;  /* Darker for better visibility */
         border-right: 1px solid #ddd;
     }
     
     .stTabs [aria-selected="true"] {
         background-color: white;
-        color: #FF4B4B;
-        font-weight: 600;
-        border-bottom: 3px solid #FF4B4B;
+        color: #D32F2F;  /* Stronger red */
+        font-weight: 700;
+        border-bottom: 3px solid #D32F2F;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover:not([aria-selected="true"]) {
+        color: #333333;  /* Darker on hover */
+        background-color: #e6e9ef;
     }
     
     /* Form styling */
@@ -112,10 +166,15 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
     
+    .stForm label {
+        color: #333333 !important;
+        font-weight: 500;
+    }
+    
     /* Button styling */
     .stButton > button {
-        background: linear-gradient(90deg, #FF4B4B 0%, #FF8C42 100%);
-        color: white;
+        background: linear-gradient(90deg, #D32F2F 0%, #F57C00 100%);
+        color: white !important;
         border: none;
         padding: 0.5rem 2rem;
         border-radius: 8px;
@@ -125,16 +184,23 @@ st.markdown("""
     
     .stButton > button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(255, 75, 75, 0.2);
+        box-shadow: 0 6px 12px rgba(211, 47, 47, 0.3);
+        color: white !important;
     }
     
-    /* Alert boxes */
+    /* Alert boxes - Better contrast */
     .alert-box {
-        background: linear-gradient(90deg, #fff3cd 0%, #ffeaa7 100%);
-        border-left: 5px solid #ffc107;
+        background: linear-gradient(90deg, #FFF3E0 0%, #FFECB3 100%);
+        border-left: 5px solid #FF9800;
         padding: 1rem;
         border-radius: 8px;
         margin: 1rem 0;
+        color: #5D4037;
+        font-weight: 500;
+    }
+    
+    .alert-box strong {
+        color: #D32F2F;
     }
     
     /* Data table styling */
@@ -142,6 +208,100 @@ st.markdown("""
         border-radius: 10px;
         overflow: hidden;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    
+    .dataframe th {
+        background-color: #1976D2 !important;
+        color: white !important;
+        font-weight: 600;
+    }
+    
+    .dataframe td {
+        color: #333333 !important;
+    }
+    
+    /* Fix for Streamlit's default text colors */
+    .stMarkdown, .stText, .stTitle, .stHeader {
+        color: #333333 !important;
+    }
+    
+    /* Improve visibility for metric values */
+    .stMetric {
+        color: #333333 !important;
+    }
+    
+    .stMetric label {
+        color: #666666 !important;
+        font-weight: 500;
+    }
+    
+    .stMetric div[data-testid="stMetricValue"] {
+        color: #333333 !important;
+        font-weight: 700;
+    }
+    
+    /* Improve form input labels */
+    .stTextInput label, .stNumberInput label, .stSelectbox label, .stDateInput label, .stTextArea label {
+        color: #333333 !important;
+        font-weight: 500;
+    }
+    
+    /* Make placeholders more visible */
+    ::placeholder {
+        color: #999999 !important;
+        opacity: 1;
+    }
+    
+    /* Improve info/warning/success/error boxes */
+    .stAlert {
+        color: #333333 !important;
+    }
+    
+    .stAlert [data-testid="stMarkdownContainer"] {
+        color: #333333 !important;
+    }
+    
+    /* Improve expander visibility */
+    .streamlit-expanderHeader {
+        color: #333333 !important;
+        font-weight: 600;
+    }
+    
+    /* Make all text in containers dark */
+    .stContainer, .stColumn, .stExpander {
+        color: #333333 !important;
+    }
+    
+    /* Fix for captions and small text */
+    .stCaption {
+        color: #666666 !important;
+    }
+    
+    /* Improve selectbox dropdown */
+    .stSelectbox div[data-baseweb="select"] {
+        color: #333333 !important;
+    }
+    
+    /* Make all h1-h6 tags dark */
+    h1, h2, h3, h4, h5, h6 {
+        color: #333333 !important;
+    }
+    
+    /* Divider color */
+    hr {
+        border-color: #e0e0e0 !important;
+    }
+    
+    /* Make sidebar text more visible */
+    .sidebar .sidebar-content {
+        color: #333333 !important;
+    }
+    
+    .sidebar .stSelectbox label, 
+    .sidebar .stMultiselect label, 
+    .sidebar .stDateInput label,
+    .sidebar .stButton button {
+        color: #333333 !important;
     }
 </style>
 """, unsafe_allow_html=True)
