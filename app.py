@@ -922,48 +922,88 @@ with tab2:
 
 # In your Sales tab (Tab 2), add at the bottom
 if DEBUG_MODE:
-    with st.expander("🧪 Quick Test Form (Debug)"):
-        st.write("Use this to test with predefined values")
-        
-        if st.button("Fill Test Data"):
-            # Pre-fill the form with test data
-            st.session_state.shop_name = "Test Shop " + str(datetime.now().time())[:8]
-            st.session_state.phone = "0712345678"
-            st.session_state.location = "Nairobi"
-            st.session_state.product = "SpiseUp Chilli Sachet"
-            st.session_state.quantity = 5
-            st.session_state.price = 30
-            st.session_state.payment_status = "Cash"
-            st.session_state.sales_person_name = list(sales_person_options.keys())[0] if sales_person_options else "N/A"
-            st.session_state.feedback = "Test feedback"
-            st.session_state.follow_up = "Test follow up"
-            
-            st.success("Test data filled! Scroll up to see form.")
-            st.rerun()
-
-    def verify_test_data(sale_id=None):
+    st.markdown("---")
+    st.subheader("🧪 Debug Testing")
     
-        if DEBUG_MODE:
-            st.sidebar.markdown("---")
-            st.sidebar.write("### 📊 Data Verification")
-        
-        # Check SALES table
-        if sale_id:
-            response = supabase.table("SALES").select("*").eq("id", sale_id).execute()
-            if hasattr(response, 'data') and response.data:
-                st.sidebar.success(f"✅ Sale found in database")
-                st.sidebar.write(f"Shop: {response.data[0].get('Name')}")
-            else:
-                st.sidebar.error("❌ Sale not found in database")
-        
-        # Check DISTRIBUTION table
-        if sale_id:
-            response = supabase.table("DISTRIBUTION").select("*").eq("sale_id", sale_id).execute()
-            if hasattr(response, 'data') and response.data:
-                st.sidebar.success(f"✅ Distribution record found")
-                st.sidebar.write(f"Quantity: {response.data[0].get('quantity_distributed')}")
-            else:
-                st.sidebar.warning("⚠️ No distribution record found (might be expected)")        
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Test Sale + Distribution", type="primary", help="Create a test sale with distribution"):
+            try:
+                # Generate unique shop name
+                shop_name = f"Debug Shop {datetime.now().strftime('%H:%M:%S')}"
+                
+                # Create sale
+                sale_data = {
+                    "Date": str(date.today()),
+                    "Name": shop_name,
+                    "Phone": "0712000000",
+                    "Location": "Test Location",
+                    "Product": "SpiseUp Chilli Sachet",
+                    "Quantity": 15,
+                    "Price_per_Unit": 50,
+                    "Total": 750,
+                    "Payment_Status": "Cash",
+                    "Feedback": "Debug sale",
+                    "Follow_Up": ""
+                }
+                
+                sale_id = save_sale(sale_data)
+                
+                if sale_id:
+                    st.success(f"✅ Sale created: {shop_name}")
+                    
+                    # Try distribution
+                    if sales_person_options:
+                        sp_name = list(sales_person_options.keys())[0]
+                        sp_id = sales_person_options[sp_name]
+                        
+                        dist_success = save_distribution(
+                            sale_id=sale_id,
+                            sales_person_id=sp_id,
+                            quantity=15,
+                            sale_date=str(date.today()),
+                            price=50,
+                            sale_data=sale_data
+                        )
+                        
+                        if dist_success:
+                            st.info(f"✅ Distribution assigned to {sp_name}")
+                        else:
+                            st.warning("⚠️ Distribution failed (check logs)")
+                    else:
+                        st.warning("⚠️ No salespeople to assign")
+                else:
+                    st.error("❌ Sale creation failed")
+                    
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")
+    
+    with col2:
+        if st.button("Test Sale Only", help="Create test sale without distribution"):
+            try:
+                shop_name = f"Test Only {datetime.now().strftime('%H:%M:%S')}"
+                sale_data = {
+                    "Date": str(date.today()),
+                    "Name": shop_name,
+                    "Phone": "0722000000",
+                    "Location": "Test Only",
+                    "Product": "SpiseUp Chilli Sachet",
+                    "Quantity": 5,
+                    "Price_per_Unit": 40,
+                    "Total": 200,
+                    "Payment_Status": "Credit / Pending",
+                    "Feedback": "",
+                    "Follow_Up": ""
+                }
+                
+                sale_id = save_sale(sale_data)
+                if sale_id:
+                    st.success(f"✅ Sale created: {shop_name}")
+                else:
+                    st.error("❌ Failed")
+            except Exception as e:
+                st.error(f"❌ Error: {str(e)}")       
 # -------------------------------
 # TAB 3: EXPENSES
 # -------------------------------
