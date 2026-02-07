@@ -7,6 +7,8 @@ import io
 import numpy as np
 from dateutil.relativedelta import relativedelta
 
+
+
 # Supabase functions
 from supabase_client import (
     save_sale,
@@ -18,6 +20,38 @@ from supabase_client import (
     save_sales_person,
     get_distribution_data
 )
+
+# DEBUG MODE - Set to True for testing
+DEBUG_MODE = True  # Change to False when done testing
+
+def test_distribution_connection():
+    """Test if distribution table works"""
+    try:
+        # Test with minimal data
+        test_record = {
+            "id": str(uuid.uuid4()),
+            "date": str(date.today()),
+            "sales_person_id": "00000000-0000-0000-0000-000000000000",  # Dummy UUID
+            "distributor_type": "Test",
+            "location": "Test Location",
+            "product": "Test Product",
+            "quantity_distributed": 1,
+            "unit_price": 100,
+            "expected_amount": 100,
+            "distribution_type": "Test",
+            "status": "Test",
+            "notes": "Test connection"
+        }
+        
+        if DEBUG_MODE:
+            st.sidebar.write("🔍 DEBUG: Testing distribution connection...")
+            st.sidebar.write("Test record:", test_record)
+        
+        return True
+    except Exception as e:
+        if DEBUG_MODE:
+            st.sidebar.error(f"❌ Distribution test failed: {str(e)}")
+        return False
 
 # -------------------------------
 # Streamlit page setup with custom CSS
@@ -405,6 +439,27 @@ with st.sidebar:
     # Last updated
     st.markdown(f"**Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
+    # In the sidebar, after other filters
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🧪 Testing")
+
+if st.sidebar.button("Test Distribution Connection"):
+    if test_distribution_connection():
+        st.sidebar.success("✅ Distribution connection test passed!")
+    else:
+        st.sidebar.error("❌ Distribution connection test failed!")
+
+if st.sidebar.button("Check Database Structure"):
+    # Show current table structure
+    st.sidebar.write("**Current DISTRIBUTION columns expected:**")
+    expected_columns = [
+        "id", "date", "sales_person_id", "sale_id", "distributor_type",
+        "location", "product", "quantity_distributed", "unit_price",
+        "expected_amount", "distribution_type", "status", "notes"
+    ]
+    for col in expected_columns:
+        st.sidebar.write(f"- {col}")
+
 # -------------------------------
 # FETCH & PREPARE DATA
 # -------------------------------
@@ -728,8 +783,17 @@ with tab2:
         clear_form = st.button("🗑️ Clear Form", use_container_width=True)
     
     if submitted_sale:
-        if not shop_name.strip():
-            st.error("Please enter a Shop/Contact Name!")
+        if DEBUG_MODE:
+            st.write("🔍 **DEBUG MODE ACTIVE**")
+            st.write("Form data received:")
+            st.write(f"- Shop Name: {shop_name}")
+            st.write(f"- Quantity: {quantity}")
+            st.write(f"- Price: {price}")
+            st.write(f"- Salesperson: {sales_person_name}")
+            st.write(f"- Salesperson Options: {list(sales_person_options.keys())[:3]}...")
+    
+    if not shop_name.strip():
+        st.error("Please enter a Shop/Contact Name!")
     elif sales_person_name == "Select...":
         st.error("Please select a salesperson!")
     else:
@@ -748,29 +812,64 @@ with tab2:
             "Follow_Up": follow_up
         }
         
+        if DEBUG_MODE:
+            st.write("🔍 Sale record to save:", sale_record)
+        
         # Save the sale first
         sale_id = save_sale(sale_record)
         
+        if DEBUG_MODE:
+            st.write(f"🔍 Save sale returned ID: {sale_id}")
+        
         if sale_id:
             st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
-    
-    # Only save distribution if a salesperson is selected
+            st.write(f"**Sale ID:** `{sale_id}`")
+            
+            # Only save distribution if a salesperson is selected
             if sales_person_name not in ["Select...", "N/A"] and sales_person_name in sales_person_options:
-        # Pass the sale record to get location and product
-                success = save_distribution(
-            sale_id=sale_id,
-            sales_person_id=sales_person_options[sales_person_name],
-            quantity=quantity,
-            sale_date=str(sale_date),
-            price=price,
-            sale_data=sale_record  # Pass the sale record for additional info
-        )
-        
-        if success:
-            st.info(f"👤 Successfully assigned to: **{sales_person_name}**")
+                sales_person_id = sales_person_options[sales_person_name]
+                
+                if DEBUG_MODE:
+                    st.write("🔍 Attempting to save distribution...")
+                    st.write(f"- Sale ID: {sale_id}")
+                    st.write(f"- Salesperson ID: {sales_person_id}")
+                    st.write(f"- Salesperson Name: {sales_person_name}")
+                    st.write(f"- Quantity: {quantity}")
+                    st.write(f"- Price: {price}")
+                
+                # Call the UPDATED save_distribution function
+                try:
+                    success = save_distribution(
+                        sale_id=sale_id,
+                        sales_person_id=sales_person_id,
+                        quantity=quantity,
+                        sale_date=str(sale_date),
+                        price=price,
+                        sale_data=sale_record
+                    )
+                    
+                    if DEBUG_MODE:
+                        st.write(f"🔍 save_distribution returned: {success}")
+                    
+                    if success:
+                        st.info(f"👤 Successfully assigned to: **{sales_person_name}**")
+                        st.balloons()  # Celebration!
+                    else:
+                        st.warning(f"⚠️ Sale saved but could not assign to {sales_person_name}.")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error saving distribution: {str(e)}")
+                    if DEBUG_MODE:
+                        import traceback
+                        st.write("Full traceback:")
+                        st.code(traceback.format_exc())
+            else:
+                if DEBUG_MODE:
+                    st.write("🔍 No distribution saved because:")
+                    st.write(f"- Salesperson name: {sales_person_name}")
+                    st.write(f"- In options: {sales_person_name in sales_person_options}")
         else:
-            st.warning(f"⚠️ Sale saved but could not assign to {sales_person_name}.")
-    
+            st.error("❌ Failed to save sale. Please check your input and try again.")
     
     # Recent Sales Table
     st.markdown('<div class="section-header">📋 Recent Sales</div>', unsafe_allow_html=True)
@@ -821,6 +920,50 @@ with tab2:
                            color='Total', color_continuous_scale='Viridis')
                 st.plotly_chart(fig, use_container_width=True)
 
+# In your Sales tab (Tab 2), add at the bottom
+if DEBUG_MODE:
+    with st.expander("🧪 Quick Test Form (Debug)"):
+        st.write("Use this to test with predefined values")
+        
+        if st.button("Fill Test Data"):
+            # Pre-fill the form with test data
+            st.session_state.shop_name = "Test Shop " + str(datetime.now().time())[:8]
+            st.session_state.phone = "0712345678"
+            st.session_state.location = "Nairobi"
+            st.session_state.product = "SpiseUp Chilli Sachet"
+            st.session_state.quantity = 5
+            st.session_state.price = 30
+            st.session_state.payment_status = "Cash"
+            st.session_state.sales_person_name = list(sales_person_options.keys())[0] if sales_person_options else "N/A"
+            st.session_state.feedback = "Test feedback"
+            st.session_state.follow_up = "Test follow up"
+            
+            st.success("Test data filled! Scroll up to see form.")
+            st.rerun()
+
+    def verify_test_data(sale_id=None):
+    
+        if DEBUG_MODE:
+            st.sidebar.markdown("---")
+            st.sidebar.write("### 📊 Data Verification")
+        
+        # Check SALES table
+        if sale_id:
+            response = supabase.table("SALES").select("*").eq("id", sale_id).execute()
+            if hasattr(response, 'data') and response.data:
+                st.sidebar.success(f"✅ Sale found in database")
+                st.sidebar.write(f"Shop: {response.data[0].get('Name')}")
+            else:
+                st.sidebar.error("❌ Sale not found in database")
+        
+        # Check DISTRIBUTION table
+        if sale_id:
+            response = supabase.table("DISTRIBUTION").select("*").eq("sale_id", sale_id).execute()
+            if hasattr(response, 'data') and response.data:
+                st.sidebar.success(f"✅ Distribution record found")
+                st.sidebar.write(f"Quantity: {response.data[0].get('quantity_distributed')}")
+            else:
+                st.sidebar.warning("⚠️ No distribution record found (might be expected)")        
 # -------------------------------
 # TAB 3: EXPENSES
 # -------------------------------
