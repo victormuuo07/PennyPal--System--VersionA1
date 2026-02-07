@@ -703,7 +703,7 @@ with tab2:
             st.markdown("### Sale Details")
             product = st.selectbox("Product", ["SpiseUp Chilli Sachet", "SpiseUp Hot Sauce", "Other"])
             quantity = st.number_input("Quantity (sachets)", min_value=1, step=1, value=10)
-            price = st.number_input("Price per sachet (KES)", min_value=10, step=10, value=50)
+            price = st.number_input("Price per sachet (KES)", min_value=1, step=10, value=5)
             payment_status = st.selectbox("Payment Status", ["Cash", "Credit / Pending"])
             
             if sales_person_options:
