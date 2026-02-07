@@ -102,10 +102,28 @@ def save_distribution(record: dict):
         'sale_id': <sale_id>,
         'sales_person_id': <sales_person_id>,
         'quantity': <sold_quantity>,
-        'date': <date>
+        'date': <date>,
+        'price_per_unit': <price_per_unit>
     }
     """
     record["id"] = str(uuid.uuid4())
     response = supabase.table("DISTRIBUTION").insert(record).execute()
     if response.error:
         st.error(f"Error saving distribution: {response.error.message}")
+
+def get_distribution_data(start_date=None, end_date=None):
+    """
+    Fetch distribution data from Supabase, optionally filtered by date range
+    Returns a list of dicts
+    """
+    query = supabase.table("DISTRIBUTION").select("*")
+    if start_date:
+        query = query.gte("date", str(start_date))
+    if end_date:
+        query = query.lte("date", str(end_date))
+
+    response = query.execute()
+    if response.error:
+        st.error(f"Error fetching distribution data: {response.error.message}")
+        return []
+    return response.data if response.data else []

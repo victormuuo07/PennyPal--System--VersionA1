@@ -1,37 +1,21 @@
-# 🌶️ SpiseUp Finance Tracker
+# 🌶️ SpiseUp Field & Finance Tracker
 
-**Real-time Sales, Expense & Distribution Tracker for SpiseUp**
-
----
-
-## Overview
-
-SpiseUp Finance Tracker is a Streamlit-based app to manage your field sales, track expenses, monitor salespeople performance, and calculate net profit and cash flow. It integrates with **Supabase** as the backend for storage and is fully customizable for FMCG products like SpiseUp Chilli Sachets.
+**SpiseUp Field & Finance Tracker** is a Streamlit app designed to help small businesses manage sales, expenses, distribution, and salespeople performance in real-time. Track your revenue, net profit, and get visual dashboards for decision-making.
 
 ---
 
-## Features
+## ⚡ Features
 
-- **Sales & Expenses Tracking**
-  - Record sales with date, product, quantity, price, payment status, and customer feedback.
-  - Record expenses with category, amount, payment method, and status.
-  
-- **Salespeople Management**
-  - Add new sales reps, managers, and distributors.
-  - Track performance by **total sales value** and **quantity sold**.
-
-- **Dashboard & Visuals**
-  - Daily, weekly, monthly, or custom date filters.
-  - Charts for sales, expenses, and net profit over time.
-  - Leaderboards for top 10 salespeople and top 10 shops.
-  - Shop distribution by salesperson.
-
-- **Financial Metrics**
-  - Total sales, cash collected, credit/pending, total expenses, net profit, and running cash balance.
-
-- **Data Export**
-  - Export sales and expenses to CSV for offline analysis.
+- **Sales Management**: Add sales with product, quantity, price, payment status, and salesperson.  
+- **Expenses Tracking**: Record expenses with category, payment method, and status.  
+- **Salespeople Management**: Add and track performance of your sales team.  
+- **Distribution**: Link sales to salespeople and track distribution by shop and quantity.  
+- **Dashboards**:
+  - Finance summary (total sales, cash, credit, expenses, net profit, running balance)
+  - Sales, expenses, and profit over time (line charts)
+  - Salespeople leaderboard (total sales value & quantity)
+  - Shop & distribution performance (top shops and distribution by salesperson)
+  - Expenses by category (pie chart)
+- **Export Data**: Download sales and expenses data as CSV.
 
 ---
-
-## Folder Structure

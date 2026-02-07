@@ -12,14 +12,20 @@ from supabase_client import (
     get_sales_summary,
     get_expenses_summary,
     get_sales_people,
-    save_sales_person
+    save_sales_person,
+    get_distribution_data
 )
 
+# -------------------------------
+# Streamlit page setup
+# -------------------------------
 st.set_page_config(page_title="🌶️ SpiseUp Finance Tracker", layout="wide")
 st.title("🌶️ SpiseUp Field & Finance Tracker")
 st.write("Track sales, expenses, salespeople, distribution, and net profit in real-time!")
 
-# -------------------- SALESPEOPLE --------------------
+# -------------------------------
+# SALESPEOPLE MANAGEMENT
+# -------------------------------
 st.header("🧑‍💼 Salespeople Management")
 with st.form("sales_people_form"):
     full_name = st.text_input("Full Name")
@@ -50,11 +56,13 @@ with st.form("sales_people_form"):
             else:
                 st.error("❌ Failed to add salesperson. Check logs for details.")
 
-# Fetch salespeople for dropdown
+# Fetch salespeople for dropdowns
 sales_people = get_sales_people()
 sales_person_options = {p['full_name']: p['id'] for p in sales_people} if sales_people else {}
 
-# -------------------- SALES FORM --------------------
+# -------------------------------
+# SALES FORM
+# -------------------------------
 st.header("💰 Record a Sale")
 with st.form("sales_form"):
     sale_date = st.date_input("Date", value=date.today())
@@ -102,7 +110,9 @@ if submitted_sale:
 
     st.success(f"✅ Sale saved! Total: KES {total} by {sales_person_name}")
 
-# -------------------- EXPENSE FORM --------------------
+# -------------------------------
+# EXPENSE FORM
+# -------------------------------
 st.header("💸 Record an Expense")
 with st.form("expense_form"):
     expense_date = st.date_input("Date", value=date.today(), key="exp_date")
@@ -128,10 +138,14 @@ if submitted_expense:
     save_expense(expense_record)
     st.success(f"✅ Expense saved! Amount: KES {amount}")
 
-# -------------------- DASHBOARD --------------------
+# -------------------------------
+# DASHBOARD
+# -------------------------------
 st.header("📊 Finance Summary & Charts")
 
-# -------------------- DATE FILTER --------------------
+# -------------------------------
+# DATE FILTER
+# -------------------------------
 st.sidebar.header("📅 Filter Data")
 filter_mode = st.sidebar.selectbox("Select Period", ["Custom Range", "Today", "This Week", "This Month"])
 start_date = end_date = date.today()
@@ -148,13 +162,12 @@ elif filter_mode == "This Month":
     start_date = date.today().replace(day=1)
     end_date = date.today()
 
-# -------------------- FETCH & PREP DATA --------------------
+# -------------------------------
+# FETCH & PREP DATA
+# -------------------------------
 sales_data = get_sales_summary()
 expense_data = get_expenses_summary()
-distribution_data = []  # Fetch distribution table from Supabase
-if sales_data:
-    dist_data_response = supabase.table("DISTRIBUTION").select("*").execute()
-    distribution_data = dist_data_response.data if dist_data_response.data else []
+distribution_data = get_distribution_data(start_date, end_date)  # <--- UPDATED
 
 sales_df = pd.DataFrame(sales_data) if sales_data else pd.DataFrame()
 expenses_df = pd.DataFrame(expense_data) if expense_data else pd.DataFrame()
@@ -176,7 +189,9 @@ if not dist_df.empty:
 sales_df['Total'] = pd.to_numeric(sales_df['Total'], errors='coerce').fillna(0)
 expenses_df['amount'] = pd.to_numeric(expenses_df['amount'], errors='coerce').fillna(0)
 
-# -------------------- FINANCE METRICS --------------------
+# -------------------------------
+# FINANCE METRICS
+# -------------------------------
 total_sales = sales_df['Total'].sum()
 total_cash = sales_df[sales_df['Payment_Status'] == "Cash"]['Total'].sum()
 total_credit = sales_df[sales_df['Payment_Status'] != "Cash"]['Total'].sum()
@@ -192,7 +207,9 @@ col4.metric("Total Expenses (KES)", total_expenses)
 col5.metric("Net Profit (KES)", net_profit)
 col6.metric("Running Cash Balance (KES)", running_balance)
 
-# -------------------- VISUALIZATIONS --------------------
+# -------------------------------
+# VISUALIZATIONS
+# -------------------------------
 st.subheader("📈 Sales, Expenses & Profit Over Time")
 if not sales_df.empty:
     sales_over_time = sales_df.groupby("Date")['Total'].sum().reset_index()
@@ -209,25 +226,29 @@ if not sales_df.empty or not expenses_df.empty:
     combined_df['Net_Profit'] = combined_df['Sales'] - combined_df['Expenses']
     st.plotly_chart(px.line(combined_df, x='Date', y='Net_Profit', title="Net Profit Over Time", color_discrete_sequence=["green"]), use_container_width=True)
 
-# -------------------- SALESPEOPLE LEADERBOARD --------------------
+# -------------------------------
+# SALESPEOPLE LEADERBOARD
+# -------------------------------
 st.header("🏆 Salespeople Performance")
 if not dist_df.empty and not sp_df.empty:
     dist_merged = dist_df.merge(sp_df, left_on="sales_person_id", right_on="id")
     dist_merged['Total_Value'] = dist_merged['quantity'] * dist_merged['price_per_unit']
 
-    # By Total Value (Top 10)
+    # Top 10 by Total Value
     sp_summary_value = dist_merged.groupby("full_name")['Total_Value'].sum().reset_index().sort_values("Total_Value", ascending=False).head(10)
     st.subheader("Top 10 by Total Sales Value")
     st.dataframe(sp_summary_value)
     st.plotly_chart(px.bar(sp_summary_value, x="full_name", y="Total_Value", title="Top 10 Salespeople by Total Value"), use_container_width=True)
 
-    # By Quantity Sold (Top 10)
+    # Top 10 by Quantity Sold
     sp_summary_qty = dist_merged.groupby("full_name")['quantity'].sum().reset_index().sort_values("quantity", ascending=False).head(10)
     st.subheader("Top 10 by Quantity Sold")
     st.dataframe(sp_summary_qty)
     st.plotly_chart(px.bar(sp_summary_qty, x="full_name", y="quantity", title="Top 10 Salespeople by Quantity Sold", color="full_name"), use_container_width=True)
 
-# -------------------- SHOP & DISTRIBUTION LEADERBOARD --------------------
+# -------------------------------
+# SHOP & DISTRIBUTION LEADERBOARD
+# -------------------------------
 st.header("🏪 Shop & Distribution Performance")
 if not dist_df.empty and not sales_df.empty and not sp_df.empty:
     merged_shop = dist_df.merge(sales_df, left_on="sale_id", right_on="id")
@@ -251,13 +272,17 @@ if not dist_df.empty and not sales_df.empty and not sp_df.empty:
     st.dataframe(dist_shop_sp)
     st.plotly_chart(px.bar(dist_shop_sp, x="Name", y="quantity", color="full_name", title="Shop Distribution by Salesperson"), use_container_width=True)
 
-# -------------------- EXPENSES BY CATEGORY --------------------
+# -------------------------------
+# EXPENSES BY CATEGORY
+# -------------------------------
 st.subheader("💼 Expenses by Category")
 if not expenses_df.empty:
     category_summary = expenses_df.groupby("category")['amount'].sum().reset_index()
     st.plotly_chart(px.pie(category_summary, names="category", values="amount", title="Expenses by Category"), use_container_width=True)
 
-# -------------------- EXPORT DATA --------------------
+# -------------------------------
+# EXPORT DATA
+# -------------------------------
 st.subheader("📁 Export Data")
 if st.button("Export Sales to CSV"):
     csv_buffer = io.StringIO()
