@@ -34,20 +34,28 @@ def save_sale(record: dict):
     }
 
     response = supabase.table("SALES").insert(sale_data).execute()
-    if response.error:
-        st.error(f"Error saving sale: {response.error.message}")
+    error = getattr(response, "error", None)
+    if error:
+        st.error(f"Error saving sale: {error}")
         return None
-    return record["id"]  # Return ID for linking to distribution
+
+    data = getattr(response, "data", [])
+    return record["id"] if data else None  # Return ID for linking to distribution
 
 def get_sales_summary():
     """Fetch all sales from Supabase"""
     response = supabase.table("SALES").select("*").execute()
-    return response.data if response.data else []
+    error = getattr(response, "error", None)
+    if error:
+        st.error(f"Error fetching sales: {error}")
+        return []
+    return getattr(response, "data", []) or []
 
 # -------------------------------
 # EXPENSE FUNCTIONS
 # -------------------------------
 def save_expense(record: dict):
+    """Save an expense to the EXPENSES table"""
     expense_data = {
         "date": record["date"],
         "category": record["category"],
@@ -59,13 +67,18 @@ def save_expense(record: dict):
         "status": record["status"],
     }
     response = supabase.table("EXPENSES").insert(expense_data).execute()
-    if response.error:
-        st.error(f"Error saving expense: {response.error.message}")
+    error = getattr(response, "error", None)
+    if error:
+        st.error(f"Error saving expense: {error}")
 
 def get_expenses_summary():
     """Fetch all expenses from Supabase"""
     response = supabase.table("EXPENSES").select("*").execute()
-    return response.data if response.data else []
+    error = getattr(response, "error", None)
+    if error:
+        st.error(f"Error fetching expenses: {error}")
+        return []
+    return getattr(response, "data", []) or []
 
 # -------------------------------
 # SALESPEOPLE FUNCTIONS
@@ -73,7 +86,11 @@ def get_expenses_summary():
 def get_sales_people():
     """Fetch all salespeople"""
     response = supabase.table("SALES_PEOPLE").select("*").execute()
-    return response.data if response.data else []
+    error = getattr(response, "error", None)
+    if error:
+        st.error(f"Error fetching salespeople: {error}")
+        return []
+    return getattr(response, "data", []) or []
 
 def save_sales_person(full_name: str, phone: str, role: str, location: str, status: str, commission_rate=None, notes=None):
     """Save a new salesperson to Supabase"""
@@ -87,35 +104,27 @@ def save_sales_person(full_name: str, phone: str, role: str, location: str, stat
         "notes": notes
     }
     response = supabase.table("SALES_PEOPLE").insert(record).execute()
-    if response.error:
-        st.error(f"Error saving salesperson: {response.error.message}")
+    error = getattr(response, "error", None)
+    if error:
+        st.error(f"Error saving salesperson: {error}")
         return None
-    return response.data[0]["id"]  # Returns the generated UUID
+
+    data = getattr(response, "data", [])
+    return data[0]["id"] if data else None
 
 # -------------------------------
 # DISTRIBUTION FUNCTIONS
 # -------------------------------
 def save_distribution(record: dict):
-    """
-    Save a distribution record linking a sale to a salesperson
-    record = {
-        'sale_id': <sale_id>,
-        'sales_person_id': <sales_person_id>,
-        'quantity': <sold_quantity>,
-        'date': <date>,
-        'price_per_unit': <price_per_unit>
-    }
-    """
+    """Save a distribution record linking a sale to a salesperson"""
     record["id"] = str(uuid.uuid4())
     response = supabase.table("DISTRIBUTION").insert(record).execute()
-    if response.error:
-        st.error(f"Error saving distribution: {response.error.message}")
+    error = getattr(response, "error", None)
+    if error:
+        st.error(f"Error saving distribution: {error}")
 
 def get_distribution_data(start_date=None, end_date=None):
-    """
-    Fetch distribution data from Supabase, optionally filtered by date range
-    Returns a list of dicts
-    """
+    """Fetch distribution records with optional date filtering"""
     query = supabase.table("DISTRIBUTION").select("*")
     if start_date:
         query = query.gte("date", str(start_date))
@@ -123,12 +132,9 @@ def get_distribution_data(start_date=None, end_date=None):
         query = query.lte("date", str(end_date))
 
     response = query.execute()
-
-# Supabase APIResponse may have 'error' as dict or None
     error = getattr(response, "error", None)
     if error:
         st.error(f"Error fetching distribution data: {error}")
         return []
 
-    data = getattr(response, "data", [])
-    return data if data else []
+    return getattr(response, "data", []) or []
