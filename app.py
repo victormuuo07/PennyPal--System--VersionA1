@@ -345,7 +345,7 @@ if (isDarkMode) {
 # -------------------------------
 col1, col2 = st.columns([1, 5])
 with col1:
-    st.image("https://cdn-icons-png.flaticon.com/512/2917/2917633.png", width=80)
+    st.image("C:\Users\hp\Documents\BETARLUX DOCUMENTS\SpiseUp\spicyup.jpeg", width=80)
 with col2:
     st.markdown('<h1 class="main-header">🌶️ SpiseUp Field & Finance Tracker</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Track sales, expenses, salespeople, distribution, and net profit in real-time!</p>', unsafe_allow_html=True)
@@ -1220,12 +1220,12 @@ with tab5:
             st.markdown("### 🏆 Salespeople Performance Leaderboard")
             
             dist_merged = dist_df.merge(sp_df, left_on="sales_person_id", right_on="id")
-            dist_merged['Total_Value'] = dist_merged['quantity'] * dist_merged['price_per_unit']
+            dist_merged['Total_Value'] = dist_merged['quantity_distributed'] * dist_merged['price_per_unit']
             
             # Top performers by value
             sp_summary_value = dist_merged.groupby("full_name").agg({
                 'Total_Value': 'sum',
-                'quantity': 'sum',
+                'quantity_distributed': 'sum',
                 'sales_person_id': 'count'
             }).reset_index()
             
