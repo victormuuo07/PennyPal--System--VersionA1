@@ -70,14 +70,23 @@ def get_sales_people():
     response = supabase.table("SALES_PEOPLE").select("*").execute()
     return response.data if response.data else []
 
-def save_sales_person(name: str):
-    """Add a new salesperson"""
+def save_sales_person(full_name: str, phone: str, role: str, location: str, status: str, commission_rate=None, notes=None):
+    """Save a new salesperson to Supabase"""
     record = {
-        "id": str(uuid.uuid4()),
-        "name": name
+        "full_name": full_name.strip(),
+        "phone": phone.strip(),
+        "role": role.strip(),
+        "location": location.strip(),
+        "status": status.strip(),
+        "commission_rate": commission_rate,
+        "notes": notes
     }
-    supabase.table("SALES_PEOPLE").insert(record).execute()
-    return record["id"]
+    response = supabase.table("SALES_PEOPLE").insert(record).execute()
+    if response.error:
+        st.error(f"Error saving salesperson: {response.error.message}")
+        return None
+    return response.data[0]["id"]  # Returns the generated UUID
+
 
 # -------------------------------
 # DISTRIBUTION FUNCTIONS
