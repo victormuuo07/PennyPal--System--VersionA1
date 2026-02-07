@@ -123,7 +123,12 @@ def get_distribution_data(start_date=None, end_date=None):
         query = query.lte("date", str(end_date))
 
     response = query.execute()
-    if response.error:
-        st.error(f"Error fetching distribution data: {response.error.message}")
+
+# Supabase APIResponse may have 'error' as dict or None
+    error = getattr(response, "error", None)
+    if error:
+        st.error(f"Error fetching distribution data: {error}")
         return []
-    return response.data if response.data else []
+
+    data = getattr(response, "data", [])
+    return data if data else []
