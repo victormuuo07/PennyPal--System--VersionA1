@@ -345,7 +345,7 @@ if (isDarkMode) {
 # -------------------------------
 col1, col2 = st.columns([1, 5])
 with col1:
-    st.image("C:\Users\hp\Documents\BETARLUX DOCUMENTS\SpiseUp\spicyup.jpeg", width=80)
+    st.image("spicyup.jpeg", width=80)
 with col2:
     st.markdown('<h1 class="main-header">🌶️ SpiseUp Field & Finance Tracker</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Track sales, expenses, salespeople, distribution, and net profit in real-time!</p>', unsafe_allow_html=True)
