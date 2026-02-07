@@ -1,15 +1,38 @@
 import streamlit as st
 from datetime import date
-from supabase_client import save_sale, save_expense, get_sales_summary, get_expenses_summary
 import pandas as pd
 import plotly.express as px
 import io
 
+# Supabase functions
+from supabase_client import (
+    save_sale,
+    save_expense,
+    save_distribution,
+    get_sales_summary,
+    get_expenses_summary,
+    get_sales_people,
+    save_sales_person
+)
+
 st.set_page_config(page_title="🌶️ SpiseUp Finance Tracker", layout="wide")
 st.title("🌶️ SpiseUp Field & Finance Tracker")
-st.write("Track sales, expenses, and net profit in real-time with analytics and CSV export!")
+st.write("Track sales, expenses, salespeople, distribution, and net profit in real-time!")
 
-# ---------- SALES FORM ----------
+# -------------------- SALESPEOPLE --------------------
+st.header("🧑‍💼 Salespeople Management")
+with st.form("sales_people_form"):
+    new_sales_person = st.text_input("Add New Salesperson")
+    add_sales_person = st.form_submit_button("➕ Add Salesperson")
+    if add_sales_person and new_sales_person.strip():
+        save_sales_person(new_sales_person.strip())
+        st.success(f"✅ Salesperson '{new_sales_person}' added!")
+
+# Fetch salespeople for dropdown
+sales_people = get_sales_people()
+sales_person_options = {p['name']: p['id'] for p in sales_people} if sales_people else {}
+
+# -------------------- SALES FORM --------------------
 st.header("💰 Record a Sale")
 with st.form("sales_form"):
     sale_date = st.date_input("Date", value=date.today())
@@ -20,6 +43,10 @@ with st.form("sales_form"):
     quantity = st.number_input("Quantity (sachets)", min_value=0, step=1)
     price = st.number_input("Price per sachet (KES)", min_value=0, step=1)
     payment_status = st.selectbox("Payment Status", ["Cash", "Credit / Pending"])
+    sales_person_name = st.selectbox(
+        "Sales Person",
+        list(sales_person_options.keys()) if sales_person_options else ["N/A"]
+    )
     feedback = st.text_area("Customer Feedback")
     follow_up = st.text_input("Follow-up Action")
     submitted_sale = st.form_submit_button("💾 Save Sale")
@@ -39,10 +66,20 @@ if submitted_sale:
         "Feedback": feedback,
         "Follow_Up": follow_up
     }
-    save_sale(sale_record)
-    st.success(f"✅ Sale saved! Total: KES {total}")
+    sale_id = save_sale(sale_record)
 
-# ---------- EXPENSE FORM ----------
+    if sales_person_options and sales_person_name != "N/A":
+        distribution_record = {
+            "sale_id": sale_id,
+            "sales_person_id": sales_person_options[sales_person_name],
+            "quantity": quantity,
+            "date": str(sale_date)
+        }
+        save_distribution(distribution_record)
+
+    st.success(f"✅ Sale saved! Total: KES {total} by {sales_person_name}")
+
+# -------------------- EXPENSE FORM --------------------
 st.header("💸 Record an Expense")
 with st.form("expense_form"):
     expense_date = st.date_input("Date", value=date.today(), key="exp_date")
@@ -68,18 +105,18 @@ if submitted_expense:
     save_expense(expense_record)
     st.success(f"✅ Expense saved! Amount: KES {amount}")
 
-# ---------- DASHBOARD ----------
+# -------------------- DASHBOARD --------------------
 st.header("📊 Finance Summary & Charts")
 
 # Fetch data
 sales_data = get_sales_summary()
 expense_data = get_expenses_summary()
 
-# Convert to DataFrames with proper column casing
-sales_df = pd.DataFrame(sales_data)
-expenses_df = pd.DataFrame(expense_data)
+# Convert to DataFrames safely
+sales_df = pd.DataFrame(sales_data) if sales_data else pd.DataFrame()
+expenses_df = pd.DataFrame(expense_data) if expense_data else pd.DataFrame()
 
-# Handle missing columns safely
+# Ensure necessary columns exist
 for col in ["Total", "Payment_Status"]:
     if col not in sales_df.columns:
         sales_df[col] = 0 if col == "Total" else ""
@@ -88,7 +125,7 @@ for col in ["amount", "category"]:
     if col not in expenses_df.columns:
         expenses_df[col] = 0 if col == "amount" else ""
 
-# Convert numeric columns
+# Convert numeric safely
 sales_df['Total'] = pd.to_numeric(sales_df['Total'], errors='coerce').fillna(0)
 expenses_df['amount'] = pd.to_numeric(expenses_df['amount'], errors='coerce').fillna(0)
 
@@ -109,7 +146,7 @@ col4.metric("Total Expenses (KES)", total_expenses)
 col5.metric("Net Profit (KES)", net_profit)
 col6.metric("Running Cash Balance (KES)", running_balance)
 
-# ---------- CHARTS ----------
+# -------------------- CHARTS --------------------
 st.subheader("📈 Visualizations")
 
 # Sales over time
@@ -135,7 +172,7 @@ if not sales_df_grouped.empty or not expenses_df_grouped.empty:
     fig_profit = px.line(combined_df, x='Date', y='Net_Profit', title="Net Profit Over Time", color_discrete_sequence=["green"])
     st.plotly_chart(fig_profit, use_container_width=True)
 
-# ---------- OVERDUE / CREDIT SALES ----------
+# -------------------- OVERDUE / CREDIT SALES --------------------
 if not sales_df.empty:
     st.subheader("⚠️ Credit / Pending Sales")
     pending_sales = sales_df[sales_df['Payment_Status'] != "Cash"]
@@ -144,14 +181,14 @@ if not sales_df.empty:
     else:
         st.info("No pending credit sales!")
 
-# ---------- EXPENSES BY CATEGORY ----------
+# -------------------- EXPENSES BY CATEGORY --------------------
 if not expenses_df.empty:
     st.subheader("💼 Expenses by Category")
     category_summary = expenses_df.groupby("category")['amount'].sum().reset_index()
     fig_category = px.pie(category_summary, names="category", values="amount", title="Expenses by Category")
     st.plotly_chart(fig_category, use_container_width=True)
 
-# ---------- EXPORT DATA ----------
+# -------------------- EXPORT DATA --------------------
 st.subheader("📁 Export Data")
 if st.button("Export Sales to CSV"):
     csv_buffer = io.StringIO()

@@ -1,8 +1,5 @@
 from supabase import create_client, Client
-import os
 import uuid
-from datetime import date
-import pandas as pd
 import streamlit as st
 
 # -------------------------------
@@ -18,11 +15,9 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # -------------------------------
 def save_sale(record: dict):
     """Save a sale to the SALES table"""
-    # Ensure ID for uniqueness
     if "id" not in record or not record["id"]:
         record["id"] = str(uuid.uuid4())
 
-    # Map fields to match Supabase table
     sale_data = {
         "Date": record.get("Date"),
         "Name": record.get("Name") or record.get("Shop_Name"),
@@ -32,11 +27,14 @@ def save_sale(record: dict):
         "Quantity": int(record.get("Quantity", 0)),
         "Price_per_Unit": int(record.get("Price_per_Unit", 0)),
         "Total": int(record.get("Total", 0)),
+        "Payment_Status": record.get("Payment_Status"),
         "Feedback": record.get("Feedback"),
         "Follow_Up": record.get("Follow_Up"),
         "id": record.get("id")
     }
+
     supabase.table("SALES").insert(sale_data).execute()
+    return record["id"]  # Return ID for linking to distribution
 
 def get_sales_summary():
     """Fetch all sales from Supabase"""
@@ -46,7 +44,7 @@ def get_sales_summary():
 # -------------------------------
 # EXPENSE FUNCTIONS
 # -------------------------------
-def save_expense(record):
+def save_expense(record: dict):
     expense_data = {
         "date": record["date"],
         "category": record["category"],
@@ -57,10 +55,42 @@ def save_expense(record):
         "receipt": record.get("receipt", ""),
         "status": record["status"],
     }
-
     supabase.table("EXPENSES").insert(expense_data).execute()
 
 def get_expenses_summary():
     """Fetch all expenses from Supabase"""
     response = supabase.table("EXPENSES").select("*").execute()
     return response.data if response.data else []
+
+# -------------------------------
+# SALESPEOPLE FUNCTIONS
+# -------------------------------
+def get_sales_people():
+    """Fetch all salespeople"""
+    response = supabase.table("SALES_PEOPLE").select("*").execute()
+    return response.data if response.data else []
+
+def save_sales_person(name: str):
+    """Add a new salesperson"""
+    record = {
+        "id": str(uuid.uuid4()),
+        "name": name
+    }
+    supabase.table("SALES_PEOPLE").insert(record).execute()
+    return record["id"]
+
+# -------------------------------
+# DISTRIBUTION FUNCTIONS
+# -------------------------------
+def save_distribution(record: dict):
+    """
+    Save a distribution record linking a sale to a salesperson
+    record = {
+        'sale_id': <sale_id>,
+        'sales_person_id': <sales_person_id>,
+        'quantity': <sold_quantity>,
+        'date': <date>
+    }
+    """
+    record["id"] = str(uuid.uuid4())
+    supabase.table("DISTRIBUTION").insert(record).execute()
