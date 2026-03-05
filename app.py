@@ -463,7 +463,7 @@ if st.sidebar.button("Check Database Structure"):
 # -------------------------------
 # FETCH & PREPARE DATA
 # -------------------------------
-@st.cache_data(ttl=300)  # Cache for 5 minutes
+@st.cache_data(ttl=0)  # Cache for 5 minutes
 def load_data(start_date, end_date):
     sales_data = get_sales_summary()
     expense_data = get_expenses_summary()
