@@ -463,11 +463,15 @@ if st.sidebar.button("Check Database Structure"):
 # -------------------------------
 # FETCH & PREPARE DATA
 # -------------------------------
-@st.cache_data(ttl=0)  # Cache for 5 minutes
-def load_data(start_date, end_date):
+# -------------------------------
+# FETCH & PREPARE DATA (FIXED VERSION)
+# -------------------------------
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def fetch_raw_data():
+    """Fetch raw data without filtering - cache this only"""
     sales_data = get_sales_summary()
     expense_data = get_expenses_summary()
-    distribution_data = get_distribution_data(start_date, end_date)
+    distribution_data = get_distribution_data()  # Fetch all, filter later
     sales_people_data = get_sales_people()
     
     # Convert to DataFrames
@@ -476,33 +480,83 @@ def load_data(start_date, end_date):
     dist_df = pd.DataFrame(distribution_data) if distribution_data else pd.DataFrame()
     sp_df = pd.DataFrame(sales_people_data) if sales_people_data else pd.DataFrame()
     
-    # Date filtering
-    if not sales_df.empty:
-        sales_df['Date'] = pd.to_datetime(sales_df['Date'])
-        sales_df = sales_df[(sales_df['Date'] >= pd.to_datetime(start_date)) & 
-                           (sales_df['Date'] <= pd.to_datetime(end_date))]
-    if not expenses_df.empty:
-        expenses_df['date'] = pd.to_datetime(expenses_df['date'])
-        expenses_df = expenses_df[(expenses_df['date'] >= pd.to_datetime(start_date)) & 
-                                 (expenses_df['date'] <= pd.to_datetime(end_date))]
-    if not dist_df.empty:
-        dist_df['date'] = pd.to_datetime(dist_df['date'])
-        dist_df = dist_df[(dist_df['date'] >= pd.to_datetime(start_date)) & 
-                         (dist_df['date'] <= pd.to_datetime(end_date))]
-    
-    # Convert numeric safely
-    if not sales_df.empty:
-        sales_df['Total'] = pd.to_numeric(sales_df['Total'], errors='coerce').fillna(0)
-        sales_df['Quantity'] = pd.to_numeric(sales_df['Quantity'], errors='coerce').fillna(0)
-        sales_df['Price_per_Unit'] = pd.to_numeric(sales_df['Price_per_Unit'], errors='coerce').fillna(0)
-    
-    if not expenses_df.empty:
-        expenses_df['amount'] = pd.to_numeric(expenses_df['amount'], errors='coerce').fillna(0)
+    # Debug: Show raw counts
+    if DEBUG_MODE:
+        st.sidebar.write(f"📊 RAW DATA COUNTS:")
+        st.sidebar.write(f"- Sales in DB: {len(sales_df)}")
+        st.sidebar.write(f"- Expenses in DB: {len(expenses_df)}")
+        st.sidebar.write(f"- Distributions in DB: {len(dist_df)}")
+        st.sidebar.write(f"- Salespeople: {len(sp_df)}")
     
     return sales_df, expenses_df, dist_df, sp_df
 
-# Load data
-sales_df, expenses_df, dist_df, sp_df = load_data(start_date, end_date)
+# Fetch raw data (cached)
+raw_sales_df, raw_expenses_df, raw_dist_df, raw_sp_df = fetch_raw_data()
+
+# -------------------------------
+# APPLY DATE FILTERS (outside cache)
+# -------------------------------
+def filter_by_date(df, date_column, start_date, end_date):
+    """Safely filter dataframe by date range"""
+    if df.empty or date_column not in df.columns:
+        return df
+    
+    try:
+        # Ensure datetime conversion
+        df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+        df = df.dropna(subset=[date_column])
+        
+        # Convert filter dates to datetime
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+        
+        # Filter
+        mask = (df[date_column] >= start_dt) & (df[date_column] <= end_dt)
+        filtered = df[mask].copy()
+        
+        if DEBUG_MODE and len(df) > 0 and len(filtered) == 0:
+            st.sidebar.warning(f"⚠️ No data in selected range!")
+            st.sidebar.write(f"Data range: {df[date_column].min().date()} to {df[date_column].max().date()}")
+            st.sidebar.write(f"Selected: {start_dt.date()} to {end_dt.date()}")
+        
+        return filtered
+    except Exception as e:
+        if DEBUG_MODE:
+            st.sidebar.error(f"Filter error: {e}")
+        return df
+
+# Apply filters
+sales_df = filter_by_date(raw_sales_df.copy(), 'Date', start_date, end_date)
+expenses_df = filter_by_date(raw_expenses_df.copy(), 'date', start_date, end_date)
+dist_df = filter_by_date(raw_dist_df.copy(), 'date', start_date, end_date)
+sp_df = raw_sp_df.copy()  # No date filter for salespeople
+
+# Convert numeric safely
+if not sales_df.empty:
+    for col in ['Total', 'Quantity', 'Price_per_Unit']:
+        if col in sales_df.columns:
+            sales_df[col] = pd.to_numeric(sales_df[col], errors='coerce').fillna(0)
+
+if not expenses_df.empty and 'amount' in expenses_df.columns:
+    expenses_df['amount'] = pd.to_numeric(expenses_df['amount'], errors='coerce').fillna(0)
+
+# Debug: Show filtered counts
+if DEBUG_MODE:
+    with st.sidebar.expander("📊 Filtered Data Debug", expanded=False):
+        st.write(f"**FILTERED DATA:**")
+        st.write(f"- Sales: {len(sales_df)} of {len(raw_sales_df)}")
+        st.write(f"- Expenses: {len(expenses_df)} of {len(raw_expenses_df)}")
+        st.write(f"- Distributions: {len(dist_df)} of {len(raw_dist_df)}")
+        
+        if not sales_df.empty:
+            st.write(f"**Sales Date Range:**")
+            st.write(f"Min: {sales_df['Date'].min().date()}")
+            st.write(f"Max: {sales_df['Date'].max().date()}")
+        
+        st.write(f"**Current Filter:**")
+        st.write(f"Mode: {filter_mode}")
+        st.write(f"Start: {start_date}")
+        st.write(f"End: {end_date}")
 
 # -------------------------------
 # CALCULATE KPIs
@@ -781,24 +835,28 @@ with tab2:
     
     with col2:
         clear_form = st.button("🗑️ Clear Form", use_container_width=True)
+
+       # ⬇️⬇️⬇️ CLEAR FORM LOGIC  ⬇️⬇️⬇️  
+
+    if clear_form:
+        # Clear session state
+        for key in ['shop_name', 'phone', 'location', 'product', 
+                    'quantity', 'price', 'payment_status', 
+                    'sales_person_name', 'feedback', 'follow_up']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.success("✅ Form cleared!")
+        st.rerun()
     
     if submitted_sale:
-        if DEBUG_MODE:
-            st.write("🔍 **DEBUG MODE ACTIVE**")
-            st.write("Form data received:")
-            st.write(f"- Shop Name: {shop_name}")
-            st.write(f"- Quantity: {quantity}")
-            st.write(f"- Price: {price}")
-            st.write(f"- Salesperson: {sales_person_name}")
-            st.write(f"- Salesperson Options: {list(sales_person_options.keys())[:3]}...")
-    
-    if not shop_name.strip():
-        st.error("Please enter a Shop/Contact Name!")
-    elif sales_person_name == "Select...":
-        st.error("Please select a salesperson!")
-    else:
-        total = quantity * price
-        sale_record = {
+    # ALL validation MUST be INSIDE this if block
+        if not shop_name.strip():
+            st.error("Please enter a Shop/Contact Name!")
+        elif sales_person_name == "Select...":
+            st.error("Please select a salesperson!")
+        else:
+            total = quantity * price
+            sale_record = {
             "Date": str(sale_date),
             "Name": shop_name,
             "Phone": phone,
@@ -813,6 +871,12 @@ with tab2:
         }
         
         if DEBUG_MODE:
+            st.write("🔍 **DEBUG MODE ACTIVE**")
+            st.write("Form data received:")
+            st.write(f"- Shop Name: {shop_name}")
+            st.write(f"- Quantity: {quantity}")
+            st.write(f"- Price: {price}")
+            st.write(f"- Salesperson: {sales_person_name}")
             st.write("🔍 Sale record to save:", sale_record)
         
         # Save the sale first
@@ -853,7 +917,7 @@ with tab2:
                     
                     if success:
                         st.info(f"👤 Successfully assigned to: **{sales_person_name}**")
-                        st.balloons()  # Celebration!
+                        st.balloons()
                     else:
                         st.warning(f"⚠️ Sale saved but could not assign to {sales_person_name}.")
                         
