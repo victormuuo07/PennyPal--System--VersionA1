@@ -466,7 +466,7 @@ if st.sidebar.button("Check Database Structure"):
 # -------------------------------
 # FETCH & PREPARE DATA (FIXED VERSION)
 # -------------------------------
-@st.cache_data(ttl=300)  # Cache for 5 minutes
+@st.cache_data(ttl=0)  # Cache for 5 minutes
 def fetch_raw_data():
     """Fetch raw data without filtering - cache this only"""
     sales_data = get_sales_summary()
