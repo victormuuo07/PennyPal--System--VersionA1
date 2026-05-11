@@ -6,7 +6,17 @@ import plotly.graph_objects as go
 import io
 import numpy as np
 from dateutil.relativedelta import relativedelta
+import time
 
+# Auto-refresh every 30 seconds
+if 'last_refresh' not in st.session_state:
+    st.session_state.last_refresh = datetime.now()
+
+# Check if 30 seconds have passed
+time_since_refresh = (datetime.now() - st.session_state.last_refresh).total_seconds()
+if time_since_refresh > 30:  # Refresh every 30 seconds
+    st.session_state.last_refresh = datetime.now()
+    st.rerun()
 
 
 # Supabase functions
