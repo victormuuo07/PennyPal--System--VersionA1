@@ -421,7 +421,7 @@ with st.sidebar:
     # Product filter
     product_filter = st.multiselect(
         "Product:",
-        ["All", "SpiseUp Chilli Sachet", "Other"],
+        ["All", "SpiseUp Chilli Sachet", "Spiseup Spicy salt Bottle", "Other"],
         default=["All"]
     )
     
