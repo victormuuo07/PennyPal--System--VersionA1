@@ -1336,43 +1336,45 @@ with tab5:
             
             merged_shop = dist_df.merge(sales_df, left_on="sale_id", right_on="id")
             merged_shop = merged_shop.merge(sp_df, left_on="sales_person_id", right_on="id")
+
+            if DEBUG_MODE:
+                st.write("Available columns in merged_shop:", list(merged_shop.columns))
             
             shop_summary = merged_shop.groupby("Name").agg(
-                total_quantity=pd.NamedAgg(column="quantity", aggfunc="sum"),
-                total_value=pd.NamedAgg(column="price_per_unit", 
-                                      aggfunc=lambda x: (merged_shop.loc[x.index, 'quantity'] * x).sum()),
-                num_visits=pd.NamedAgg(column="sale_id", aggfunc="nunique"),
-                avg_order_value=pd.NamedAgg(column="Total", aggfunc="mean")
-            ).reset_index()
+        total_quantity=pd.NamedAgg(column="quantity_distributed", aggfunc="sum"),  # Fixed
+        total_value=pd.NamedAgg(column="unit_price", aggfunc=lambda x: (merged_shop.loc[x.index, 'quantity_distributed'] * x).sum()),  # Fixed
+        num_visits=pd.NamedAgg(column="sale_id", aggfunc="nunique"),
+        avg_order_value=pd.NamedAgg(column="Total", aggfunc="mean")
+    ).reset_index()
             
             shop_summary.columns = ['Shop Name', 'Total Quantity', 'Total Revenue', 'Number of Visits', 'Average Order Value']
             shop_summary = shop_summary.sort_values('Total Revenue', ascending=False)
             
             # Display top shops
             st.dataframe(
-                shop_summary.head(15),
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Shop Name": st.column_config.TextColumn("Shop"),
-                    "Total Revenue": st.column_config.NumberColumn("Revenue", format="KES %d"),
-                    "Total Quantity": st.column_config.NumberColumn("Qty", format="%d"),
-                    "Number of Visits": st.column_config.NumberColumn("Visits", format="%d"),
-                    "Average Order Value": st.column_config.NumberColumn("Avg Order", format="KES %d")
-                }
-            )
-            
-            # Shop performance visualization
+        shop_summary.head(15),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Shop Name": st.column_config.TextColumn("Shop"),
+            "Total Revenue": st.column_config.NumberColumn("Revenue", format="KES %d"),
+            "Total Quantity": st.column_config.NumberColumn("Qty", format="%d"),
+            "Number of Visits": st.column_config.NumberColumn("Visits", format="%d"),
+            "Average Order Value": st.column_config.NumberColumn("Avg Order", format="KES %d")
+        }
+    )
+    
+    # Shop performance visualization
             fig = px.scatter(shop_summary.head(20), 
-                           x='Number of Visits', 
-                           y='Total Revenue',
-                           size='Average Order Value',
-                           color='Total Quantity',
-                           hover_name='Shop Name',
-                           title='Shop Performance: Visits vs Revenue',
-                           labels={'Number of Visits': 'Number of Visits', 'Total Revenue': 'Total Revenue (KES)'},
-                           color_continuous_scale='Rainbow')
-            st.plotly_chart(fig, use_container_width=True)
+                   x='Number of Visits', 
+                   y='Total Revenue',
+                   size='Average Order Value',
+                   color='Total Quantity',
+                   hover_name='Shop Name',
+                   title='Shop Performance: Visits vs Revenue',
+                   labels={'Number of Visits': 'Number of Visits', 'Total Revenue': 'Total Revenue (KES)'},
+                   color_continuous_scale='Rainbow')
+        st.plotly_chart(fig, use_container_width=True)
     
     with analytics_tab2:
         st.markdown("### 📊 Distribution Channel Analysis")
