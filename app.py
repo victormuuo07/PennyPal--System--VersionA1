@@ -912,7 +912,7 @@ with tab5:
                 else:
                     st.success("✅ Sales data quality check passed!")
                     
-    with analytics_tab5:  # Add as 4th tab or replace existing
+    with analytics_tab5:
         st.markdown("### 🦈 Shark Tank-Style Business Intelligence")
     
         if not sales_df.empty:
@@ -922,12 +922,22 @@ with tab5:
         # ============================================
             st.markdown("#### 📊 Customer Cohort Analysis")
         
-        # Create cohort data
-            sales_df['CohortMonth'] = sales_df.groupby('Name')['Date'].transform('min').dt.to_period('M')
-            sales_df['OrderMonth'] = sales_df['Date'].dt.to_period('M')
-            sales_df['CohortIndex'] = (sales_df['OrderMonth'].dt.year - sales_df['CohortMonth'].dt.year) * 12 + (sales_df['OrderMonth'].dt.month - sales_df['CohortMonth'].dt.month)
+        # Create cohort data - FIXED Period serialization issue
+            sales_df_copy = sales_df.copy()
+            sales_df_copy['CohortMonth'] = sales_df_copy.groupby('Name')['Date'].transform('min').dt.strftime('%Y-%m')
+            sales_df_copy['OrderMonth'] = sales_df_copy['Date'].dt.strftime('%Y-%m')
         
-            cohort_data = sales_df.groupby(['CohortMonth', 'CohortIndex']).agg(
+        # Calculate months difference
+            def get_month_diff(order_month, cohort_month):
+                y1, m1 = map(int, order_month.split('-'))
+                y2, m2 = map(int, cohort_month.split('-'))
+                return (y1 - y2) * 12 + (m1 - m2)
+        
+            sales_df_copy['CohortIndex'] = sales_df_copy.apply(
+            lambda x: get_month_diff(x['OrderMonth'], x['CohortMonth']), axis=1
+        )
+        
+            cohort_data = sales_df_copy.groupby(['CohortMonth', 'CohortIndex']).agg(
             unique_customers=pd.NamedAgg(column='Name', aggfunc='nunique'),
             total_revenue=pd.NamedAgg(column='Total', aggfunc='sum')
         ).reset_index()
@@ -935,10 +945,18 @@ with tab5:
             cohort_pivot = cohort_data.pivot(index='CohortMonth', columns='CohortIndex', values='unique_customers')
         
             if not cohort_pivot.empty:
-                fig = px.imshow(cohort_pivot, 
+            # Convert to string for display
+                cohort_pivot_display = cohort_pivot.copy()
+                cohort_pivot_display.index = cohort_pivot_display.index.astype(str)
+                cohort_pivot_display.columns = cohort_pivot_display.columns.astype(str)
+            
+                fig = px.imshow(cohort_pivot_display.values, 
                            title='Customer Retention Heatmap (Cohort Analysis)',
                            labels=dict(x="Months since first purchase", y="Cohort Month", color="Customers"),
-                           color_continuous_scale='RdBu')
+                           color_continuous_scale='RdBu',
+                           x=cohort_pivot_display.columns.astype(str),
+                           y=cohort_pivot_display.index.astype(str))
+                fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
                 st.caption("💡 **Insight:** Shows how many customers return month after month")
         
@@ -956,7 +974,7 @@ with tab5:
         ).reset_index()
         
             customer_ltv['days_active'] = (customer_ltv['last_purchase'] - customer_ltv['first_purchase']).dt.days
-            customer_ltv['purchase_frequency'] = customer_ltv['order_count'] / (customer_ltv['days_active'] / 30)
+            customer_ltv['purchase_frequency'] = customer_ltv['order_count'] / ((customer_ltv['days_active'] + 1) / 30)
         
         # Segment customers
             customer_ltv['Segment'] = pd.cut(customer_ltv['total_spent'], 
@@ -978,7 +996,7 @@ with tab5:
                           title='Customer Lifetime Value Distribution',
                           labels={'total_spent': 'Total Spent (KES)', 'count': 'Number of Customers'},
                           color_discrete_sequence=['#36B37E'])
-            fig.update_layout(bargap=0.1)
+            fig.update_layout(bargap=0.1, height=400)
             st.plotly_chart(fig, use_container_width=True)
         
         # ============================================
@@ -986,26 +1004,20 @@ with tab5:
         # ============================================
             st.markdown("#### 🎯 RFM Analysis (Best Customers)")
         
-        # Calculate RFM scores
             current_date = sales_df['Date'].max()
             rfm = sales_df.groupby('Name').agg({
-            'Date': lambda x: (current_date - x.max()).days,  # Recency
-            'Total': 'count',  # Frequency
-            'Total': 'sum'  # Monetary
-        }).rename(columns={'Date': 'Recency', 'Total': 'Frequency', 'Total': 'Monetary'})
+            'Date': lambda x: (current_date - x.max()).days,
+            'Total': ['count', 'sum']
+        })
+            rfm.columns = ['Recency', 'Frequency', 'Monetary']
+            rfm = rfm.reset_index()
         
-        # Create RFM segments
-            rfm['R_Score'] = pd.qcut(rfm['Recency'], 4, labels=['4', '3', '2', '1'])
-            rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 4, labels=['1', '2', '3', '4'])
-            rfm['M_Score'] = pd.qcut(rfm['Monetary'], 4, labels=['1', '2', '3', '4'])
-            rfm['RFM_Score'] = rfm['R_Score'].astype(str) + rfm['F_Score'].astype(str) + rfm['M_Score'].astype(str)
-        
-        # Top customers
-            st.subheader("🏆 Top 10 Customers (By RFM Score)")
-            top_customers = rfm.nlargest(10, 'Monetary')[['Recency', 'Frequency', 'Monetary']]
+        # Top customers by Monetary
+            st.subheader("🏆 Top 10 Customers (By Total Spend)")
+            top_customers = rfm.nlargest(10, 'Monetary')[['Name', 'Recency', 'Frequency', 'Monetary']]
             top_customers['Monetary'] = top_customers['Monetary'].apply(lambda x: f"KES {x:,.0f}")
             top_customers['Recency'] = top_customers['Recency'].apply(lambda x: f"{x} days ago")
-            st.dataframe(top_customers, use_container_width=True)
+            st.dataframe(top_customers, use_container_width=True, hide_index=True)
         
         # ============================================
         # 4. PRODUCT PERFORMANCE & MARGIN ANALYSIS
@@ -1025,63 +1037,42 @@ with tab5:
                 sales_df['Margin'] = sales_df['Total'] - (sales_df['Quantity'] * sales_df['Cost'])
                 sales_df['Margin_Percentage'] = (sales_df['Margin'] / sales_df['Total']) * 100
             
-            product_margin = sales_df.groupby('Product_Type').agg({
+                product_margin = sales_df.groupby('Product_Type').agg({
                 'Total': 'sum',
                 'Margin': 'sum',
                 'Quantity': 'sum'
             }).reset_index()
             
-            product_margin['Margin_Percentage'] = (product_margin['Margin'] / product_margin['Total']) * 100
+                product_margin['Margin_Percentage'] = (product_margin['Margin'] / product_margin['Total']) * 100
             
-            col1, col2 = st.columns(2)
+                col1, col2 = st.columns(2)
             
-            with col1:
-                fig = px.bar(product_margin, x='Product_Type', y='Total', 
+                with col1:
+                    fig = px.bar(product_margin, x='Product_Type', y='Total', 
                             title='Revenue by Product',
                             color='Margin_Percentage',
                             color_continuous_scale='RdYlGn',
                             text='Total')
-                fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
-                st.plotly_chart(fig, use_container_width=True)
+                    fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
             
-            with col2:
-                fig = px.bar(product_margin, x='Product_Type', y='Margin_Percentage',
+                with col2:
+                    fig = px.bar(product_margin, x='Product_Type', y='Margin_Percentage',
                             title='Gross Margin % by Product',
                             color='Margin_Percentage',
                             color_continuous_scale='RdYlGn',
                             range_y=[0, 100])
-                fig.add_hline(y=50, line_dash="dash", line_color="red", 
+                    fig.add_hline(y=50, line_dash="dash", line_color="red", 
                             annotation_text="Target 50%", annotation_position="bottom right")
-                st.plotly_chart(fig, use_container_width=True)
-        
-        # ============================================
-        # 5. PRICE ELASTICITY & OPTIMIZATION
-        # ============================================
-            st.markdown("#### 📈 Price Elasticity & Optimization")
-        
-            if 'Price_per_Unit' in sales_df.columns and 'Product_Type' in sales_df.columns:
-                price_elasticity = sales_df.groupby(['Product_Type', 'Price_per_Unit']).agg({
-                'Quantity': 'sum',
-                'Total': 'sum'
-            }).reset_index()
-            
-            for product in price_elasticity['Product_Type'].unique():
-                product_data = price_elasticity[price_elasticity['Product_Type'] == product]
-                if len(product_data) > 1:
-                    fig = px.scatter(product_data, x='Price_per_Unit', y='Quantity',
-                                    title=f'Price vs Quantity - {product}',
-                                    size='Total', 
-                                    text='Price_per_Unit',
-                                    trendline='ols')
-                    fig.update_traces(textposition='top center')
+                    fig.update_layout(height=400)
                     st.plotly_chart(fig, use_container_width=True)
         
         # ============================================
-        # 6. SEASONALITY & FORECASTING
+        # 5. SEASONALITY & FORECASTING
         # ============================================
             st.markdown("#### 📅 Seasonality & Forecasting")
         
-        # Weekly patterns
             sales_df['Week'] = sales_df['Date'].dt.isocalendar().week
             sales_df['Month'] = sales_df['Date'].dt.month_name()
             sales_df['Quarter'] = sales_df['Date'].dt.quarter
@@ -1096,6 +1087,7 @@ with tab5:
                 fig = px.bar(monthly_sales, x='Month', y='Total', 
                         title='Seasonal Pattern - Monthly Sales',
                         color='Total', color_continuous_scale='Viridis')
+                fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
         
             with col2:
@@ -1104,84 +1096,44 @@ with tab5:
                          title='Quarterly Growth Trend',
                          markers=True, line_shape='spline')
                 fig.update_traces(line=dict(color='#FF9800', width=3))
+                fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
         
-        # Simple forecast
+        # Simple forecast (without sklearn to avoid dependency issues)
             if len(sales_df) > 30:
                 from sklearn.linear_model import LinearRegression
-                daily_sales = sales_df.groupby('Date')['Total'].sum().reset_index()
-                daily_sales['Days'] = (daily_sales['Date'] - daily_sales['Date'].min()).dt.days
-            
-                X = daily_sales['Days'].values.reshape(-1, 1)
-                y = daily_sales['Total'].values
-            
-                model = LinearRegression()
-                model.fit(X, y)
-            
-                future_days = np.array(range(X[-1][0] + 1, X[-1][0] + 31)).reshape(-1, 1)
-                predictions = model.predict(future_days)
-            
-                st.subheader("🔮 30-Day Sales Forecast")
-                st.metric("Projected Next 30 Days", f"KES {predictions.sum():,.0f}")
-            
-                forecast_df = pd.DataFrame({
-                'Date': pd.date_range(start=daily_sales['Date'].max() + timedelta(days=1), periods=30),
-                'Forecast': predictions
-            })
-            
-                fig = px.line(forecast_df, x='Date', y='Forecast', 
-                         title='Sales Forecast - Next 30 Days',
-                         markers=True)
-                fig.update_traces(line=dict(color='#4CAF50', width=3))
-                st.plotly_chart(fig, use_container_width=True)
+            try:
+                    daily_sales = sales_df.groupby('Date')['Total'].sum().reset_index()
+                    daily_sales['Days'] = (daily_sales['Date'] - daily_sales['Date'].min()).dt.days
+                
+                    X = daily_sales['Days'].values.reshape(-1, 1)
+                    y = daily_sales['Total'].values
+                
+                    model = LinearRegression()
+                    model.fit(X, y)
+                
+                    future_days = np.array(range(X[-1][0] + 1, X[-1][0] + 31)).reshape(-1, 1)
+                    predictions = model.predict(future_days)
+                
+                    st.subheader("🔮 30-Day Sales Forecast")
+                    st.metric("Projected Next 30 Days", f"KES {predictions.sum():,.0f}")
+                
+                    forecast_df = pd.DataFrame({
+                    'Date': pd.date_range(start=daily_sales['Date'].max() + timedelta(days=1), periods=30),
+                    'Forecast': predictions
+                })
+                
+                    fig = px.line(forecast_df, x='Date', y='Forecast', 
+                             title='Sales Forecast - Next 30 Days',
+                             markers=True)
+                    fig.update_traces(line=dict(color='#4CAF50', width=3))
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                    st.info(f"Forecast not available: {str(e)}")
         
         # ============================================
-        # 7. BREAK-EVEN ANALYSIS
-        # ============================================
-            st.markdown("#### ⚖️ Break-Even Analysis")
-        
-            total_fixed_costs = st.number_input("Monthly Fixed Costs (KES)", value=50000, step=10000)
-            avg_margin = (sales_df['Margin'].mean() if 'Margin' in sales_df.columns else 0.3)
-        
-            break_even_revenue = total_fixed_costs / (avg_margin / 100) if avg_margin > 0 else 0
-        
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Break-Even Revenue", f"KES {break_even_revenue:,.0f}")
-                st.caption(f"Based on average margin of {avg_margin:.1f}%")
-        
-            with col2:
-                current_revenue = kpis['total_sales']
-                revenue_gap = break_even_revenue - current_revenue
-                if revenue_gap > 0:
-                    st.metric("Revenue Gap to Break-Even", f"KES {revenue_gap:,.0f}", delta="Need more", delta_color="inverse")
-                else:
-                    st.metric("Above Break-Even", f"KES {abs(revenue_gap):,.0f}", delta="Profit Zone", delta_color="normal")
-        
-        # ============================================
-        # 8. CHURN RISK ANALYSIS
-        # ============================================
-            st.markdown("#### ⚠️ Customer Churn Risk")
-        
-        # Identify at-risk customers (haven't purchased in 30+ days)
-            last_purchase = sales_df.groupby('Name')['Date'].max().reset_index()
-            last_purchase['Days_Since'] = (current_date - last_purchase['Date']).dt.days
-            at_risk = last_purchase[last_purchase['Days_Since'] > 30]
-        
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("At-Risk Customers", len(at_risk), 
-                     delta=f"{len(at_risk)/len(last_purchase)*100:.0f}% of total" if len(last_purchase) > 0 else "0%")
-            with col2:
-                st.metric("Lost Revenue Risk", f"KES {at_risk['Days_Since'].sum() * 100:,.0f}")
-            with col3:
-                st.metric("Avg Days Inactive", f"{at_risk['Days_Since'].mean():.0f} days" if not at_risk.empty else "N/A")
-        
-            if not at_risk.empty:
-                st.dataframe(at_risk.head(10), use_container_width=True, hide_index=True)
-        
-        # ============================================
-        # 9. EXECUTIVE SUMMARY (Shark Tank Style)
+        # 6. EXECUTIVE SUMMARY (Shark Tank Style)
         # ============================================
             st.markdown("---")
             st.markdown("## 🎯 Executive Summary")
@@ -1190,10 +1142,23 @@ with tab5:
         
             with col1:
                 st.markdown("### 📈 Growth Metrics")
-                st.write(f"• **Revenue Growth:** {(sales_df['Total'].pct_change().mean() * 100):.1f}% per transaction")
-                st.write(f"• **Customer Retention:** {(customer_ltv[customer_ltv['order_count'] > 1].shape[0] / len(customer_ltv) * 100):.1f}% repeat rate")
+            # Calculate revenue growth
+                daily_sales_ordered = sales_df.sort_values('Date')
+                if len(daily_sales_ordered) > 1:
+                    recent_avg = daily_sales_ordered.tail(7)['Total'].mean() if len(daily_sales_ordered) >= 7 else daily_sales_ordered['Total'].mean()
+                    previous_avg = daily_sales_ordered.head(7)['Total'].mean() if len(daily_sales_ordered) >= 7 else daily_sales_ordered['Total'].mean()
+                    growth = ((recent_avg - previous_avg) / previous_avg * 100) if previous_avg > 0 else 0
+                    st.write(f"• **Revenue Growth:** {growth:.1f}% (last 7 days vs first 7 days)")
+                else:
+                    st.write(f"• **Revenue Growth:** N/A (need more data)")
+            
+                repeat_customers = len(customer_ltv[customer_ltv['order_count'] > 1]) if len(customer_ltv) > 0 else 0
+                st.write(f"• **Customer Retention:** {(repeat_customers / len(customer_ltv) * 100):.1f}% repeat rate" if len(customer_ltv) > 0 else "• **Customer Retention:** N/A")
                 st.write(f"• **Average Order Value:** KES {kpis['avg_sale_value']:,.0f}")
-                st.write(f"• **Best Performing Product:** {product_margin.loc[product_margin['Total'].idxmax(), 'Product_Type'] if 'Product_Margin' in dir() else 'N/A'}")
+            
+                if 'product_margin' in locals() and not product_margin.empty:
+                    best_product = product_margin.loc[product_margin['Total'].idxmax(), 'Product_Type']
+                    st.write(f"• **Best Performing Product:** {best_product}")
         
             with col2:
                 st.markdown("### 💎 Key Insights")
@@ -1202,14 +1167,24 @@ with tab5:
                 insights = []
                 if kpis['cash_percentage'] < 50:
                     insights.append("🔴 Too much credit - tighten payment terms")
-                if len(customer_ltv[customer_ltv['order_count'] == 1]) / len(customer_ltv) > 0.6:
+                if len(customer_ltv[customer_ltv['order_count'] == 1]) / len(customer_ltv) > 0.6 if len(customer_ltv) > 0 else False:
                     insights.append("🟡 Low customer retention - implement loyalty program")
-                if 'Margin_Percentage' in locals() and product_margin['Margin_Percentage'].min() < 20:
+                if 'Margin_Percentage' in locals() and not product_margin.empty and product_margin['Margin_Percentage'].min() < 20:
                     insights.append("🟠 Low margin on some products - review pricing")
-                insights.append(f"🟢 Most valuable segment: {customer_ltv['Segment'].mode().iloc[0] if not customer_ltv.empty else 'N/A'} customers")
+            
+                if len(customer_ltv) > 0:
+                    best_segment = customer_ltv['Segment'].mode().iloc[0] if not customer_ltv.empty else 'N/A'
+                    insights.append(f"🟢 Most valuable segment: {best_segment} customers")
+            
+                if kpis['total_sales'] > 0:
+                    insights.append(f"💰 Total revenue: KES {kpis['total_sales']:,.0f}")
+                    insights.append(f"📈 Net profit margin: {(kpis['net_profit']/kpis['total_sales']*100):.1f}%" if kpis['total_sales'] > 0 else "📈 Net profit margin: N/A")
             
                 for insight in insights[:4]:
-                    st.write(f"• {insight}")    
+                    st.write(f"• {insight}")
+    
+        else:
+            st.info("Not enough sales data for advanced analytics. Add some sales to see insights!")
 
 # Footer
 st.markdown("---")
