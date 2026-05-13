@@ -8,6 +8,7 @@ import numpy as np
 from dateutil.relativedelta import relativedelta
 import time
 import uuid
+from sklearn.linear_model import LinearRegression
 
 # Auto-refresh every 30 seconds
 if 'last_refresh' not in st.session_state:
@@ -698,11 +699,12 @@ with tab4:
 with tab5:
     st.markdown('<div class="section-header">📈 Advanced Analytics</div>', unsafe_allow_html=True)
     
-    analytics_tab1, analytics_tab2, analytics_tab3, analytics_tab4 = st.tabs([
+    analytics_tab1, analytics_tab2, analytics_tab3, analytics_tab4, analytics_tab5 = st.tabs([
         "🏆 Performance Leaderboards", 
         "📊 Distribution Insights", 
         "🏨 Hotel & Mama Mboga", 
-        "📁 Data Management"
+        "📁 Data Management",
+        "🦈 Shark Tank Analytics"
     ])
     
     with analytics_tab1:
