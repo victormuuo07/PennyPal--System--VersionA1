@@ -40,7 +40,13 @@ from supabase_client import (
     update_finished_goods,
     save_funding,
     get_funding,
-    get_total_funding
+    get_total_funding,
+    get_material_balance,
+    record_restock_with_transaction,
+    record_material_usage,
+    get_inventory_transactions,
+    get_material_usage_summary,
+    get_all_material_usage
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -1404,9 +1410,13 @@ with tab6:
                 
                 # Show material usage for this batch
                 usage_summary = get_material_usage_summary(batch_detail['id'])
-                if not usage_summary.empty:
-                    st.write("**Materials Used in this Batch:**")
-                    st.dataframe(usage_summary, use_container_width=True, hide_index=True)
+                try:
+                    usage_summary = get_material_usage_summary(batch_detail['id'])
+                    if not usage_summary.empty:
+                        st.write("**Materials Used in this Batch:**")
+                        st.dataframe(usage_summary, use_container_width=True, hide_index=True)
+                except Exception as e:
+                    st.write("No material usage data available for this batch")
                 
                 st.write("**Ingredients Used:**")
                 ing_data = {
