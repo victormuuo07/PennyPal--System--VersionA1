@@ -1388,63 +1388,100 @@ with tab5:
     
     with analytics_tab2:
         st.markdown("### 📊 Distribution Channel Analysis")
-        
+    
         if not dist_df.empty and not sp_df.empty:
-            # Sales by location
+            # Sales by location - FIXED: Check available columns
             dist_merged = dist_df.merge(sp_df, left_on="sales_person_id", right_on="id")
-            
-            # Location analysis
-            location_summary = dist_merged.groupby('location').agg({
-                'quantity': 'sum',
+        
+        # Debug: Show available columns
+            if DEBUG_MODE:
+                st.write("🔍 Available columns in dist_merged:", list(dist_merged.columns))
+        
+        # Check if 'location' column exists, if not, use 'Location' or create from sales data
+            location_col = None
+            for col in ['location', 'Location', 'city', 'region', 'area']:
+                if col in dist_merged.columns:
+                    location_col = col
+                    break
+        
+            if location_col:
+            # Location analysis using available column
+                location_summary = dist_merged.groupby(location_col).agg({
+                'quantity_distributed': 'sum',
                 'sales_person_id': 'nunique'
             }).reset_index()
             
-            location_summary.columns = ['Location', 'Total Quantity', 'Number of Salespeople']
+                location_summary.columns = ['Location', 'Total Quantity', 'Number of Salespeople']
             
-            col1, col2 = st.columns(2)
+                col1, col2 = st.columns(2)
             
-            with col1:
-                fig = px.treemap(location_summary, 
+                with col1:
+                    fig = px.treemap(location_summary, 
                                 path=['Location'], 
                                 values='Total Quantity',
                                 title='Sales Distribution by Location',
                                 color='Total Quantity',
                                 color_continuous_scale='RdBu')
-                st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True)
             
-            with col2:
+                with col2:
                 # Salesperson productivity
-                productivity = dist_merged.groupby(['full_name', 'location']).agg({
-                    'quantity': 'sum',
+                    productivity = dist_merged.groupby(['full_name', location_col]).agg({
+                    'quantity_distributed': 'sum',
                     'sales_person_id': 'count'
                 }).reset_index()
                 
-                fig = px.sunburst(productivity, 
-                                path=['location', 'full_name'], 
-                                values='quantity',
+                    fig = px.sunburst(productivity, 
+                                path=[location_col, 'full_name'], 
+                                values='quantity_distributed',
                                 title='Salesperson Contribution by Location',
-                                color='quantity',
+                                color='quantity_distributed',
                                 color_continuous_scale='IceFire')
-                st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("⚠️ No location column found in distribution data")
             
-            # Time-based analysis
-            st.markdown("### 📅 Time-Based Analysis")
+            # Alternative: Show salesperson productivity without location
+            st.subheader("Salesperson Productivity")
+            productivity = dist_merged.groupby('full_name').agg({
+                'quantity_distributed': 'sum',
+                'sales_person_id': 'count'
+            }).reset_index()
+            productivity.columns = ['Salesperson', 'Total Quantity', 'Number of Sales']
+            productivity = productivity.sort_values('Total Quantity', ascending=False)
             
-            if not dist_df.empty:
-                dist_df['day_of_week'] = dist_df['date'].dt.day_name()
-                dist_df['month'] = dist_df['date'].dt.month_name()
-                dist_df['week'] = dist_df['date'].dt.isocalendar().week
-                
-                # Sales by day of week
-                daily_pattern = dist_df.groupby('day_of_week')['quantity'].sum().reindex([
-                    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-                ]).reset_index()
-                
-                fig = px.line(daily_pattern, x='day_of_week', y='quantity',
-                             title='Sales Pattern by Day of Week',
-                             markers=True, line_shape='spline')
-                fig.update_traces(line=dict(color='#667eea', width=3))
-                st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(productivity, use_container_width=True, hide_index=True)
+        
+        # Time-based analysis
+        st.markdown("### 📅 Time-Based Analysis")
+        
+        if not dist_df.empty and 'date' in dist_df.columns:
+            # Create a copy to avoid modifying original
+            dist_time = dist_df.copy()
+            dist_time['day_of_week'] = dist_time['date'].dt.day_name()
+            dist_time['month'] = dist_time['date'].dt.month_name()
+            dist_time['week'] = dist_time['date'].dt.isocalendar().week
+            
+            # Sales by day of week
+            daily_pattern = dist_time.groupby('day_of_week')['quantity_distributed'].sum().reindex([
+                'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+            ]).reset_index()
+            daily_pattern.columns = ['Day', 'Quantity']
+            
+            fig = px.line(daily_pattern, x='Day', y='Quantity',
+                         title='Sales Pattern by Day of Week',
+                         markers=True, line_shape='spline')
+            fig.update_traces(line=dict(color='#667eea', width=3))
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Monthly trend
+            monthly_pattern = dist_time.groupby(dist_time['date'].dt.strftime('%Y-%m'))['quantity_distributed'].sum().reset_index()
+            monthly_pattern.columns = ['Month', 'Quantity']
+            
+            fig = px.bar(monthly_pattern, x='Month', y='Quantity',
+                        title='Monthly Sales Trend',
+                        color='Quantity', color_continuous_scale='Viridis')
+            st.plotly_chart(fig, use_container_width=True)
     
     with analytics_tab3:
         st.markdown("### 📁 Data Export & Management")
