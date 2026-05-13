@@ -30,7 +30,7 @@ from supabase_client import (
     get_distribution_data
 )
 
-DEBUG_MODE = True
+DEBUG_MODE = False  # Set to True only when debugging
 
 def test_distribution_connection():
     try:
@@ -48,12 +48,8 @@ def test_distribution_connection():
             "status": "Test",
             "notes": "Test connection"
         }
-        if DEBUG_MODE:
-            st.sidebar.write("🔍 DEBUG: Testing distribution connection...")
         return True
     except Exception as e:
-        if DEBUG_MODE:
-            st.sidebar.error(f"❌ Distribution test failed: {str(e)}")
         return False
 
 st.set_page_config(
@@ -63,6 +59,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
@@ -134,6 +131,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Header
 col1, col2 = st.columns([1, 5])
 with col1:
     st.image("spicyup.jpeg", width=80)
@@ -143,6 +141,7 @@ with col2:
 
 st.markdown("---")
 
+# Sidebar Filters
 with st.sidebar:
     st.markdown('<div class="section-header">📅 Filter Data</div>', unsafe_allow_html=True)
     
@@ -213,10 +212,8 @@ with st.sidebar:
     
     st.markdown(f"**Last updated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-# -------------------------------
-# FETCH & PREPARE DATA
-# -------------------------------
-@st.cache_data(ttl=0, show_spinner=False)
+# Fetch & Prepare Data
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_raw_data():
     sales_data = get_sales_summary()
     expense_data = get_expenses_summary()
@@ -227,11 +224,6 @@ def fetch_raw_data():
     expenses_df = pd.DataFrame(expense_data) if expense_data else pd.DataFrame()
     dist_df = pd.DataFrame(distribution_data) if distribution_data else pd.DataFrame()
     sp_df = pd.DataFrame(sales_people_data) if sales_people_data else pd.DataFrame()
-    
-    if DEBUG_MODE:
-        st.sidebar.write(f"📊 RAW DATA COUNTS:")
-        st.sidebar.write(f"- Sales in DB: {len(sales_df)}")
-        st.sidebar.write(f"- Expenses in DB: {len(expenses_df)}")
     
     return sales_df, expenses_df, dist_df, sp_df
 
@@ -276,11 +268,18 @@ def calculate_kpis(sales_df, expenses_df):
         avg_sale_value = sales_df['Total'].mean() if len(sales_df) > 0 else 0
         cash_percentage = (total_cash / total_sales * 100) if total_sales > 0 else 0
         credit_percentage = (total_credit / total_sales * 100) if total_sales > 0 else 0
+        sales_by_date = sales_df.groupby('Date')['Total'].sum()
+        avg_daily_sales = sales_by_date.mean() if len(sales_by_date) > 0 else 0
+        best_day = sales_by_date.idxmax() if len(sales_by_date) > 0 else None
+        best_day_sales = sales_by_date.max() if len(sales_by_date) > 0 else 0
     else:
         total_sachets = 0
         avg_sale_value = 0
         cash_percentage = 0
         credit_percentage = 0
+        avg_daily_sales = 0
+        best_day = None
+        best_day_sales = 0
     
     return {
         'total_sales': total_sales,
@@ -293,11 +292,15 @@ def calculate_kpis(sales_df, expenses_df):
         'avg_sale_value': avg_sale_value,
         'cash_percentage': cash_percentage,
         'credit_percentage': credit_percentage,
+        'avg_daily_sales': avg_daily_sales,
+        'best_day': best_day,
+        'best_day_sales': best_day_sales,
         'top_expense_category': expenses_df.groupby('category')['amount'].sum().idxmax() if not expenses_df.empty and 'category' in expenses_df.columns else "None"
     }
 
 kpis = calculate_kpis(sales_df, expenses_df)
 
+# Create Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
@@ -306,12 +309,11 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📈 Analytics"
 ])
 
-# -------------------------------
-# TAB 1: DASHBOARD
-# -------------------------------
+# ==================== TAB 1: DASHBOARD ====================
 with tab1:
     st.markdown('<div class="section-header">📈 Financial Overview</div>', unsafe_allow_html=True)
     
+    # Top Metrics Row
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
@@ -330,6 +332,7 @@ with tab1:
         st.caption(f"Status: {cash_status}")
         st.markdown('</div>', unsafe_allow_html=True)
     
+    # Second Metrics Row
     col4, col5, col6 = st.columns(3)
     with col4:
         st.metric("Cash Collected", f"KES {kpis['total_cash']:,.0f}", delta=f"{kpis['cash_percentage']:.1f}% of total")
@@ -338,6 +341,7 @@ with tab1:
     with col6:
         st.metric("Total Expenses", f"KES {kpis['total_expenses']:,.0f}", help=f"Top category: {kpis['top_expense_category']}")
     
+    # Alerts
     alerts = []
     if kpis['credit_percentage'] > 30:
         alerts.append("⚠️ **High credit sales** (>30% of total). Consider following up on pending payments.")
@@ -351,9 +355,11 @@ with tab1:
         for alert in alerts:
             st.markdown(f'<div class="alert-box">{alert}</div>', unsafe_allow_html=True)
     
-    st.markdown('<div class="section-header">📊 Performance Charts</div>', unsafe_allow_html=True)
+    # Advanced Charts Section
+    st.markdown('<div class="section-header">📊 Performance Analytics</div>', unsafe_allow_html=True)
     
     if not sales_df.empty or not expenses_df.empty:
+        # Create data for charts
         sales_by_date = sales_df.groupby("Date")['Total'].sum().reset_index() if not sales_df.empty else pd.DataFrame()
         expenses_by_date = expenses_df.groupby("date")['amount'].sum().reset_index() if not expenses_df.empty else pd.DataFrame()
         
@@ -367,24 +373,60 @@ with tab1:
         else:
             combined_df = pd.DataFrame()
         
+        # Chart 1: Sales vs Expenses vs Profit (Line + Bar)
         if not combined_df.empty:
             fig = go.Figure()
             fig.add_trace(go.Bar(x=combined_df['Date'], y=combined_df['Total'], name='Sales', marker_color='#36B37E', opacity=0.7))
             fig.add_trace(go.Bar(x=combined_df['Date'], y=combined_df['amount'], name='Expenses', marker_color='#FF4B4B', opacity=0.7))
-            fig.add_trace(go.Scatter(x=combined_df['Date'], y=combined_df['Net Profit'], name='Net Profit', mode='lines+markers', line=dict(color='#FFB020', width=3)))
-            fig.update_layout(title='Sales vs Expenses vs Net Profit', xaxis_title='Date', yaxis_title='Amount (KES)', hovermode='x unified')
+            fig.add_trace(go.Scatter(x=combined_df['Date'], y=combined_df['Net Profit'], name='Net Profit', mode='lines+markers', line=dict(color='#FFB020', width=3), marker=dict(size=8)))
+            fig.update_layout(title='Sales vs Expenses vs Net Profit Over Time', xaxis_title='Date', yaxis_title='Amount (KES)', hovermode='x unified', barmode='group')
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Chart 2: Sales Trend with Moving Average
+        if not sales_by_date.empty and len(sales_by_date) > 3:
+            sales_by_date['7_Day_MA'] = sales_by_date['Total'].rolling(window=min(7, len(sales_by_date))).mean()
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=sales_by_date['Date'], y=sales_by_date['Total'], name='Daily Sales', mode='lines+markers', line=dict(color='#1565C0', width=2), marker=dict(size=6)))
+            fig.add_trace(go.Scatter(x=sales_by_date['Date'], y=sales_by_date['7_Day_MA'], name='7-Day Moving Average', line=dict(color='#FF9800', width=3, dash='dash')))
+            fig.update_layout(title='Sales Trend with Moving Average', xaxis_title='Date', yaxis_title='Sales (KES)', hovermode='x unified')
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Chart 3: Cumulative Sales
+        if not sales_by_date.empty:
+            sales_by_date['Cumulative Sales'] = sales_by_date['Total'].cumsum()
+            fig = px.area(sales_by_date, x='Date', y='Cumulative Sales', title='Cumulative Sales Over Time', color_discrete_sequence=['#4CAF50'])
+            fig.update_layout(xaxis_title='Date', yaxis_title='Cumulative Sales (KES)')
             st.plotly_chart(fig, use_container_width=True)
     
+    # Quick Stats Row
     st.markdown('<div class="section-header">📋 Quick Statistics</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.info(f"**Avg Sale Value:** KES {kpis['avg_sale_value']:,.0f}")
+        st.info(f"**Avg Sale Value:**\nKES {kpis['avg_sale_value']:,.0f}")
     with col2:
-        st.info(f"**Cash vs Credit:** {kpis['cash_percentage']:.0f}% / {kpis['credit_percentage']:.0f}%")
+        st.info(f"**Avg Daily Sales:**\nKES {kpis['avg_daily_sales']:,.0f}")
+    with col3:
+        st.info(f"**Cash vs Credit:**\n{kpis['cash_percentage']:.0f}% / {kpis['credit_percentage']:.0f}%")
+    with col4:
+        best_day_str = kpis['best_day'].strftime('%b %d') if kpis['best_day'] else "N/A"
+        st.info(f"**Best Day:**\n{best_day_str} (KES {kpis['best_day_sales']:,.0f})")
+    
+    # Recent Activity
+    st.markdown('<div class="section-header">🕒 Recent Activity</div>', unsafe_allow_html=True)
+    if not sales_df.empty:
+        recent_sales = sales_df.sort_values('Date', ascending=False).head(5)
+        for _, row in recent_sales.iterrows():
+            col1, col2, col3 = st.columns([3, 2, 2])
+            with col1:
+                st.write(f"**{row['Name']}**")
+                st.caption(f"{row['Location']} • {row['Date'].strftime('%b %d')}")
+            with col2:
+                st.write(f"📦 {int(row['Quantity'])} items")
+            with col3:
+                st.write(f"💰 KES {row['Total']:,.0f}")
+            st.divider()
 
-# -------------------------------
-# TAB 2: SALES (WITH FULL PRODUCT VARIATIONS)
-# -------------------------------
+# ==================== TAB 2: SALES ====================
 with tab2:
     st.markdown('<div class="section-header">💰 Record New Sale</div>', unsafe_allow_html=True)
     
@@ -545,6 +587,7 @@ with tab2:
             else:
                 st.error("❌ Failed to save sale.")
     
+    # Recent Sales Table
     st.markdown('<div class="section-header">📋 Recent Sales</div>', unsafe_allow_html=True)
     if not sales_df.empty:
         recent_sales = sales_df.sort_values('Date', ascending=False).head(20)
@@ -553,9 +596,7 @@ with tab2:
         display_df['Total'] = display_df['Total'].apply(lambda x: f"KES {x:,.0f}")
         st.dataframe(display_df[['Date', 'Name', 'Quantity', 'Total', 'Payment_Status', 'Location']], use_container_width=True, hide_index=True)
 
-# -------------------------------
-# TAB 3: EXPENSES
-# -------------------------------
+# ==================== TAB 3: EXPENSES ====================
 with tab3:
     st.markdown('<div class="section-header">💸 Record New Expense</div>', unsafe_allow_html=True)
     
@@ -590,6 +631,7 @@ with tab3:
             })
             st.success(f"✅ Expense saved! Amount: **KES {amount:,.0f}**")
     
+    # Expense Analysis Charts
     st.markdown('<div class="section-header">📊 Expense Analysis</div>', unsafe_allow_html=True)
     if not expenses_df.empty:
         col1, col2, col3 = st.columns(3)
@@ -600,13 +642,19 @@ with tab3:
         with col3:
             st.metric("Number of Expenses", len(expenses_df))
         
-        category_summary = expenses_df.groupby("category")['amount'].sum().reset_index()
-        fig = px.pie(category_summary, values='amount', names='category', title='Expenses by Category')
-        st.plotly_chart(fig, use_container_width=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            category_summary = expenses_df.groupby("category")['amount'].sum().reset_index()
+            fig = px.pie(category_summary, values='amount', names='category', title='Expenses by Category', color_discrete_sequence=px.colors.qualitative.Set3)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            expenses_by_date = expenses_df.groupby('date')['amount'].sum().reset_index()
+            fig = px.line(expenses_by_date, x='date', y='amount', title='Expense Trend Over Time', markers=True, line_shape='spline')
+            fig.update_traces(line=dict(color='#FF4B4B', width=3))
+            st.plotly_chart(fig, use_container_width=True)
 
-# -------------------------------
-# TAB 4: SALESPEOPLE
-# -------------------------------
+# ==================== TAB 4: SALESPEOPLE ====================
 with tab4:
     st.markdown('<div class="section-header">👥 Manage Sales Team</div>', unsafe_allow_html=True)
     
@@ -632,11 +680,11 @@ with tab4:
                     st.rerun()
     
     if sales_people:
-        active_count = len([p for p in sales_people if p.get('status') == 'Active'])
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Total Team Members", len(sales_people))
         with col2:
+            active_count = len([p for p in sales_people if p.get('status') == 'Active'])
             st.metric("Active Members", active_count)
         
         for person in sales_people:
@@ -646,29 +694,98 @@ with tab4:
                     st.caption(f"📱 {person['phone']} | 💰 {person.get('commission_rate', 0)}% commission")
                     st.divider()
 
-# -------------------------------
-# TAB 5: ANALYTICS (FIXED)
-# -------------------------------
+# ==================== TAB 5: ADVANCED ANALYTICS ====================
 with tab5:
     st.markdown('<div class="section-header">📈 Advanced Analytics</div>', unsafe_allow_html=True)
     
-    analytics_tab1, analytics_tab2, analytics_tab3 = st.tabs(["🏆 Performance Leaderboards", "📊 Distribution Insights", "📁 Data Management"])
+    analytics_tab1, analytics_tab2, analytics_tab3, analytics_tab4 = st.tabs([
+        "🏆 Performance Leaderboards", 
+        "📊 Distribution Insights", 
+        "🏨 Hotel & Mama Mboga", 
+        "📁 Data Management"
+    ])
     
     with analytics_tab1:
+        # Salespeople Leaderboard
         if not dist_df.empty and not sp_df.empty:
+            st.markdown("### 🏆 Salespeople Performance Leaderboard")
+            
             dist_merged = dist_df.merge(sp_df, left_on="sales_person_id", right_on="id")
             dist_merged['Total_Value'] = dist_merged['quantity_distributed'] * dist_merged['unit_price']
             
-            sp_summary = dist_merged.groupby("full_name").agg({'Total_Value': 'sum', 'quantity_distributed': 'sum'}).reset_index()
-            sp_summary.columns = ['Salesperson', 'Revenue (KES)', 'Quantity']
+            sp_summary = dist_merged.groupby("full_name").agg({'Total_Value': 'sum', 'quantity_distributed': 'sum', 'sales_person_id': 'count'}).reset_index()
+            sp_summary.columns = ['Salesperson', 'Revenue (KES)', 'Quantity', 'Number of Sales']
             sp_summary = sp_summary.sort_values('Revenue (KES)', ascending=False)
+            sp_summary['Rank'] = range(1, len(sp_summary) + 1)
             
-            st.dataframe(sp_summary.head(10), use_container_width=True, hide_index=True)
-            fig = px.bar(sp_summary.head(10), x='Salesperson', y='Revenue (KES)', title='Top 10 Salespeople by Revenue')
-            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(sp_summary[['Rank', 'Salesperson', 'Revenue (KES)', 'Quantity', 'Number of Sales']].head(10), use_container_width=True, hide_index=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                fig = px.bar(sp_summary.head(10), x='Salesperson', y='Revenue (KES)', title='Top 10 Salespeople by Revenue', color='Revenue (KES)', color_continuous_scale='Viridis')
+                st.plotly_chart(fig, use_container_width=True)
+            with col2:
+                fig = px.bar(sp_summary.head(10), x='Salesperson', y='Quantity', title='Top 10 Salespeople by Quantity', color='Quantity', color_continuous_scale='Plasma')
+                st.plotly_chart(fig, use_container_width=True)
         
+        # Shop Performance
+        if not dist_df.empty and not sales_df.empty:
+            st.markdown("### 🏪 Shop Performance Analysis")
+            
+            merged_shop = dist_df.merge(sales_df, left_on="sale_id", right_on="id")
+            
+            if not merged_shop.empty:
+                shop_summary = merged_shop.groupby("Name").agg(
+                    total_quantity=pd.NamedAgg(column="quantity_distributed", aggfunc="sum"),
+                    total_value=pd.NamedAgg(column="unit_price", aggfunc=lambda x: (merged_shop.loc[x.index, 'quantity_distributed'] * x).sum()),
+                    num_visits=pd.NamedAgg(column="sale_id", aggfunc="nunique"),
+                    avg_order_value=pd.NamedAgg(column="Total", aggfunc="mean")
+                ).reset_index()
+                
+                shop_summary.columns = ['Shop Name', 'Total Quantity', 'Total Revenue', 'Number of Visits', 'Average Order Value']
+                shop_summary = shop_summary.sort_values('Total Revenue', ascending=False)
+                
+                st.dataframe(shop_summary.head(10), use_container_width=True, hide_index=True)
+                
+                fig = px.scatter(shop_summary.head(20), x='Number of Visits', y='Total Revenue', size='Average Order Value', color='Total Quantity', hover_name='Shop Name', title='Shop Performance: Visits vs Revenue')
+                st.plotly_chart(fig, use_container_width=True)
+    
+    with analytics_tab2:
+        st.markdown("### 📊 Distribution Insights")
+        
+        if not dist_df.empty and not sp_df.empty:
+            dist_merged = dist_df.merge(sp_df, left_on="sales_person_id", right_on="id")
+            
+            # Productivity
+            productivity = dist_merged.groupby('full_name').agg({'quantity_distributed': 'sum', 'sales_person_id': 'count'}).reset_index()
+            productivity.columns = ['Salesperson', 'Total Quantity', 'Number of Sales']
+            productivity = productivity.sort_values('Total Quantity', ascending=False)
+            st.dataframe(productivity, use_container_width=True, hide_index=True)
+            
+            # Time-based analysis
+            if 'date' in dist_df.columns:
+                st.markdown("### 📅 Time-Based Analysis")
+                
+                dist_time = dist_df.copy()
+                dist_time['day_of_week'] = dist_time['date'].dt.day_name()
+                dist_time['month'] = dist_time['date'].dt.month_name()
+                dist_time['week'] = dist_time['date'].dt.isocalendar().week
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    daily = dist_time.groupby('day_of_week')['quantity_distributed'].sum().reindex(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']).reset_index()
+                    daily.columns = ['Day', 'Quantity']
+                    fig = px.bar(daily, x='Day', y='Quantity', title='Sales by Day of Week', color='Quantity', color_continuous_scale='Viridis')
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    monthly = dist_time.groupby(dist_time['date'].dt.strftime('%Y-%m'))['quantity_distributed'].sum().reset_index()
+                    monthly.columns = ['Month', 'Quantity']
+                    fig = px.line(monthly, x='Month', y='Quantity', title='Monthly Sales Trend', markers=True)
+                    st.plotly_chart(fig, use_container_width=True)
+    
+    with analytics_tab3:
         # Hotel Refill Tracking Dashboard
-        st.markdown("---")
         st.markdown("### 🏨 Hotel Refill Performance")
         
         if not sales_df.empty:
@@ -683,10 +800,15 @@ with tab5:
                 with col3:
                     st.metric("Hotel Revenue", f"KES {hotel_sales['Total'].sum():,.0f}")
                 
-                hotel_summary = hotel_sales.groupby('Name').agg({'Total': 'sum', 'Date': 'count'}).reset_index()
-                hotel_summary.columns = ['Hotel', 'Revenue', 'Orders']
+                hotel_summary = hotel_sales.groupby('Name').agg({'Total': 'sum', 'Date': 'count', 'Quantity': 'sum'}).reset_index()
+                hotel_summary.columns = ['Hotel', 'Revenue', 'Orders', 'Quantity']
                 hotel_summary = hotel_summary.sort_values('Orders', ascending=False).head(10)
+                
                 st.dataframe(hotel_summary, use_container_width=True, hide_index=True)
+                
+                fig = px.bar(hotel_summary, x='Hotel', y='Orders', title='Fastest Refilling Hotels', color='Revenue', text='Orders')
+                fig.update_traces(textposition='outside')
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No hotel sales recorded yet")
         
@@ -702,43 +824,92 @@ with tab5:
                 with col2:
                     st.metric("Total Revenue", f"KES {mama_sales['Total'].sum():,.0f}")
                 
-                mama_summary = mama_sales.groupby('Name').agg({'Total': 'sum', 'Quantity': 'sum'}).reset_index()
-                mama_summary.columns = ['Shop', 'Revenue', 'Quantity']
+                mama_summary = mama_sales.groupby('Name').agg({'Total': 'sum', 'Quantity': 'sum', 'Date': 'count'}).reset_index()
+                mama_summary.columns = ['Shop', 'Revenue', 'Quantity', 'Orders']
                 mama_summary = mama_summary.sort_values('Revenue', ascending=False).head(10)
+                
                 st.dataframe(mama_summary, use_container_width=True, hide_index=True)
                 
+                # Profit potential
                 mama_summary['Potential Profit'] = mama_summary['Quantity'] * 2.1
                 st.caption("💡 Reseller profit potential: Buy at 2.9, sell at 5 = 2.1 profit per sachet")
-                st.dataframe(mama_summary[['Shop', 'Quantity', 'Potential Profit']].head(10), use_container_width=True, hide_index=True)
+                
+                fig = px.bar(mama_summary, x='Shop', y='Potential Profit', title='Top Shops by Reseller Profit Potential', color='Revenue', text='Potential Profit')
+                fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No Mama Mboga sales recorded yet")
-    
-    with analytics_tab2:
-        st.markdown("### 📊 Distribution Insights")
-        if not dist_df.empty and not sp_df.empty:
-            dist_merged = dist_df.merge(sp_df, left_on="sales_person_id", right_on="id")
-            productivity = dist_merged.groupby('full_name').agg({'quantity_distributed': 'sum', 'sales_person_id': 'count'}).reset_index()
-            productivity.columns = ['Salesperson', 'Total Quantity', 'Number of Sales']
-            productivity = productivity.sort_values('Total Quantity', ascending=False)
-            st.dataframe(productivity, use_container_width=True, hide_index=True)
-            
-            if 'date' in dist_df.columns:
-                dist_time = dist_df.copy()
-                dist_time['day_of_week'] = dist_time['date'].dt.day_name()
-                daily = dist_time.groupby('day_of_week')['quantity_distributed'].sum().reindex(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']).reset_index()
-                daily.columns = ['Day', 'Quantity']
-                fig = px.bar(daily, x='Day', y='Quantity', title='Sales by Day of Week')
+        
+        # Product Mix Analysis
+        st.markdown("---")
+        st.markdown("### 📦 Product Mix Analysis")
+        
+        if not sales_df.empty:
+            col1, col2 = st.columns(2)
+            with col1:
+                product_summary = sales_df.groupby('Product_Type')['Total'].sum().reset_index() if 'Product_Type' in sales_df.columns else sales_df.groupby('Product')['Total'].sum().reset_index()
+                product_summary.columns = ['Product', 'Revenue']
+                fig = px.pie(product_summary, values='Revenue', names='Product', title='Revenue by Product Type', color_discrete_sequence=px.colors.qualitative.Set2)
                 st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                if 'Price_per_Unit' in sales_df.columns:
+                    price_analysis = sales_df.groupby('Price_per_Unit')['Quantity'].sum().reset_index()
+                    price_analysis.columns = ['Price (KES)', 'Quantity Sold']
+                    fig = px.bar(price_analysis, x='Price (KES)', y='Quantity Sold', title='Sales Volume by Price Point', color='Quantity Sold', color_continuous_scale='Viridis')
+                    st.plotly_chart(fig, use_container_width=True)
     
-    with analytics_tab3:
-        st.markdown("### 📁 Data Export")
-        if st.button("📥 Export Sales Data", use_container_width=True):
+    with analytics_tab4:
+        st.markdown("### 📁 Data Export & Management")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("📥 Export Sales Data", use_container_width=True, type="primary"):
+                if not sales_df.empty:
+                    csv = sales_df.to_csv(index=False)
+                    st.download_button("Download CSV", csv, f"sales_data_{date.today()}.csv", "text/csv")
+                else:
+                    st.warning("No sales data to export")
+        
+        with col2:
+            if st.button("📥 Export Expenses Data", use_container_width=True, type="primary"):
+                if not expenses_df.empty:
+                    csv = expenses_df.to_csv(index=False)
+                    st.download_button("Download CSV", csv, f"expenses_data_{date.today()}.csv", "text/csv")
+                else:
+                    st.warning("No expenses data to export")
+        
+        with col3:
+            if st.button("📊 Generate Summary Report", use_container_width=True, type="primary"):
+                report = f"""
+                # SpiseUp Finance Report
+                ## Period: {start_date} to {end_date}
+                
+                ### Summary
+                - Total Sales: KES {kpis['total_sales']:,.0f}
+                - Total Expenses: KES {kpis['total_expenses']:,.0f}
+                - Net Profit: KES {kpis['net_profit']:,.0f}
+                - Cash Balance: KES {kpis['running_balance']:,.0f}
+                
+                ### Sales Details
+                - Cash Collected: KES {kpis['total_cash']:,.0f} ({kpis['cash_percentage']:.1f}%)
+                - Credit Pending: KES {kpis['total_credit']:,.0f} ({kpis['credit_percentage']:.1f}%)
+                - Total Items Sold: {kpis['total_sachets']:,.0f}
+                - Average Sale Value: KES {kpis['avg_sale_value']:,.0f}
+                
+                Report generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                """
+                st.download_button("Download Report", report, f"spiseup_report_{date.today()}.txt", "text/plain")
+        
+        with st.expander("Data Quality Check"):
             if not sales_df.empty:
-                csv = sales_df.to_csv(index=False)
-                st.download_button("Download CSV", csv, f"sales_data_{date.today()}.csv", "text/csv")
+                missing_data = sales_df.isnull().sum()
+                if missing_data.sum() > 0:
+                    st.warning(f"Found {missing_data.sum()} missing values in sales data")
+                else:
+                    st.success("✅ Sales data quality check passed!")
 
-# -------------------------------
-# FOOTER
-# -------------------------------
+# Footer
 st.markdown("---")
 st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
