@@ -194,3 +194,111 @@ def get_distribution_data(start_date=None, end_date=None):
         return []
 
     return getattr(response, "data", []) or []
+
+# -------------------------------
+# PRODUCTION & INVENTORY FUNCTIONS
+# -------------------------------
+
+def save_batch(batch_data: dict):
+    """Save a production batch"""
+    try:
+        batch_data["id"] = str(uuid.uuid4())
+        response = supabase.table("BATCHES").insert(batch_data).execute()
+        if hasattr(response, 'error') and response.error:
+            st.error(f"Error saving batch: {response.error.message}")
+            return None
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving batch: {str(e)}")
+        return None
+
+def get_batches():
+    """Get all production batches"""
+    try:
+        response = supabase.table("BATCHES").select("*").order("production_date", desc=True).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Error fetching batches: {str(e)}")
+        return []
+
+def save_production_output(output_data: dict):
+    """Save finished goods from batch"""
+    try:
+        output_data["id"] = str(uuid.uuid4())
+        response = supabase.table("PRODUCTION_OUTPUT").insert(output_data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error saving production output: {str(e)}")
+        return False
+
+def get_raw_materials():
+    """Get current raw materials inventory"""
+    try:
+        response = supabase.table("RAW_MATERIALS_INVENTORY").select("*").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Error fetching raw materials: {str(e)}")
+        return []
+
+def save_restock(restock_data: dict):
+    """Save restock record and update inventory"""
+    try:
+        restock_data["id"] = str(uuid.uuid4())
+        response = supabase.table("STOCK_RESTOCK").insert(restock_data).execute()
+        
+        # Update inventory
+        material = restock_data["material_name"]
+        quantity = restock_data["quantity_kg"]
+        
+        # Get current stock
+        inv_response = supabase.table("RAW_MATERIALS_INVENTORY").select("*").eq("material_name", material).execute()
+        if inv_response.data:
+            current = inv_response.data[0]["current_stock_kg"]
+            new_stock = current + quantity
+            supabase.table("RAW_MATERIALS_INVENTORY").update({
+                "current_stock_kg": new_stock, 
+                "last_restock_date": str(date.today())
+            }).eq("material_name", material).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Error saving restock: {str(e)}")
+        return False
+
+def get_finished_goods():
+    """Get finished goods inventory"""
+    try:
+        response = supabase.table("FINISHED_GOODS_INVENTORY").select("*").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Error fetching finished goods: {str(e)}")
+        return []
+
+def update_raw_material_stock(material_name: str, quantity_used_kg: float):
+    """Update raw material stock after production"""
+    try:
+        response = supabase.table("RAW_MATERIALS_INVENTORY").select("*").eq("material_name", material_name).execute()
+        if response.data:
+            current_stock = response.data[0]["current_stock_kg"]
+            new_stock = current_stock - quantity_used_kg
+            supabase.table("RAW_MATERIALS_INVENTORY").update({"current_stock_kg": new_stock}).eq("material_name", material_name).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error updating stock: {str(e)}")
+        return False
+
+def update_finished_goods(product_type: str, quantity_sold: int):
+    """Update finished goods stock after sale"""
+    try:
+        response = supabase.table("FINISHED_GOODS_INVENTORY").select("*").eq("product_type", product_type).execute()
+        if response.data:
+            current = response.data[0]["current_stock"]
+            new_stock = current - quantity_sold
+            supabase.table("FINISHED_GOODS_INVENTORY").update({
+                "current_stock": new_stock, 
+                "last_updated": str(datetime.now())
+            }).eq("product_type", product_type).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error updating finished goods: {str(e)}")
+        return False
