@@ -9,6 +9,7 @@ from dateutil.relativedelta import relativedelta
 import time
 import uuid
 from sklearn.linear_model import LinearRegression
+import pandas as pd
 
 
 # Auto-refresh every 30 seconds
