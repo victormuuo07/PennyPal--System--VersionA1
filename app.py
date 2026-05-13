@@ -371,7 +371,7 @@ with tab1:
         # You can add another metric here
         capital_used = (kpis['total_expenses'] / get_total_funding() * 100) if get_total_funding() > 0 else 0
         st.metric("Capital Used", f"{capital_used:.1f}%")
-        
+
     # Alerts
     alerts = []
     if kpis['credit_percentage'] > 30:
@@ -477,7 +477,7 @@ with tab2:
             
             product_main = st.radio(
                 "Product Type",
-                ["Sachet - Standard (5 KES)", "Sachet - Premium (30 KES)", "Bottle (100g New)", "Bottle (120g Refill)"],
+                ["Sachet - Standard (5 KES)", "Sachet - Premium (30 KES)", "Bottle (100g New)", "Bottle (100g Refill)"],
                 horizontal=True
             )
             
@@ -512,8 +512,8 @@ with tab2:
                     product_name = "SpiseUp Spicy Salt Bottle (100g New) - Hotel"
             else:
                 price, min_qty, default_qty, unit = 120.0, 1, 5, "refills"
-                product_name = f"SpiseUp Spicy Salt Bottle (120g Refill) - {customer_type}"
-                st.success("🔄 **REFILL BENEFIT:** Pay KES 120 and get 120g (save KES 30, get 20% more!)")
+                product_name = f"SpiseUp Spicy Salt Bottle (100g Refill) - {customer_type}"
+                st.success("🔄 **REFILL BENEFIT:** Pay KES 120 and get 100g (save KES 30, get 20% more!)")
             
             if min_qty > 1:
                 st.info(f"📦 Minimum order: {min_qty} {unit}")
