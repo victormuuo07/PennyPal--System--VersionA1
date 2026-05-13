@@ -10,6 +10,7 @@ import time
 import uuid
 from sklearn.linear_model import LinearRegression
 
+
 # Auto-refresh every 30 seconds
 if 'last_refresh' not in st.session_state:
     st.session_state.last_refresh = datetime.now()
@@ -28,7 +29,15 @@ from supabase_client import (
     get_expenses_summary,
     get_sales_people,
     save_sales_person,
-    get_distribution_data
+    get_distribution_data,
+    save_batch,
+    get_batches,
+    save_production_output,
+    get_raw_materials,
+    save_restock,
+    get_finished_goods,
+    update_raw_material_stock,
+    update_finished_goods
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -302,12 +311,13 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
     "👥 Salespeople", 
-    "📈 Analytics"
+    "📈 Analytics",
+     "🏭 Production & Inventory"
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -1185,6 +1195,291 @@ with tab5:
     
         else:
             st.info("Not enough sales data for advanced analytics. Add some sales to see insights!")
+
+# ==================== TAB 6: PRODUCTION & INVENTORY ====================
+with tab6:
+    st.markdown('<div class="section-header">🏭 Production Batch Management</div>', unsafe_allow_html=True)
+    
+    # Sub-tabs for Production and Inventory
+    prod_tab1, prod_tab2, prod_tab3, prod_tab4 = st.tabs([
+        "📦 New Production Batch", 
+        "📊 Batch History", 
+        "📦 Raw Materials Inventory", 
+        "📦 Finished Goods"
+    ])
+    
+    # ========== TAB 1: NEW PRODUCTION BATCH ==========
+    with prod_tab1:
+        st.markdown("### 📦 Create New Production Batch")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            batch_number = st.text_input("Batch Number", placeholder="e.g., BATCH-001", key="batch_num")
+            production_date = st.date_input("Production Date", value=date.today(), key="prod_date")
+            total_kg = st.number_input("Total KG Produced", min_value=0.5, step=0.5, value=2.0, key="total_kg")
+        
+        with col2:
+            st.markdown("### 📊 Recipe Formula")
+            st.info("""
+            **Standard Recipe (per batch):**
+            - Salt: 50%
+            - African Birds Eye: 30%
+            - Cayenne Pepper: 15%
+            - Onion Powder: 2%
+            - Garlic Powder: 2%
+            - Paprika: 1%
+            """)
+        
+        # Calculate ingredient quantities
+        salt_kg = total_kg * 0.50
+        birds_eye_kg = total_kg * 0.30
+        cayenne_kg = total_kg * 0.15
+        onion_kg = total_kg * 0.02
+        garlic_kg = total_kg * 0.02
+        paprika_kg = total_kg * 0.01
+        
+        st.markdown("### 📊 Calculated Ingredients")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("🧂 Salt", f"{salt_kg:.2f} kg", "50%")
+            st.metric("🌶️ African Birds Eye", f"{birds_eye_kg:.2f} kg", "30%")
+        with col2:
+            st.metric("🔥 Cayenne Pepper", f"{cayenne_kg:.2f} kg", "15%")
+            st.metric("🧅 Onion Powder", f"{onion_kg:.2f} kg", "2%")
+        with col3:
+            st.metric("🧄 Garlic Powder", f"{garlic_kg:.2f} kg", "2%")
+            st.metric("🌶️ Paprika", f"{paprika_kg:.2f} kg", "1%")
+        
+        st.markdown("### 🏭 Finished Goods Production")
+        st.write("How many units did this batch produce?")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            sachet_5_qty = st.number_input("5 KES Sachets", min_value=0, step=50, value=0, key="sachet_5")
+        with col2:
+            sachet_30_qty = st.number_input("30 KES Sachets", min_value=0, step=20, value=0, key="sachet_30")
+        with col3:
+            bottle_100g_qty = st.number_input("100g Bottles (KES 150)", min_value=0, step=10, value=0, key="bottle_100")
+        with col4:
+            refill_120g_qty = st.number_input("120g Refills (KES 120)", min_value=0, step=10, value=0, key="refill_120")
+        
+        total_units = sachet_5_qty + sachet_30_qty + bottle_100g_qty + refill_120g_qty
+        st.info(f"📦 **Total Units Produced:** {total_units:,}")
+        
+        notes = st.text_area("Production Notes", placeholder="Any issues or observations?", key="prod_notes")
+        
+        if st.button("✅ Save Production Batch", type="primary", use_container_width=True):
+            if not batch_number:
+                st.error("Please enter a batch number!")
+            elif total_units == 0:
+                st.warning("Please enter at least one finished good quantity!")
+            else:
+                # Save batch
+                batch_data = {
+                    "batch_number": batch_number,
+                    "production_date": str(production_date),
+                    "total_kg_produced": total_kg,
+                    "salt_kg": salt_kg,
+                    "african_birds_eye_kg": birds_eye_kg,
+                    "cayenne_kg": cayenne_kg,
+                    "onion_powder_kg": onion_kg,
+                    "garlic_powder_kg": garlic_kg,
+                    "paprika_kg": paprika_kg,
+                    "status": "Completed",
+                    "notes": notes
+                }
+                
+                batch_id = save_batch(batch_data)
+                
+                if batch_id:
+                    # Save production outputs
+                    outputs = [
+                        ("Sachet 5", sachet_5_qty, 5),
+                        ("Sachet 30", sachet_30_qty, 30),
+                        ("Bottle 100g", bottle_100g_qty, 150),
+                        ("Refill 120g", refill_120g_qty, 120)
+                    ]
+                    
+                    for product_type, qty, price in outputs:
+                        if qty > 0:
+                            save_production_output({
+                                "batch_id": batch_id,
+                                "product_type": product_type,
+                                "quantity_produced": qty,
+                                "unit_price": price
+                            })
+                    
+                    st.success(f"✅ Batch {batch_number} saved successfully!")
+                    st.balloons()
+                    
+                    # Clear form
+                    st.rerun()
+                else:
+                    st.error("Failed to save batch!")
+    
+    # ========== TAB 2: BATCH HISTORY ==========
+    with prod_tab2:
+        st.markdown("### 📊 Batch History")
+        
+        batches = get_batches()
+        if batches:
+            df_batches = pd.DataFrame(batches)
+            df_batches['production_date'] = pd.to_datetime(df_batches['production_date']).dt.strftime('%Y-%m-%d')
+            st.dataframe(df_batches[['batch_number', 'production_date', 'total_kg_produced', 'status']], use_container_width=True, hide_index=True)
+            
+            # Batch detail view
+            st.markdown("### 🔍 Batch Details")
+            selected_batch = st.selectbox("Select Batch", [b['batch_number'] for b in batches], key="select_batch")
+            batch_detail = next((b for b in batches if b['batch_number'] == selected_batch), None)
+            
+            if batch_detail:
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Batch Number:** {batch_detail['batch_number']}")
+                    st.write(f"**Production Date:** {batch_detail['production_date']}")
+                    st.write(f"**Total KG:** {batch_detail['total_kg_produced']} kg")
+                with col2:
+                    st.write(f"**Status:** {batch_detail['status']}")
+                    st.write(f"**Notes:** {batch_detail.get('notes', 'N/A')}")
+                
+                st.write("**Ingredients Used:**")
+                ing_data = {
+                    'Ingredient': ['Salt', 'African Birds Eye', 'Cayenne Pepper', 'Onion Powder', 'Garlic Powder', 'Paprika'],
+                    'KG Used': [
+                        batch_detail.get('salt_kg', 0),
+                        batch_detail.get('african_birds_eye_kg', 0),
+                        batch_detail.get('cayenne_kg', 0),
+                        batch_detail.get('onion_powder_kg', 0),
+                        batch_detail.get('garlic_powder_kg', 0),
+                        batch_detail.get('paprika_kg', 0)
+                    ]
+                }
+                st.dataframe(pd.DataFrame(ing_data), use_container_width=True, hide_index=True)
+        else:
+            st.info("No batches recorded yet. Create your first production batch!")
+    
+    # ========== TAB 3: RAW MATERIALS INVENTORY ==========
+    with prod_tab3:
+        st.markdown("### 📦 Raw Materials Inventory")
+        
+        # Restock section
+        with st.expander("➕ Restock Raw Materials", expanded=False):
+            materials = get_raw_materials()
+            material_list = [m['material_name'] for m in materials] if materials else []
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                restock_material = st.selectbox("Material", material_list, key="restock_material")
+            with col2:
+                restock_qty = st.number_input("Quantity (KG)", min_value=0.5, step=0.5, value=5.0, key="restock_qty")
+            with col3:
+                restock_cost = st.number_input("Cost per KG (KES)", min_value=0, step=10, value=100, key="restock_cost")
+            
+            supplier = st.text_input("Supplier Name", key="supplier")
+            restock_notes = st.text_area("Notes", key="restock_notes")
+            
+            if st.button("💾 Record Restock", type="primary", key="record_restock"):
+                restock_data = {
+                    "material_name": restock_material,
+                    "quantity_kg": restock_qty,
+                    "cost_per_kg": restock_cost,
+                    "total_cost": restock_qty * restock_cost,
+                    "supplier": supplier,
+                    "restock_date": str(date.today()),
+                    "notes": restock_notes
+                }
+                if save_restock(restock_data):
+                    st.success(f"✅ Restocked {restock_qty} KG of {restock_material}")
+                    st.rerun()
+                else:
+                    st.error("Failed to record restock")
+        
+        # Current inventory display
+        materials = get_raw_materials()
+        if materials:
+            df_materials = pd.DataFrame(materials)
+            df_materials['current_stock_kg'] = df_materials['current_stock_kg'].round(2)
+            df_materials['unit_cost'] = df_materials['unit_cost'].apply(lambda x: f"KES {x:,.0f}")
+            
+            st.dataframe(df_materials[['material_name', 'current_stock_kg', 'unit_cost', 'reorder_level']], use_container_width=True, hide_index=True)
+            
+            # Stock alerts
+            low_stock = df_materials[df_materials['current_stock_kg'] < df_materials['reorder_level']]
+            if not low_stock.empty:
+                st.warning("⚠️ **Low Stock Alert!** The following materials need restocking:")
+                for _, item in low_stock.iterrows():
+                    st.write(f"- {item['material_name']}: {item['current_stock_kg']:.1f} KG (Reorder at {item['reorder_level']} KG)")
+            
+            # Stock usage chart
+            st.markdown("### 📊 Material Stock Levels")
+            fig = px.bar(df_materials, x='material_name', y='current_stock_kg', 
+                        title='Current Raw Materials Stock',
+                        color='current_stock_kg', color_continuous_scale='RdYlGn',
+                        text='current_stock_kg')
+            fig.add_hline(y=10, line_dash="dash", line_color="red", annotation_text="Reorder Alert (10 KG)")
+            fig.update_traces(texttemplate='%{text:.1f} KG', textposition='outside')
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No raw materials data")
+    
+    # ========== TAB 4: FINISHED GOODS ==========
+    with prod_tab4:
+        st.markdown("### 📦 Finished Goods Inventory")
+        
+        finished_goods = get_finished_goods()
+        if finished_goods:
+            df_finished = pd.DataFrame(finished_goods)
+            st.dataframe(df_finished[['product_type', 'current_stock', 'unit_price', 'reorder_level']], use_container_width=True, hide_index=True)
+            
+            # Stock alerts for finished goods
+            low_stock_fg = df_finished[df_finished['current_stock'] < df_finished['reorder_level']]
+            if not low_stock_fg.empty:
+                st.warning("⚠️ **Low Stock Alert!** The following products need production:")
+                for _, item in low_stock_fg.iterrows():
+                    st.write(f"- {item['product_type']}: {item['current_stock']} units (Reorder at {item['reorder_level']} units)")
+            
+            # Inventory chart
+            fig = px.bar(df_finished, x='product_type', y='current_stock', 
+                        title='Current Finished Goods Inventory',
+                        color='current_stock', color_continuous_scale='Viridis',
+                        text='current_stock')
+            fig.update_traces(texttemplate='%{text} units', textposition='outside')
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Weekly sales tracking
+            st.markdown("### 📈 Weekly Sales Performance")
+            
+            if not sales_df.empty:
+                # Map product types for sales tracking
+                sales_df['Week'] = sales_df['Date'].dt.isocalendar().week
+                sales_df['Year'] = sales_df['Date'].dt.year
+                
+                # Get last 4 weeks of sales
+                last_4_weeks = sales_df.nlargest(28, 'Date')
+                weekly_sales = last_4_weeks.groupby(['Year', 'Week']).agg({
+                    'Total': 'sum',
+                    'Quantity': 'sum'
+                }).reset_index()
+                
+                weekly_sales['Week_Label'] = weekly_sales.apply(lambda x: f"W{x['Week']}", axis=1)
+                
+                fig = px.bar(weekly_sales, x='Week_Label', y='Total', 
+                            title='Weekly Sales Performance (Last 4 Weeks)',
+                            color='Total', color_continuous_scale='Blues',
+                            text='Total')
+                fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No sales data for weekly tracking")
+        else:
+            st.info("No finished goods data")
+
+# -------------------------------
+# FOOTER (Keep as is)
+# -------------------------------
+st.markdown("---")
+st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
 
 # Footer
 st.markdown("---")
