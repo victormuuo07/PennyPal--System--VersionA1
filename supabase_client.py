@@ -355,4 +355,151 @@ def delete_funding(funding_id: str):
         return True
     except Exception as e:
         st.error(f"Error deleting funding: {str(e)}")
-        return False    
+        return False
+
+# -------------------------------
+# ADVANCED INVENTORY TRACKING FUNCTIONS
+# -------------------------------
+
+def get_material_balance(material_name: str):
+    """Calculate current stock based on all transactions"""
+    try:
+        response = supabase.table("INVENTORY_TRANSACTIONS").select("*").eq("material_name", material_name).execute()
+        if response.data:
+            balance = 0
+            for trans in response.data:
+                if trans['transaction_type'] == 'RESTOCK':
+                    balance += trans['quantity_kg']
+                elif trans['transaction_type'] == 'USAGE':
+                    balance -= trans['quantity_kg']
+            return balance
+        return 0
+    except Exception as e:
+        st.error(f"Error calculating balance: {str(e)}")
+        return 0
+
+def record_restock_with_transaction(material_name: str, quantity_kg: float, cost_per_kg: float, supplier: str, notes: str = ""):
+    """Record a restock with transaction tracking"""
+    try:
+        restock_id = str(uuid.uuid4())
+        today = str(date.today())
+        
+        # Record in RESTOCK table
+        restock_data = {
+            "id": restock_id,
+            "material_name": material_name,
+            "quantity_kg": quantity_kg,
+            "cost_per_kg": cost_per_kg,
+            "total_cost": quantity_kg * cost_per_kg,
+            "supplier": supplier,
+            "restock_date": today,
+            "notes": notes
+        }
+        supabase.table("STOCK_RESTOCK").insert(restock_data).execute()
+        
+        # Record transaction
+        transaction_data = {
+            "id": str(uuid.uuid4()),
+            "transaction_date": today,
+            "transaction_type": "RESTOCK",
+            "material_name": material_name,
+            "quantity_kg": quantity_kg,
+            "cost_per_kg": cost_per_kg,
+            "total_value": quantity_kg * cost_per_kg,
+            "reference_id": restock_id,
+            "notes": f"Restocked from {supplier}. {notes}"
+        }
+        supabase.table("INVENTORY_TRANSACTIONS").insert(transaction_data).execute()
+        
+        # Update raw materials inventory
+        inv_response = supabase.table("RAW_MATERIALS_INVENTORY").select("*").eq("material_name", material_name).execute()
+        if inv_response.data:
+            current = inv_response.data[0]["current_stock_kg"]
+            new_stock = current + quantity_kg
+            supabase.table("RAW_MATERIALS_INVENTORY").update({
+                "current_stock_kg": new_stock,
+                "last_restock_date": today
+            }).eq("material_name", material_name).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Error recording restock: {str(e)}")
+        return False
+
+def record_material_usage(batch_id: str, material_name: str, quantity_used_kg: float, cost_per_kg: float):
+    """Record material usage in a batch"""
+    try:
+        # Record in MATERIAL_USAGE table
+        usage_data = {
+            "id": str(uuid.uuid4()),
+            "batch_id": batch_id,
+            "material_name": material_name,
+            "quantity_used_kg": quantity_used_kg,
+            "cost_per_kg": cost_per_kg,
+            "total_cost": quantity_used_kg * cost_per_kg
+        }
+        supabase.table("MATERIAL_USAGE").insert(usage_data).execute()
+        
+        # Record transaction
+        transaction_data = {
+            "id": str(uuid.uuid4()),
+            "transaction_date": str(date.today()),
+            "transaction_type": "USAGE",
+            "material_name": material_name,
+            "quantity_kg": -quantity_used_kg,  # Negative for usage
+            "cost_per_kg": cost_per_kg,
+            "total_value": -(quantity_used_kg * cost_per_kg),
+            "reference_id": batch_id,
+            "notes": f"Used in batch {batch_id}"
+        }
+        supabase.table("INVENTORY_TRANSACTIONS").insert(transaction_data).execute()
+        
+        # Update raw materials inventory
+        inv_response = supabase.table("RAW_MATERIALS_INVENTORY").select("*").eq("material_name", material_name).execute()
+        if inv_response.data:
+            current = inv_response.data[0]["current_stock_kg"]
+            new_stock = current - quantity_used_kg
+            supabase.table("RAW_MATERIALS_INVENTORY").update({"current_stock_kg": new_stock}).eq("material_name", material_name).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"Error recording usage: {str(e)}")
+        return False
+
+def get_inventory_transactions(material_name: str = None, start_date: date = None, end_date: date = None):
+    """Get inventory transactions with filters"""
+    try:
+        query = supabase.table("INVENTORY_TRANSACTIONS").select("*").order("transaction_date", desc=True)
+        if material_name:
+            query = query.eq("material_name", material_name)
+        if start_date:
+            query = query.gte("transaction_date", str(start_date))
+        if end_date:
+            query = query.lte("transaction_date", str(end_date))
+        
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Error fetching transactions: {str(e)}")
+        return []
+
+def get_material_usage_summary(batch_id: str = None):
+    """Get summary of material usage"""
+    try:
+        query = supabase.table("MATERIAL_USAGE").select("*")
+        if batch_id:
+            query = query.eq("batch_id", batch_id)
+        response = query.execute()
+        
+        # Summarize by material
+        if response.data:
+            df = pd.DataFrame(response.data)
+            summary = df.groupby('material_name').agg({
+                'quantity_used_kg': 'sum',
+                'total_cost': 'sum'
+            }).reset_index()
+            return summary
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error fetching usage summary: {str(e)}")
+        return pd.DataFrame()    
