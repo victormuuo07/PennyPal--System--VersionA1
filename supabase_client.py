@@ -302,3 +302,57 @@ def update_finished_goods(product_type: str, quantity_sold: int):
     except Exception as e:
         st.error(f"Error updating finished goods: {str(e)}")
         return False
+
+# -------------------------------
+# FUNDING/CAPITAL FUNCTIONS
+# -------------------------------
+
+def save_funding(funding_data: dict):
+    """Save a funding record"""
+    try:
+        funding_data["id"] = str(uuid.uuid4())
+        response = supabase.table("FUNDING").insert(funding_data).execute()
+        if hasattr(response, 'error') and response.error:
+            st.error(f"Error saving funding: {response.error.message}")
+            return None
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving funding: {str(e)}")
+        return None
+
+def get_funding():
+    """Get all funding records"""
+    try:
+        response = supabase.table("FUNDING").select("*").order("funding_date", desc=True).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Error fetching funding: {str(e)}")
+        return []
+
+def get_total_funding():
+    """Get total funding amount"""
+    try:
+        response = supabase.table("FUNDING").select("amount").execute()
+        total = sum([r["amount"] for r in response.data]) if response.data else 0
+        return total
+    except Exception as e:
+        st.error(f"Error calculating total funding: {str(e)}")
+        return 0
+
+def update_funding(funding_id: str, updates: dict):
+    """Update a funding record"""
+    try:
+        response = supabase.table("FUNDING").update(updates).eq("id", funding_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error updating funding: {str(e)}")
+        return False
+
+def delete_funding(funding_id: str):
+    """Delete a funding record"""
+    try:
+        response = supabase.table("FUNDING").delete().eq("id", funding_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error deleting funding: {str(e)}")
+        return False    
