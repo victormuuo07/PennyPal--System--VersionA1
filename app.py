@@ -329,7 +329,7 @@ with tab1:
     st.markdown('<div class="section-header">📈 Financial Overview</div>', unsafe_allow_html=True)
     
     # Top Metrics Row
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, = st.columns(3)
     with col1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
         st.metric("Total Sales", f"KES {kpis['total_sales']:,.0f}")
@@ -356,8 +356,22 @@ with tab1:
     with col6:
         st.metric("Total Expenses", f"KES {kpis['total_expenses']:,.0f}", help=f"Top category: {kpis['top_expense_category']}")
     # Add this in your metrics row (around the other metrics)
-    with col7:  # or create a new row
+     # Third Metrics Row (3 columns) - NEW
+    col7, col8, col9 = st.columns(3)
+    with col7:
         st.metric("Total Funding", f"KES {get_total_funding():,.0f}")
+    with col8:
+        # You can add another metric here (e.g., ROI)
+        if get_total_funding() > 0:
+            roi = ((kpis['total_sales'] - kpis['total_expenses']) / get_total_funding()) * 100
+            st.metric("ROI", f"{roi:.1f}%")
+        else:
+            st.metric("ROI", "N/A")
+    with col9:
+        # You can add another metric here
+        capital_used = (kpis['total_expenses'] / get_total_funding() * 100) if get_total_funding() > 0 else 0
+        st.metric("Capital Used", f"{capital_used:.1f}%")
+        
     # Alerts
     alerts = []
     if kpis['credit_percentage'] > 30:
