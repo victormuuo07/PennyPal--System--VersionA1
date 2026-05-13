@@ -1218,19 +1218,29 @@ with tab5:
 
 # ==================== TAB 6: PRODUCTION & INVENTORY ====================
 with tab6:
-    st.markdown('<div class="section-header">🏭 Production Batch Management</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">🏭 Production & Inventory Management</div>', unsafe_allow_html=True)
     
     # Sub-tabs for Production and Inventory
-    prod_tab1, prod_tab2, prod_tab3, prod_tab4 = st.tabs([
+    prod_tab1, prod_tab2, prod_tab3, prod_tab4, prod_tab5 = st.tabs([
         "📦 New Production Batch", 
         "📊 Batch History", 
-        "📦 Raw Materials Inventory", 
-        "📦 Finished Goods"
+        "📦 Raw Materials", 
+        "📦 Finished Goods",
+        "📈 Inventory Reports"  # NEW TAB
     ])
     
     # ========== TAB 1: NEW PRODUCTION BATCH ==========
     with prod_tab1:
         st.markdown("### 📦 Create New Production Batch")
+        
+        # Check material availability first
+        st.subheader("🔍 Material Availability Check")
+        materials = get_raw_materials()
+        if materials:
+            df_check = pd.DataFrame(materials)
+            df_check = df_check[['material_name', 'current_stock_kg', 'reorder_level']]
+            df_check.columns = ['Material', 'Current Stock (KG)', 'Reorder Level']
+            st.dataframe(df_check, use_container_width=True, hide_index=True)
         
         col1, col2 = st.columns(2)
         
@@ -1259,17 +1269,36 @@ with tab6:
         garlic_kg = total_kg * 0.02
         paprika_kg = total_kg * 0.01
         
-        st.markdown("### 📊 Calculated Ingredients")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("🧂 Salt", f"{salt_kg:.2f} kg", "50%")
-            st.metric("🌶️ African Birds Eye", f"{birds_eye_kg:.2f} kg", "30%")
-        with col2:
-            st.metric("🔥 Cayenne Pepper", f"{cayenne_kg:.2f} kg", "15%")
-            st.metric("🧅 Onion Powder", f"{onion_kg:.2f} kg", "2%")
-        with col3:
-            st.metric("🧄 Garlic Powder", f"{garlic_kg:.2f} kg", "2%")
-            st.metric("🌶️ Paprika", f"{paprika_kg:.2f} kg", "1%")
+        # Check if enough stock is available
+        st.markdown("### 📊 Material Requirements & Availability")
+        
+        materials_needed = {
+            'Salt': salt_kg,
+            'African Birds Eye': birds_eye_kg,
+            'Cayenne Pepper': cayenne_kg,
+            'Onion Powder': onion_kg,
+            'Garlic Powder': garlic_kg,
+            'Paprika': paprika_kg
+        }
+        
+        sufficient_stock = True
+        for mat_name, needed in materials_needed.items():
+            mat_data = next((m for m in materials if m['material_name'] == mat_name), None)
+            if mat_data:
+                current = mat_data['current_stock_kg']
+                status = "✅" if current >= needed else "❌"
+                if current < needed:
+                    sufficient_stock = False
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.write(f"{status} **{mat_name}:**")
+                with col2:
+                    st.write(f"Needed: {needed:.2f} kg")
+                with col3:
+                    st.write(f"Available: {current:.2f} kg")
+        
+        if not sufficient_stock:
+            st.error("⚠️ **Insufficient materials!** Please restock before producing this batch.")
         
         st.markdown("### 🏭 Finished Goods Production")
         st.write("How many units did this batch produce?")
@@ -1282,9 +1311,9 @@ with tab6:
         with col3:
             bottle_100g_qty = st.number_input("100g Bottles (KES 150)", min_value=0, step=10, value=0, key="bottle_100")
         with col4:
-            refill_100g_qty = st.number_input("100g Refills (KES 120)", min_value=0, step=10, value=0, key="refill_100")
+            refill_120g_qty = st.number_input("120g Refills (KES 120)", min_value=0, step=10, value=0, key="refill_120")
         
-        total_units = sachet_5_qty + sachet_30_qty + bottle_100g_qty + refill_100g_qty
+        total_units = sachet_5_qty + sachet_30_qty + bottle_100g_qty + refill_120g_qty
         st.info(f"📦 **Total Units Produced:** {total_units:,}")
         
         notes = st.text_area("Production Notes", placeholder="Any issues or observations?", key="prod_notes")
@@ -1294,6 +1323,8 @@ with tab6:
                 st.error("Please enter a batch number!")
             elif total_units == 0:
                 st.warning("Please enter at least one finished good quantity!")
+            elif not sufficient_stock:
+                st.error("Cannot create batch due to insufficient materials!")
             else:
                 # Save batch
                 batch_data = {
@@ -1306,6 +1337,7 @@ with tab6:
                     "onion_powder_kg": onion_kg,
                     "garlic_powder_kg": garlic_kg,
                     "paprika_kg": paprika_kg,
+                    "remaining_stock_kg": total_kg,  # Initially full
                     "status": "Completed",
                     "notes": notes
                 }
@@ -1313,12 +1345,21 @@ with tab6:
                 batch_id = save_batch(batch_data)
                 
                 if batch_id:
+                    # Record material usage and update inventory
+                    for mat_name, needed in materials_needed.items():
+                        # Get current cost per kg
+                        mat_data = next((m for m in materials if m['material_name'] == mat_name), None)
+                        cost_per_kg = mat_data['unit_cost'] if mat_data else 0
+                        
+                        # Record usage
+                        record_material_usage(batch_id, mat_name, needed, cost_per_kg)
+                    
                     # Save production outputs
                     outputs = [
                         ("Sachet 5", sachet_5_qty, 5),
                         ("Sachet 30", sachet_30_qty, 30),
                         ("Bottle 100g", bottle_100g_qty, 150),
-                        ("Refill 100g", refill_100g_qty, 120)
+                        ("Refill 120g", refill_120g_qty, 120)
                     ]
                     
                     for product_type, qty, price in outputs:
@@ -1332,8 +1373,6 @@ with tab6:
                     
                     st.success(f"✅ Batch {batch_number} saved successfully!")
                     st.balloons()
-                    
-                    # Clear form
                     st.rerun()
                 else:
                     st.error("Failed to save batch!")
@@ -1348,8 +1387,8 @@ with tab6:
             df_batches['production_date'] = pd.to_datetime(df_batches['production_date']).dt.strftime('%Y-%m-%d')
             st.dataframe(df_batches[['batch_number', 'production_date', 'total_kg_produced', 'status']], use_container_width=True, hide_index=True)
             
-            # Batch detail view
-            st.markdown("### 🔍 Batch Details")
+            # Batch detail view with material usage
+            st.markdown("### 🔍 Batch Details with Material Usage")
             selected_batch = st.selectbox("Select Batch", [b['batch_number'] for b in batches], key="select_batch")
             batch_detail = next((b for b in batches if b['batch_number'] == selected_batch), None)
             
@@ -1362,6 +1401,12 @@ with tab6:
                 with col2:
                     st.write(f"**Status:** {batch_detail['status']}")
                     st.write(f"**Notes:** {batch_detail.get('notes', 'N/A')}")
+                
+                # Show material usage for this batch
+                usage_summary = get_material_usage_summary(batch_detail['id'])
+                if not usage_summary.empty:
+                    st.write("**Materials Used in this Batch:**")
+                    st.dataframe(usage_summary, use_container_width=True, hide_index=True)
                 
                 st.write("**Ingredients Used:**")
                 ing_data = {
@@ -1383,8 +1428,8 @@ with tab6:
     with prod_tab3:
         st.markdown("### 📦 Raw Materials Inventory")
         
-        # Restock section
-        with st.expander("➕ Restock Raw Materials", expanded=False):
+        # Restock section with date tracking
+        with st.expander("➕ Restock Raw Materials", expanded=True):
             materials = get_raw_materials()
             material_list = [m['material_name'] for m in materials] if materials else []
             
@@ -1396,33 +1441,31 @@ with tab6:
             with col3:
                 restock_cost = st.number_input("Cost per KG (KES)", min_value=0, step=10, value=100, key="restock_cost")
             
-            supplier = st.text_input("Supplier Name", key="supplier")
-            restock_notes = st.text_area("Notes", key="restock_notes")
+            col1, col2 = st.columns(2)
+            with col1:
+                restock_date = st.date_input("Restock Date", value=date.today(), key="restock_date")
+                supplier = st.text_input("Supplier Name", key="supplier")
+            with col2:
+                delivery_note = st.text_input("Delivery Note / Reference", key="delivery_note")
+            
+            restock_notes = st.text_area("Notes", key="restock_notes", placeholder="Any issues with quality, delivery, etc.")
             
             if st.button("💾 Record Restock", type="primary", key="record_restock"):
-                restock_data = {
-                    "material_name": restock_material,
-                    "quantity_kg": restock_qty,
-                    "cost_per_kg": restock_cost,
-                    "total_cost": restock_qty * restock_cost,
-                    "supplier": supplier,
-                    "restock_date": str(date.today()),
-                    "notes": restock_notes
-                }
-                if save_restock(restock_data):
-                    st.success(f"✅ Restocked {restock_qty} KG of {restock_material}")
+                if record_restock_with_transaction(restock_material, restock_qty, restock_cost, supplier, restock_notes):
+                    st.success(f"✅ Restocked {restock_qty} KG of {restock_material} on {restock_date}")
                     st.rerun()
                 else:
                     st.error("Failed to record restock")
         
-        # Current inventory display
+        # Current inventory display with more details
         materials = get_raw_materials()
         if materials:
             df_materials = pd.DataFrame(materials)
             df_materials['current_stock_kg'] = df_materials['current_stock_kg'].round(2)
             df_materials['unit_cost'] = df_materials['unit_cost'].apply(lambda x: f"KES {x:,.0f}")
             
-            st.dataframe(df_materials[['material_name', 'current_stock_kg', 'unit_cost', 'reorder_level']], use_container_width=True, hide_index=True)
+            st.dataframe(df_materials[['material_name', 'current_stock_kg', 'unit_cost', 'reorder_level', 'last_restock_date']], 
+                        use_container_width=True, hide_index=True)
             
             # Stock alerts
             low_stock = df_materials[df_materials['current_stock_kg'] < df_materials['reorder_level']]
@@ -1466,35 +1509,72 @@ with tab6:
                         text='current_stock')
             fig.update_traces(texttemplate='%{text} units', textposition='outside')
             st.plotly_chart(fig, use_container_width=True)
+    
+    # ========== TAB 5: INVENTORY REPORTS ==========
+    with prod_tab5:
+        st.markdown("### 📈 Inventory Movement Reports")
+        
+        # Date range filter
+        col1, col2 = st.columns(2)
+        with col1:
+            report_start = st.date_input("Start Date", value=date.today() - timedelta(days=30), key="report_start")
+        with col2:
+            report_end = st.date_input("End Date", value=date.today(), key="report_end")
+        
+        # Material filter
+        materials = get_raw_materials()
+        material_names = [m['material_name'] for m in materials] if materials else []
+        selected_material = st.selectbox("Select Material (or All)", ["All"] + material_names, key="report_material")
+        
+        # Get transactions
+        material_filter = None if selected_material == "All" else selected_material
+        transactions = get_inventory_transactions(material_filter, report_start, report_end)
+        
+        if transactions:
+            df_trans = pd.DataFrame(transactions)
+            df_trans['transaction_date'] = pd.to_datetime(df_trans['transaction_date']).dt.strftime('%Y-%m-%d')
             
-            # Weekly sales tracking
-            st.markdown("### 📈 Weekly Sales Performance")
+            st.dataframe(df_trans[['transaction_date', 'transaction_type', 'material_name', 'quantity_kg', 'cost_per_kg', 'total_value', 'notes']], 
+                        use_container_width=True, hide_index=True)
             
-            if not sales_df.empty:
-                # Map product types for sales tracking
-                sales_df['Week'] = sales_df['Date'].dt.isocalendar().week
-                sales_df['Year'] = sales_df['Date'].dt.year
+            # Summary statistics
+            st.markdown("### 📊 Inventory Summary")
+            
+            restock_total = sum([t['quantity_kg'] for t in transactions if t['transaction_type'] == 'RESTOCK'])
+            usage_total = sum([abs(t['quantity_kg']) for t in transactions if t['transaction_type'] == 'USAGE'])
+            net_change = restock_total - usage_total
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Restocked", f"{restock_total:.1f} KG")
+            with col2:
+                st.metric("Total Used", f"{usage_total:.1f} KG")
+            with col3:
+                st.metric("Net Change", f"{net_change:.1f} KG", delta=f"{net_change:.1f}" if net_change != 0 else None)
+            
+            # Chart: Stock movement over time
+            if len(transactions) > 0:
+                # Calculate running balance
+                df_trans_sorted = sorted(transactions, key=lambda x: x['transaction_date'])
+                balance = 0
+                dates = []
+                balances = []
+                for trans in df_trans_sorted:
+                    if trans['transaction_type'] == 'RESTOCK':
+                        balance += trans['quantity_kg']
+                    else:
+                        balance -= trans['quantity_kg']
+                    dates.append(trans['transaction_date'])
+                    balances.append(balance)
                 
-                # Get last 4 weeks of sales
-                last_4_weeks = sales_df.nlargest(28, 'Date')
-                weekly_sales = last_4_weeks.groupby(['Year', 'Week']).agg({
-                    'Total': 'sum',
-                    'Quantity': 'sum'
-                }).reset_index()
-                
-                weekly_sales['Week_Label'] = weekly_sales.apply(lambda x: f"W{x['Week']}", axis=1)
-                
-                fig = px.bar(weekly_sales, x='Week_Label', y='Total', 
-                            title='Weekly Sales Performance (Last 4 Weeks)',
-                            color='Total', color_continuous_scale='Blues',
-                            text='Total')
-                fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+                balance_df = pd.DataFrame({'Date': dates, 'Balance (KG)': balances})
+                fig = px.line(balance_df, x='Date', y='Balance (KG)', 
+                             title=f'Stock Level Over Time - {selected_material if selected_material != "All" else "All Materials"}',
+                             markers=True)
+                fig.update_traces(line=dict(color='#4CAF50', width=3))
                 st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No sales data for weekly tracking")
         else:
-            st.info("No finished goods data")
-
+            st.info("No inventory transactions in selected period")
 # ==================== TAB 7: FUNDING & CAPITAL ====================
 with tab7:
     st.markdown('<div class="section-header">💰 Funding & Capital Management</div>', unsafe_allow_html=True)
