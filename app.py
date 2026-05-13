@@ -37,7 +37,10 @@ from supabase_client import (
     save_restock,
     get_finished_goods,
     update_raw_material_stock,
-    update_finished_goods
+    update_finished_goods,
+    save_funding,
+    get_funding,
+    get_total_funding
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -311,13 +314,14 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
     "👥 Salespeople", 
     "📈 Analytics",
-     "🏭 Production & Inventory"
+     "🏭 Production & Inventory",
+     "💰 Funding & Capital"
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -351,7 +355,9 @@ with tab1:
         st.metric("Credit Pending", f"KES {kpis['total_credit']:,.0f}", delta=f"{kpis['credit_percentage']:.1f}% of total", delta_color="inverse")
     with col6:
         st.metric("Total Expenses", f"KES {kpis['total_expenses']:,.0f}", help=f"Top category: {kpis['top_expense_category']}")
-    
+    # Add this in your metrics row (around the other metrics)
+    with col7:  # or create a new row
+        st.metric("Total Funding", f"KES {get_total_funding():,.0f}")
     # Alerts
     alerts = []
     if kpis['credit_percentage'] > 30:
@@ -1475,11 +1481,123 @@ with tab6:
         else:
             st.info("No finished goods data")
 
-# -------------------------------
-# FOOTER (Keep as is)
-# -------------------------------
-st.markdown("---")
-st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
+# ==================== TAB 7: FUNDING & CAPITAL ====================
+with tab7:
+    st.markdown('<div class="section-header">💰 Funding & Capital Management</div>', unsafe_allow_html=True)
+    
+    # Display total funding
+    total_funding = get_total_funding()
+    total_sales = kpis['total_sales']
+    net_capital = total_funding + total_sales - kpis['total_expenses']
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.metric("Total Funding Received", f"KES {total_funding:,.0f}")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.metric("Total Sales Revenue", f"KES {total_sales:,.0f}")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.metric("Net Capital Position", f"KES {net_capital:,.0f}")
+        st.caption("Funding + Sales - Expenses")
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Add new funding section
+    with st.expander("➕ Add New Funding / Investment", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            funding_date = st.date_input("Funding Date", value=date.today(), key="funding_date")
+            funding_source = st.text_input("Source", placeholder="e.g., Grandma, Bank, Investor", key="funding_source")
+            funding_amount = st.number_input("Amount (KES)", min_value=0, step=1000, value=0, key="funding_amount")
+        
+        with col2:
+            funding_type = st.selectbox("Funding Type", ["Investment", "Loan", "Grant", "Personal Capital"], key="funding_type")
+            funding_status = st.selectbox("Status", ["Received", "Pending", "Expected"], key="funding_status")
+            funding_description = st.text_area("Description", placeholder="Purpose of funding...", key="funding_description")
+        
+        if st.button("💾 Record Funding", type="primary", use_container_width=True):
+            if funding_source and funding_amount > 0:
+                funding_data = {
+                    "funding_date": str(funding_date),
+                    "source": funding_source,
+                    "amount": funding_amount,
+                    "funding_type": funding_type,
+                    "description": funding_description,
+                    "status": funding_status
+                }
+                funding_id = save_funding(funding_data)
+                if funding_id:
+                    st.success(f"✅ Recorded {funding_type} of KES {funding_amount:,.0f} from {funding_source}")
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("Failed to record funding")
+            else:
+                st.warning("Please enter source and amount")
+    
+    # Display funding history
+    st.markdown("### 📋 Funding History")
+    funding_records = get_funding()
+    
+    if funding_records:
+        df_funding = pd.DataFrame(funding_records)
+        df_funding['funding_date'] = pd.to_datetime(df_funding['funding_date']).dt.strftime('%Y-%m-%d')
+        df_funding['amount'] = df_funding['amount'].apply(lambda x: f"KES {x:,.0f}")
+        
+        st.dataframe(df_funding[['funding_date', 'source', 'amount', 'funding_type', 'description', 'status']], 
+                    use_container_width=True, hide_index=True)
+        
+        # Funding chart
+        fig = px.bar(df_funding, x='source', y=df_funding['amount'].str.replace('KES ', '').str.replace(',', '').astype(float),
+                    title='Funding by Source',
+                    color='funding_type',
+                    text='amount')
+        fig.update_traces(textposition='outside')
+        fig.update_layout(yaxis_title='Amount (KES)')
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No funding records yet. Add your first funding source above!")
+    
+    # Capital position chart
+    st.markdown("### 📊 Capital Position")
+    
+    capital_data = pd.DataFrame({
+        'Category': ['Total Funding', 'Total Sales', 'Total Expenses', 'Net Capital'],
+        'Amount': [total_funding, total_sales, kpis['total_expenses'], net_capital]
+    })
+    
+    fig = px.bar(capital_data, x='Category', y='Amount', 
+                title='Business Capital Position',
+                color='Category',
+                text='Amount')
+    fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+    fig.update_layout(yaxis_title='Amount (KES)')
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Business Health Summary
+    st.markdown("### 📈 Business Health Summary")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if total_funding > 0:
+            roi = ((total_sales - kpis['total_expenses']) / total_funding) * 100
+            st.metric("Return on Investment (ROI)", f"{roi:.1f}%")
+        
+        if total_funding > 0:
+            capital_used = kpis['total_expenses'] / total_funding * 100
+            st.metric("Capital Used", f"{capital_used:.1f}%")
+    
+    with col2:
+        if total_sales > 0:
+            profit_margin = (kpis['net_profit'] / total_sales) * 100
+            st.metric("Profit Margin", f"{profit_margin:.1f}%")
+        
+        st.metric("Cash Balance vs Funding", f"{(kpis['running_balance'] / total_funding * 100):.1f}%" if total_funding > 0 else "N/A")
 
 # Footer
 st.markdown("---")
