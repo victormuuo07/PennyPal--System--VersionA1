@@ -371,11 +371,11 @@ def get_material_balance(material_name: str):
                 if trans['transaction_type'] == 'RESTOCK':
                     balance += trans['quantity_kg']
                 elif trans['transaction_type'] == 'USAGE':
-                    balance -= trans['quantity_kg']
+                    balance -= abs(trans['quantity_kg'])
             return balance
         return 0
     except Exception as e:
-        st.error(f"Error calculating balance: {str(e)}")
+        print(f"Error calculating balance: {str(e)}")
         return 0
 
 def record_restock_with_transaction(material_name: str, quantity_kg: float, cost_per_kg: float, supplier: str, notes: str = ""):
@@ -384,7 +384,7 @@ def record_restock_with_transaction(material_name: str, quantity_kg: float, cost
         restock_id = str(uuid.uuid4())
         today = str(date.today())
         
-        # Record in RESTOCK table
+        # Record in STOCK_RESTOCK table
         restock_data = {
             "id": restock_id,
             "material_name": material_name,
@@ -423,7 +423,7 @@ def record_restock_with_transaction(material_name: str, quantity_kg: float, cost
         
         return True
     except Exception as e:
-        st.error(f"Error recording restock: {str(e)}")
+        print(f"Error recording restock: {str(e)}")
         return False
 
 def record_material_usage(batch_id: str, material_name: str, quantity_used_kg: float, cost_per_kg: float):
@@ -463,10 +463,10 @@ def record_material_usage(batch_id: str, material_name: str, quantity_used_kg: f
         
         return True
     except Exception as e:
-        st.error(f"Error recording usage: {str(e)}")
+        print(f"Error recording usage: {str(e)}")
         return False
 
-def get_inventory_transactions(material_name: str = None, start_date: date = None, end_date: date = None):
+def get_inventory_transactions(material_name: str = None, start_date=None, end_date=None):
     """Get inventory transactions with filters"""
     try:
         query = supabase.table("INVENTORY_TRANSACTIONS").select("*").order("transaction_date", desc=True)
@@ -480,26 +480,38 @@ def get_inventory_transactions(material_name: str = None, start_date: date = Non
         response = query.execute()
         return response.data if response.data else []
     except Exception as e:
-        st.error(f"Error fetching transactions: {str(e)}")
+        print(f"Error fetching transactions: {str(e)}")
         return []
 
 def get_material_usage_summary(batch_id: str = None):
-    """Get summary of material usage"""
+    """Get summary of material usage for a batch"""
     try:
-        query = supabase.table("MATERIAL_USAGE").select("*")
         if batch_id:
-            query = query.eq("batch_id", batch_id)
-        response = query.execute()
+            response = supabase.table("MATERIAL_USAGE").select("*").eq("batch_id", batch_id).execute()
+        else:
+            response = supabase.table("MATERIAL_USAGE").select("*").execute()
         
-        # Summarize by material
         if response.data:
             df = pd.DataFrame(response.data)
             summary = df.groupby('material_name').agg({
                 'quantity_used_kg': 'sum',
                 'total_cost': 'sum'
             }).reset_index()
+            summary.columns = ['Material', 'Quantity Used (KG)', 'Total Cost (KES)']
             return summary
         return pd.DataFrame()
     except Exception as e:
-        st.error(f"Error fetching usage summary: {str(e)}")
-        return pd.DataFrame()    
+        print(f"Error fetching usage summary: {str(e)}")
+        return pd.DataFrame()
+
+def get_all_material_usage():
+    """Get all material usage across all batches"""
+    try:
+        response = supabase.table("MATERIAL_USAGE").select("*, BATCHES(batch_number, production_date)").execute()
+        if response.data:
+            df = pd.DataFrame(response.data)
+            return df
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error fetching all usage: {str(e)}")
+        return pd.DataFrame()
