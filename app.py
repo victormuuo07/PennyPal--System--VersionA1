@@ -1282,9 +1282,9 @@ with tab6:
         with col3:
             bottle_100g_qty = st.number_input("100g Bottles (KES 150)", min_value=0, step=10, value=0, key="bottle_100")
         with col4:
-            refill_120g_qty = st.number_input("120g Refills (KES 120)", min_value=0, step=10, value=0, key="refill_120")
+            refill_100g_qty = st.number_input("100g Refills (KES 120)", min_value=0, step=10, value=0, key="refill_100")
         
-        total_units = sachet_5_qty + sachet_30_qty + bottle_100g_qty + refill_120g_qty
+        total_units = sachet_5_qty + sachet_30_qty + bottle_100g_qty + refill_100g_qty
         st.info(f"📦 **Total Units Produced:** {total_units:,}")
         
         notes = st.text_area("Production Notes", placeholder="Any issues or observations?", key="prod_notes")
@@ -1318,7 +1318,7 @@ with tab6:
                         ("Sachet 5", sachet_5_qty, 5),
                         ("Sachet 30", sachet_30_qty, 30),
                         ("Bottle 100g", bottle_100g_qty, 150),
-                        ("Refill 120g", refill_120g_qty, 120)
+                        ("Refill 100g", refill_100g_qty, 120)
                     ]
                     
                     for product_type, qty, price in outputs:
