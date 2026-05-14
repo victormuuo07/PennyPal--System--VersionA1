@@ -523,19 +523,23 @@ def get_all_material_usage():
         return pd.DataFrame()
     
 # -------------------------------
-# INVENTORY TRACKING FUNCTIONS (ADD THIS ENTIRE BLOCK)
+# COMPLETE INVENTORY TRACKING SYSTEM (FIXED)
 # -------------------------------
 
 def record_restock_with_balance(material_name: str, quantity_kg: float, cost_per_kg: float, supplier: str, restock_date, notes: str = ""):
     """Record a restock and update inventory balance"""
     try:
         from datetime import date
+        
+        # Convert date if needed
+        if isinstance(restock_date, str):
+            restock_date_str = restock_date
+        else:
+            restock_date_str = restock_date.strftime('%Y-%m-%d')
+        
         restock_id = str(uuid.uuid4())
         
-        # Get current balance
-        current_balance = get_current_material_balance(material_name)
-        
-        # Record restock
+        # 1. Record restock in STOCK_RESTOCK table
         restock_data = {
             "id": restock_id,
             "material_name": material_name,
@@ -543,37 +547,76 @@ def record_restock_with_balance(material_name: str, quantity_kg: float, cost_per
             "cost_per_kg": cost_per_kg,
             "total_cost": quantity_kg * cost_per_kg,
             "supplier": supplier,
-            "restock_date": str(restock_date),
-            "remaining_kg": quantity_kg,
+            "restock_date": restock_date_str,
+            "remaining_kg": quantity_kg,  # Initially full
             "notes": notes
         }
         supabase.table("STOCK_RESTOCK").insert(restock_data).execute()
         
-        # Update inventory balance
+        # 2. Update RAW_MATERIALS_INVENTORY
+        # Get current inventory
+        inv_response = supabase.table("RAW_MATERIALS_INVENTORY").select("*").eq("material_name", material_name).execute()
+        
+        if inv_response.data:
+            current = inv_response.data[0]
+            new_purchased = current.get('total_purchased_kg', 0) + quantity_kg
+            new_stock = current.get('current_stock_kg', 0) + quantity_kg
+            
+            supabase.table("RAW_MATERIALS_INVENTORY").update({
+                "total_purchased_kg": new_purchased,
+                "current_stock_kg": new_stock,
+                "last_restock_date": restock_date_str
+            }).eq("material_name", material_name).execute()
+        else:
+            # Create if doesn't exist
+            supabase.table("RAW_MATERIALS_INVENTORY").insert({
+                "material_name": material_name,
+                "total_purchased_kg": quantity_kg,
+                "current_stock_kg": quantity_kg,
+                "unit_cost": cost_per_kg,
+                "reorder_level": 10,
+                "last_restock_date": restock_date_str
+            }).execute()
+        
+        # 3. Record in INVENTORY_BALANCE
+        current_balance = get_current_material_balance(material_name)
         new_balance = current_balance + quantity_kg
+        
         balance_data = {
             "id": str(uuid.uuid4()),
             "material_name": material_name,
-            "transaction_date": str(restock_date),
+            "transaction_date": restock_date_str,
             "transaction_type": "RESTOCK",
             "quantity_kg": quantity_kg,
             "running_balance_kg": new_balance,
-            "reference_id": restock_id
+            "reference_id": restock_id,
+            "notes": f"Restocked {quantity_kg}kg from {supplier}"
         }
         supabase.table("INVENTORY_BALANCE").insert(balance_data).execute()
         
-        # Update raw materials table
-        update_raw_material_inventory(material_name, quantity_kg, 0)
-        
+        st.success(f"✅ Restocked {quantity_kg} KG of {material_name}")
         return True
+        
     except Exception as e:
-        print(f"Error recording restock: {str(e)}")
+        st.error(f"Error recording restock: {str(e)}")
         return False
 
 def record_material_usage_with_balance(batch_id: str, material_name: str, quantity_used_kg: float, usage_date):
     """Record material usage and update inventory balance (FIFO method)"""
     try:
-        # Get all restocks for this material with remaining stock (oldest first)
+        # Convert date if needed
+        if isinstance(usage_date, str):
+            usage_date_str = usage_date
+        else:
+            usage_date_str = usage_date.strftime('%Y-%m-%d')
+        
+        # 1. Check if enough stock is available
+        current_stock = get_current_material_balance(material_name)
+        if current_stock < quantity_used_kg:
+            st.error(f"Insufficient {material_name}! Need {quantity_used_kg:.2f}kg, have {current_stock:.2f}kg")
+            return False
+        
+        # 2. Get all restocks with remaining stock (oldest first for FIFO)
         response = supabase.table("STOCK_RESTOCK")\
             .select("*")\
             .eq("material_name", material_name)\
@@ -587,16 +630,16 @@ def record_material_usage_with_balance(batch_id: str, material_name: str, quanti
         
         remaining_to_use = quantity_used_kg
         
-        # Use FIFO (First In First Out) to deduct from oldest restocks first
+        # 3. Deduct from restocks using FIFO
         for restock in response.data:
             if remaining_to_use <= 0:
                 break
             
-            available_from_this = restock['remaining_kg']
-            use_from_this = min(remaining_to_use, available_from_this)
+            available = restock['remaining_kg']
+            use_from_this = min(remaining_to_use, available)
+            new_remaining = available - use_from_this
             
             # Update remaining in this restock
-            new_remaining = available_from_this - use_from_this
             supabase.table("STOCK_RESTOCK")\
                 .update({"remaining_kg": new_remaining})\
                 .eq("id", restock['id'])\
@@ -604,45 +647,53 @@ def record_material_usage_with_balance(batch_id: str, material_name: str, quanti
             
             remaining_to_use -= use_from_this
         
-        if remaining_to_use > 0:
-            st.error(f"Insufficient stock! Need {remaining_to_use}kg more of {material_name}")
-            return False
-        
-        # Record material usage
+        # 4. Record material usage
         usage_id = str(uuid.uuid4())
         usage_data = {
             "id": usage_id,
             "batch_id": batch_id,
             "material_name": material_name,
             "quantity_used_kg": quantity_used_kg,
-            "usage_date": str(usage_date)
+            "usage_date": usage_date_str
         }
         supabase.table("MATERIAL_USAGE").insert(usage_data).execute()
         
-        # Update inventory balance
+        # 5. Update RAW_MATERIALS_INVENTORY
+        inv_response = supabase.table("RAW_MATERIALS_INVENTORY").select("*").eq("material_name", material_name).execute()
+        if inv_response.data:
+            current = inv_response.data[0]
+            new_used = current.get('total_used_kg', 0) + quantity_used_kg
+            new_stock = current.get('current_stock_kg', 0) - quantity_used_kg
+            
+            supabase.table("RAW_MATERIALS_INVENTORY").update({
+                "total_used_kg": new_used,
+                "current_stock_kg": new_stock
+            }).eq("material_name", material_name).execute()
+        
+        # 6. Record in INVENTORY_BALANCE
         current_balance = get_current_material_balance(material_name)
         new_balance = current_balance - quantity_used_kg
+        
         balance_data = {
             "id": str(uuid.uuid4()),
             "material_name": material_name,
-            "transaction_date": str(usage_date),
+            "transaction_date": usage_date_str,
             "transaction_type": "USAGE",
             "quantity_kg": -quantity_used_kg,
             "running_balance_kg": new_balance,
-            "reference_id": batch_id
+            "reference_id": batch_id,
+            "notes": f"Used {quantity_used_kg}kg in batch"
         }
         supabase.table("INVENTORY_BALANCE").insert(balance_data).execute()
         
-        # Update raw materials table
-        update_raw_material_inventory(material_name, 0, quantity_used_kg)
-        
         return True
+        
     except Exception as e:
-        print(f"Error recording usage: {str(e)}")
+        st.error(f"Error recording usage: {str(e)}")
         return False
 
 def get_current_material_balance(material_name: str):
-    """Get current balance for a material"""
+    """Get current balance for a material from RAW_MATERIALS_INVENTORY"""
     try:
         response = supabase.table("RAW_MATERIALS_INVENTORY")\
             .select("current_stock_kg")\
@@ -693,7 +744,7 @@ def get_material_restock_history(material_name: str):
             .execute()
         return response.data if response.data else []
     except Exception as e:
-        print(f"Error getting restock history: {str(e)}")
+        print(f"Error: {str(e)}")
         return []
 
 def get_inventory_balance_history(material_name: str):
@@ -706,5 +757,5 @@ def get_inventory_balance_history(material_name: str):
             .execute()
         return response.data if response.data else []
     except Exception as e:
-        print(f"Error getting balance history: {str(e)}")
+        print(f"Error: {str(e)}")
         return []

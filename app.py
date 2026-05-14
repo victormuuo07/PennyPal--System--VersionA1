@@ -1461,7 +1461,7 @@ with tab6:
         with st.expander("➕ Restock Raw Materials", expanded=True):
             materials = get_raw_materials()
             material_list = [m['material_name'] for m in materials] if materials else []
-            
+    
             col1, col2, col3 = st.columns(3)
             with col1:
                 restock_material = st.selectbox("Material", material_list, key="restock_material")
@@ -1469,29 +1469,30 @@ with tab6:
                 restock_qty = st.number_input("Quantity (KG)", min_value=0.5, step=0.5, value=5.0, key="restock_qty")
             with col3:
                 restock_cost = st.number_input("Cost per KG (KES)", min_value=0, step=10, value=100, key="restock_cost")
-            
+    
             col1, col2 = st.columns(2)
             with col1:
                 restock_date = st.date_input("Restock Date", value=date.today(), key="restock_date")
                 supplier = st.text_input("Supplier Name", key="supplier")
             with col2:
-                delivery_note = st.text_input("Delivery Note / Reference", key="delivery_note")
-            
-            restock_notes = st.text_area("Notes", key="restock_notes", placeholder="Any issues with quality, delivery, etc.")
-            
+                delivery_note = st.text_input("Reference / Invoice #", key="delivery_note")
+    
+            restock_notes = st.text_area("Notes", key="restock_notes")
+    
             if st.button("💾 Record Restock", type="primary", key="record_restock"):
-                if record_restock_with_balance(
-        restock_material, 
-        restock_qty, 
-        restock_cost, 
-        supplier, 
-        restock_date, 
-        restock_notes
-    ):
-                    st.success(f"✅ Restocked {restock_qty} KG of {restock_material} on {restock_date}")
+                if restock_material and restock_qty > 0:
+                    success = record_restock_with_balance(
+                restock_material, 
+                restock_qty, 
+                restock_cost, 
+                supplier if supplier else "Unknown", 
+                restock_date, 
+                restock_notes
+            )
+                if success:
                     st.rerun()
             else:
-                st.error("Failed to record restock")
+                st.error("Please fill in all required fields")
         
         # Current inventory display with more details
         materials = get_raw_materials()
