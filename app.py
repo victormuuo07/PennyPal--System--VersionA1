@@ -41,7 +41,6 @@ from supabase_client import (
     save_restock,
     get_finished_goods,
     update_raw_material_stock,
-    update_finished_goods,
     save_funding,
     get_funding,
     get_total_funding,
