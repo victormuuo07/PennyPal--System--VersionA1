@@ -293,20 +293,41 @@ def update_raw_material_stock(material_name: str, quantity_used_kg: float):
         st.error(f"Error updating stock: {str(e)}")
         return False
 
-def update_finished_goods(product_type: str, quantity_sold: int):
-    """Update finished goods stock after sale"""
+def update_finished_goods_production(product_type: str, quantity_produced: int):
+    """Increase finished goods stock when production is made"""
     try:
-        response = supabase.table("FINISHED_GOODS_INVENTORY").select("*").eq("product_type", product_type).execute()
+        response = supabase.table("FINISHED_GOODS_INVENTORY")\
+            .select("*")\
+            .eq("product_type", product_type)\
+            .execute()
+        
         if response.data:
-            current = response.data[0]["current_stock"]
-            new_stock = current - quantity_sold
+            current = response.data[0]
+            new_stock = current.get('current_stock', 0) + quantity_produced
+            new_produced = current.get('total_produced', 0) + quantity_produced
+            
             supabase.table("FINISHED_GOODS_INVENTORY").update({
-                "current_stock": new_stock, 
-                "last_updated": str(datetime.now())
+                "current_stock": new_stock,
+                "total_produced": new_produced,
+                "last_updated": datetime.now().isoformat()
             }).eq("product_type", product_type).execute()
+        else:
+            # Get price based on product type
+            prices = {"Sachet 5": 5, "Sachet 30": 30, "Bottle 100g": 150, "Refill 120g": 120}
+            reorder = {"Sachet 5": 500, "Sachet 30": 200, "Bottle 100g": 100, "Refill 120g": 50}
+            
+            supabase.table("FINISHED_GOODS_INVENTORY").insert({
+                "product_type": product_type,
+                "current_stock": quantity_produced,
+                "total_produced": quantity_produced,
+                "total_sold": 0,
+                "unit_price": prices.get(product_type, 0),
+                "reorder_level": reorder.get(product_type, 100)
+            }).execute()
+        
         return True
     except Exception as e:
-        st.error(f"Error updating finished goods: {str(e)}")
+        print(f"Error updating finished goods: {str(e)}")
         return False
 
 # -------------------------------
