@@ -1333,14 +1333,17 @@ with tab6:
         
         notes = st.text_area("Production Notes", placeholder="Any issues or observations?", key="prod_notes")
         
+        # ========== INSIDE THE NEW PRODUCTION BATCH TAB ==========
+# Find the button that says "Save Production Batch" and replace the entire block
+
         if st.button("✅ Save Production Batch", type="primary", use_container_width=True):
             if not batch_number:
                 st.error("Please enter a batch number!")
             elif total_units == 0:
                 st.warning("Please enter at least one finished good quantity!")
             else:
-                # Save batch
-                materials_needed = {
+        # Calculate materials needed based on recipe
+             materials_needed = {
             'Salt': total_kg * 0.50,
             'African Birds Eye': total_kg * 0.30,
             'Cayenne Pepper': total_kg * 0.15,
@@ -1348,14 +1351,24 @@ with tab6:
             'Garlic Powder': total_kg * 0.02,
             'Paprika': total_kg * 0.01
         }
+        
+        # Check if enough stock is available for ALL materials
             sufficient = True
+            insufficient_materials = []
+        
             for mat_name, needed in materials_needed.items():
                 current = get_current_material_balance(mat_name)
+                st.write(f"DEBUG: {mat_name} - Need: {needed:.2f}kg, Have: {current:.2f}kg")  # Debug line
                 if current < needed:
-                    st.error(f"Insufficient {mat_name}. Need {needed:.2f}kg, have {current:.2f}kg")
                     sufficient = False
-            if sufficient:
-            # Save batch
+                    insufficient_materials.append(f"{mat_name} (need {needed:.2f}kg, have {current:.2f}kg)")
+        
+            if not sufficient:
+                st.error("❌ Cannot create batch due to insufficient materials:")
+                for msg in insufficient_materials:
+                    st.write(f"  - {msg}")
+            else:
+            # Save batch to BATCHES table
                 batch_data = {
                 "batch_number": batch_number,
                 "production_date": str(production_date),
@@ -1369,38 +1382,52 @@ with tab6:
                 "status": "Completed",
                 "notes": notes
             }
-                
-                
-                    
+            
             batch_id = save_batch(batch_data)
             
             if batch_id:
+                st.write(f"✅ Batch saved with ID: {batch_id}")
+                
                 # Record material usage for each ingredient
+                usage_success = True
                 for mat_name, needed in materials_needed.items():
-                    record_material_usage_with_balance(batch_id, mat_name, needed, production_date)
+                    st.write(f"Recording usage: {mat_name} - {needed}kg")
+                    success = record_material_usage_with_balance(batch_id, mat_name, needed, production_date)
+                    if not success:
+                        usage_success = False
+                        st.error(f"Failed to record usage for {mat_name}")
                 
-                # Save production outputs
-                outputs = [
-                    ("Sachet 5", sachet_5_qty, 5),
-                    ("Sachet 30", sachet_30_qty, 30),
-                    ("Bottle 100g", bottle_100g_qty, 150),
-                    ("Refill 120g", refill_120g_qty, 120)
-                ]
-                
-                for product_type, qty, price in outputs:
-                    if qty > 0:
-                        save_production_output({
-                            "batch_id": batch_id,
-                            "product_type": product_type,
-                            "quantity_produced": qty,
-                            "unit_price": price
-                        })
-                
-                st.success(f"✅ Batch {batch_number} saved successfully!")
-                st.balloons()
-                st.rerun()
+                if usage_success:
+                    # Save production outputs (finished goods)
+                    outputs = [
+                        ("Sachet 5", sachet_5_qty, 5),
+                        ("Sachet 30", sachet_30_qty, 30),
+                        ("Bottle 100g", bottle_100g_qty, 150),
+                        ("Refill 120g", refill_120g_qty, 120)
+                    ]
+                    
+                    for product_type, qty, price in outputs:
+                        if qty > 0:
+                            save_production_output({
+                                "batch_id": batch_id,
+                                "product_type": product_type,
+                                "quantity_produced": qty,
+                                "unit_price": price
+                            })
+                    
+                    st.success(f"✅ Batch {batch_number} saved successfully!")
+                    st.balloons()
+                    
+                    # Show what was deducted
+                    st.info("📦 Materials deducted from inventory:")
+                    for mat_name, needed in materials_needed.items():
+                        st.write(f"  - {mat_name}: {needed:.2f}kg")
+                    
+                    st.rerun()
+                else:
+                    st.error("❌ Batch saved but inventory update failed!")
             else:
-                st.error("Failed to save batch!")
+                st.error("❌ Failed to save batch!")
     
     # ========== TAB 2: BATCH HISTORY ==========
     with prod_tab2:
