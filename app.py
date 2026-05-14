@@ -618,6 +618,25 @@ with tab2:
             
             if sale_id:
                 st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
+                 # Map product to finished goods type and deduct from inventory
+                product_mapping = {
+        "SpiseUp Spicy Salt Sachet (5 KES) - Consumer": "Sachet 5",
+        "SpiseUp Spicy Salt Sachet (5 KES) - Wholesale": "Sachet 5",
+        "SpiseUp Spicy Salt Sachet (5 KES) - Hotel": "Sachet 5",
+        "SpiseUp Spicy Salt Sachet (30 KES)": "Sachet 30",
+        "SpiseUp Spicy Salt Bottle (100g New) - Consumer": "Bottle 100g",
+        "SpiseUp Spicy Salt Bottle (100g New) - Wholesale": "Bottle 100g",
+        "SpiseUp Spicy Salt Bottle (100g New) - Hotel": "Bottle 100g",
+        "SpiseUp Spicy Salt Bottle (120g Refill)": "Refill 120g"
+    }
+    
+    # Get the base product name (before the dash)
+                base_product = product_name.split(' - ')[0] if ' - ' in product_name else product_name
+                mapped_product = product_mapping.get(base_product, None)
+    
+                if mapped_product:
+                    update_finished_goods_sale(mapped_product, quantity)
+                    st.caption(f"📦 Updated inventory: -{quantity} {mapped_product}(s)")
                 if sales_person_name not in ["Select...", "N/A"] and sales_person_name in sales_person_options:
                     success = save_distribution(
                         sale_id=sale_id,
@@ -1414,6 +1433,8 @@ with tab6:
                                 "quantity_produced": qty,
                                 "unit_price": price
                             })
+
+                            update_finished_goods_production(product_type, qty)
                     
                     st.success(f"✅ Batch {batch_number} saved successfully!")
                     st.balloons()
@@ -1551,29 +1572,62 @@ with tab6:
             st.info("No raw materials data")
     
     # ========== TAB 4: FINISHED GOODS ==========
-    with prod_tab4:
-        st.markdown("### 📦 Finished Goods Inventory")
-        
-        finished_goods = get_finished_goods()
-        if finished_goods:
-            df_finished = pd.DataFrame(finished_goods)
-            st.dataframe(df_finished[['product_type', 'current_stock', 'unit_price', 'reorder_level']], use_container_width=True, hide_index=True)
-            
-            # Stock alerts for finished goods
-            low_stock_fg = df_finished[df_finished['current_stock'] < df_finished['reorder_level']]
-            if not low_stock_fg.empty:
-                st.warning("⚠️ **Low Stock Alert!** The following products need production:")
-                for _, item in low_stock_fg.iterrows():
-                    st.write(f"- {item['product_type']}: {item['current_stock']} units (Reorder at {item['reorder_level']} units)")
-            
-            # Inventory chart
-            fig = px.bar(df_finished, x='product_type', y='current_stock', 
-                        title='Current Finished Goods Inventory',
-                        color='current_stock', color_continuous_scale='Viridis',
-                        text='current_stock')
-            fig.update_traces(texttemplate='%{text} units', textposition='outside')
-            st.plotly_chart(fig, use_container_width=True)
+    # In your Production tab, under Finished Goods section:
+with prod_tab4:  # Finished Goods tab
+    st.markdown("### 📦 Finished Goods Inventory")
     
+    finished_goods = get_finished_goods()
+    if finished_goods:
+        df_finished = pd.DataFrame(finished_goods)
+        
+        # Display current stock
+        st.subheader("📊 Current Stock Levels")
+        
+        # Metrics row
+        col1, col2, col3, col4 = st.columns(4)
+        for idx, row in df_finished.iterrows():
+            cols = [col1, col2, col3, col4]
+            with cols[idx]:
+                st.metric(
+                    row['product_type'], 
+                    f"{row['current_stock']} units",
+                    delta=f"Sold: {row.get('total_sold', 0)}"
+                )
+        
+        # Stock table
+        st.dataframe(
+            df_finished[['product_type', 'current_stock', 'total_produced', 'total_sold', 'reorder_level']],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "product_type": "Product",
+                "current_stock": st.column_config.NumberColumn("Current Stock", format="%d"),
+                "total_produced": st.column_config.NumberColumn("Total Produced", format="%d"),
+                "total_sold": st.column_config.NumberColumn("Total Sold", format="%d"),
+                "reorder_level": st.column_config.NumberColumn("Reorder at", format="%d")
+            }
+        )
+        
+        # Stock level visualization
+        fig = px.bar(df_finished, x='product_type', y='current_stock', 
+                    title='Current Finished Goods Stock',
+                    color='current_stock',
+                    color_continuous_scale='RdYlGn',
+                    text='current_stock')
+        fig.update_traces(texttemplate='%{text} units', textposition='outside')
+        fig.add_hline(y=100, line_dash="dash", line_color="red", 
+                     annotation_text="Reorder Alert (100 units)")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Low stock warnings
+        low_stock = df_finished[df_finished['current_stock'] < df_finished['reorder_level']]
+        if not low_stock.empty:
+            st.warning("⚠️ **Low Stock Alert!** The following products need production:")
+            for _, item in low_stock.iterrows():
+                st.write(f"- {item['product_type']}: {item['current_stock']} units left (Reorder at {item['reorder_level']})")
+    else:
+        st.info("No finished goods data available")
+        
     # ========== TAB 5: INVENTORY REPORTS ==========
     with prod_tab5:
         st.markdown("### 📈 Inventory Movement Reports")
