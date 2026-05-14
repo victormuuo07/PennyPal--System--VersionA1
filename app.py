@@ -12,6 +12,7 @@ from sklearn.linear_model import LinearRegression
 import pandas as pd
 
 
+
 # Auto-refresh every 30 seconds
 if 'last_refresh' not in st.session_state:
     st.session_state.last_refresh = datetime.now()
@@ -23,6 +24,8 @@ if time_since_refresh > 30:
 
 # Supabase functions
 from supabase_client import (
+    get_current_material_balance,
+    record_restock_with_balance,
     save_sale,
     save_expense,
     save_distribution,
@@ -47,7 +50,12 @@ from supabase_client import (
     record_material_usage,
     get_inventory_transactions,
     get_material_usage_summary,
-    get_all_material_usage
+    get_all_material_usage,
+     record_restock_with_balance,
+    record_material_usage_with_balance,
+    get_current_material_balance,
+    get_material_restock_history,
+    get_inventory_balance_history
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -1330,59 +1338,69 @@ with tab6:
                 st.error("Please enter a batch number!")
             elif total_units == 0:
                 st.warning("Please enter at least one finished good quantity!")
-            elif not sufficient_stock:
-                st.error("Cannot create batch due to insufficient materials!")
             else:
                 # Save batch
+                materials_needed = {
+            'Salt': total_kg * 0.50,
+            'African Birds Eye': total_kg * 0.30,
+            'Cayenne Pepper': total_kg * 0.15,
+            'Onion Powder': total_kg * 0.02,
+            'Garlic Powder': total_kg * 0.02,
+            'Paprika': total_kg * 0.01
+        }
+            sufficient = True
+            for mat_name, needed in materials_needed.items():
+                current = get_current_material_balance(mat_name)
+                if current < needed:
+                    st.error(f"Insufficient {mat_name}. Need {needed:.2f}kg, have {current:.2f}kg")
+                    sufficient = False
+            if sufficient:
+            # Save batch
                 batch_data = {
-                    "batch_number": batch_number,
-                    "production_date": str(production_date),
-                    "total_kg_produced": total_kg,
-                    "salt_kg": salt_kg,
-                    "african_birds_eye_kg": birds_eye_kg,
-                    "cayenne_kg": cayenne_kg,
-                    "onion_powder_kg": onion_kg,
-                    "garlic_powder_kg": garlic_kg,
-                    "paprika_kg": paprika_kg,
-                    "remaining_stock_kg": total_kg,  # Initially full
-                    "status": "Completed",
-                    "notes": notes
-                }
+                "batch_number": batch_number,
+                "production_date": str(production_date),
+                "total_kg_produced": total_kg,
+                "salt_kg": salt_kg,
+                "african_birds_eye_kg": birds_eye_kg,
+                "cayenne_kg": cayenne_kg,
+                "onion_powder_kg": onion_kg,
+                "garlic_powder_kg": garlic_kg,
+                "paprika_kg": paprika_kg,
+                "status": "Completed",
+                "notes": notes
+            }
                 
-                batch_id = save_batch(batch_data)
                 
-                if batch_id:
-                    # Record material usage and update inventory
-                    for mat_name, needed in materials_needed.items():
-                        # Get current cost per kg
-                        mat_data = next((m for m in materials if m['material_name'] == mat_name), None)
-                        cost_per_kg = mat_data['unit_cost'] if mat_data else 0
-                        
-                        # Record usage
-                        record_material_usage(batch_id, mat_name, needed, cost_per_kg)
                     
-                    # Save production outputs
-                    outputs = [
-                        ("Sachet 5", sachet_5_qty, 5),
-                        ("Sachet 30", sachet_30_qty, 30),
-                        ("Bottle 100g", bottle_100g_qty, 150),
-                        ("Refill 120g", refill_120g_qty, 120)
-                    ]
-                    
-                    for product_type, qty, price in outputs:
-                        if qty > 0:
-                            save_production_output({
-                                "batch_id": batch_id,
-                                "product_type": product_type,
-                                "quantity_produced": qty,
-                                "unit_price": price
-                            })
-                    
-                    st.success(f"✅ Batch {batch_number} saved successfully!")
-                    st.balloons()
-                    st.rerun()
-                else:
-                    st.error("Failed to save batch!")
+            batch_id = save_batch(batch_data)
+            
+            if batch_id:
+                # Record material usage for each ingredient
+                for mat_name, needed in materials_needed.items():
+                    record_material_usage_with_balance(batch_id, mat_name, needed, production_date)
+                
+                # Save production outputs
+                outputs = [
+                    ("Sachet 5", sachet_5_qty, 5),
+                    ("Sachet 30", sachet_30_qty, 30),
+                    ("Bottle 100g", bottle_100g_qty, 150),
+                    ("Refill 120g", refill_120g_qty, 120)
+                ]
+                
+                for product_type, qty, price in outputs:
+                    if qty > 0:
+                        save_production_output({
+                            "batch_id": batch_id,
+                            "product_type": product_type,
+                            "quantity_produced": qty,
+                            "unit_price": price
+                        })
+                
+                st.success(f"✅ Batch {batch_number} saved successfully!")
+                st.balloons()
+                st.rerun()
+            else:
+                st.error("Failed to save batch!")
     
     # ========== TAB 2: BATCH HISTORY ==========
     with prod_tab2:
@@ -1462,11 +1480,18 @@ with tab6:
             restock_notes = st.text_area("Notes", key="restock_notes", placeholder="Any issues with quality, delivery, etc.")
             
             if st.button("💾 Record Restock", type="primary", key="record_restock"):
-                if record_restock_with_transaction(restock_material, restock_qty, restock_cost, supplier, restock_notes):
+                if record_restock_with_balance(
+        restock_material, 
+        restock_qty, 
+        restock_cost, 
+        supplier, 
+        restock_date, 
+        restock_notes
+    ):
                     st.success(f"✅ Restocked {restock_qty} KG of {restock_material} on {restock_date}")
                     st.rerun()
-                else:
-                    st.error("Failed to record restock")
+            else:
+                st.error("Failed to record restock")
         
         # Current inventory display with more details
         materials = get_raw_materials()
