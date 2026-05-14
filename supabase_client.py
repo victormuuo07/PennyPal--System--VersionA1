@@ -523,12 +523,13 @@ def get_all_material_usage():
         return pd.DataFrame()
     
 # -------------------------------
-# COMPLETE INVENTORY TRACKING SYSTEM (ADD THIS SECTION)
+# INVENTORY TRACKING FUNCTIONS (ADD THIS ENTIRE BLOCK)
 # -------------------------------
 
 def record_restock_with_balance(material_name: str, quantity_kg: float, cost_per_kg: float, supplier: str, restock_date, notes: str = ""):
     """Record a restock and update inventory balance"""
     try:
+        from datetime import date
         restock_id = str(uuid.uuid4())
         
         # Get current balance
@@ -566,7 +567,7 @@ def record_restock_with_balance(material_name: str, quantity_kg: float, cost_per
         
         return True
     except Exception as e:
-        st.error(f"Error recording restock: {str(e)}")
+        print(f"Error recording restock: {str(e)}")
         return False
 
 def record_material_usage_with_balance(batch_id: str, material_name: str, quantity_used_kg: float, usage_date):
@@ -637,7 +638,7 @@ def record_material_usage_with_balance(batch_id: str, material_name: str, quanti
         
         return True
     except Exception as e:
-        st.error(f"Error recording usage: {str(e)}")
+        print(f"Error recording usage: {str(e)}")
         return False
 
 def get_current_material_balance(material_name: str):
@@ -649,11 +650,11 @@ def get_current_material_balance(material_name: str):
             .execute()
         
         if response.data:
-            return response.data[0]['current_stock_kg']
-        return 0
+            return float(response.data[0]['current_stock_kg'])
+        return 0.0
     except Exception as e:
         print(f"Error getting balance: {str(e)}")
-        return 0
+        return 0.0
 
 def update_raw_material_inventory(material_name: str, purchased_kg: float = 0, used_kg: float = 0):
     """Update the raw materials inventory table"""
@@ -679,7 +680,7 @@ def update_raw_material_inventory(material_name: str, purchased_kg: float = 0, u
                 .execute()
         return True
     except Exception as e:
-        st.error(f"Error updating inventory: {str(e)}")
+        print(f"Error updating inventory: {str(e)}")
         return False
 
 def get_material_restock_history(material_name: str):
@@ -692,6 +693,7 @@ def get_material_restock_history(material_name: str):
             .execute()
         return response.data if response.data else []
     except Exception as e:
+        print(f"Error getting restock history: {str(e)}")
         return []
 
 def get_inventory_balance_history(material_name: str):
@@ -704,4 +706,5 @@ def get_inventory_balance_history(material_name: str):
             .execute()
         return response.data if response.data else []
     except Exception as e:
+        print(f"Error getting balance history: {str(e)}")
         return []
