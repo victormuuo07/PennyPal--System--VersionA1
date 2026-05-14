@@ -867,3 +867,261 @@ def get_price_for_product(product_type: str):
         "Refill 120g": 120
     }
     return prices.get(product_type, 0)
+
+# -------------------------------
+# FINISHED GOODS FUNCTIONS (ADD THIS)
+# -------------------------------
+
+def update_finished_goods_production(product_type: str, quantity_produced: int):
+    """Increase finished goods stock when production is made"""
+    try:
+        from datetime import datetime
+        
+        response = supabase.table("FINISHED_GOODS_INVENTORY")\
+            .select("*")\
+            .eq("product_type", product_type)\
+            .execute()
+        
+        # Price mapping
+        prices = {
+            "Sachet 5": 5,
+            "Sachet 30": 30,
+            "Bottle 100g": 150,
+            "Refill 120g": 120
+        }
+        reorder_levels = {
+            "Sachet 5": 500,
+            "Sachet 30": 200,
+            "Bottle 100g": 100,
+            "Refill 120g": 50
+        }
+        
+        if response.data:
+            current = response.data[0]
+            new_stock = current.get('current_stock', 0) + quantity_produced
+            new_produced = current.get('total_produced', 0) + quantity_produced
+            
+            supabase.table("FINISHED_GOODS_INVENTORY").update({
+                "current_stock": new_stock,
+                "total_produced": new_produced,
+                "last_updated": datetime.now().isoformat()
+            }).eq("product_type", product_type).execute()
+        else:
+            # Create new entry
+            supabase.table("FINISHED_GOODS_INVENTORY").insert({
+                "product_type": product_type,
+                "current_stock": quantity_produced,
+                "total_produced": quantity_produced,
+                "total_sold": 0,
+                "unit_price": prices.get(product_type, 0),
+                "reorder_level": reorder_levels.get(product_type, 100)
+            }).execute()
+        
+        return True
+    except Exception as e:
+        print(f"Error updating finished goods: {str(e)}")
+        return False
+
+def update_finished_goods_sale(product_type: str, quantity_sold: int):
+    """Decrease finished goods stock when a sale is made"""
+    try:
+        from datetime import datetime
+        
+        response = supabase.table("FINISHED_GOODS_INVENTORY")\
+            .select("*")\
+            .eq("product_type", product_type)\
+            .execute()
+        
+        if response.data:
+            current = response.data[0]
+            new_stock = current.get('current_stock', 0) - quantity_sold
+            new_sold = current.get('total_sold', 0) + quantity_sold
+            
+            supabase.table("FINISHED_GOODS_INVENTORY").update({
+                "current_stock": new_stock,
+                "total_sold": new_sold,
+                "last_updated": datetime.now().isoformat()
+            }).eq("product_type", product_type).execute()
+            
+            # Show warning if low stock
+            reorder_level = current.get('reorder_level', 100)
+            if new_stock <= reorder_level:
+                print(f"⚠️ Low stock alert: {product_type} has only {new_stock} units left!")
+        
+        return True
+    except Exception as e:
+        print(f"Error updating finished goods: {str(e)}")
+        return False
+
+# -------------------------------
+# INVENTORY TRACKING FUNCTIONS (ADD THIS)
+# -------------------------------
+
+def record_restock_with_balance(material_name: str, quantity_kg: float, cost_per_kg: float, supplier: str, restock_date, notes: str = ""):
+    """Record a restock and update inventory balance"""
+    try:
+        from datetime import date
+        
+        # Convert date if needed
+        if hasattr(restock_date, 'strftime'):
+            restock_date_str = restock_date.strftime('%Y-%m-%d')
+        else:
+            restock_date_str = str(restock_date)
+        
+        restock_id = str(uuid.uuid4())
+        
+        # Record restock
+        restock_data = {
+            "id": restock_id,
+            "material_name": material_name,
+            "quantity_kg": quantity_kg,
+            "cost_per_kg": cost_per_kg,
+            "total_cost": quantity_kg * cost_per_kg,
+            "supplier": supplier,
+            "restock_date": restock_date_str,
+            "remaining_kg": quantity_kg,
+            "notes": notes
+        }
+        supabase.table("STOCK_RESTOCK").insert(restock_data).execute()
+        
+        # Update raw materials inventory
+        inv_response = supabase.table("RAW_MATERIALS_INVENTORY").select("*").eq("material_name", material_name).execute()
+        
+        if inv_response.data:
+            current = inv_response.data[0]
+            new_purchased = current.get('total_purchased_kg', 0) + quantity_kg
+            new_stock = current.get('current_stock_kg', 0) + quantity_kg
+            
+            supabase.table("RAW_MATERIALS_INVENTORY").update({
+                "total_purchased_kg": new_purchased,
+                "current_stock_kg": new_stock,
+                "last_restock_date": restock_date_str
+            }).eq("material_name", material_name).execute()
+        else:
+            supabase.table("RAW_MATERIALS_INVENTORY").insert({
+                "material_name": material_name,
+                "total_purchased_kg": quantity_kg,
+                "current_stock_kg": quantity_kg,
+                "unit_cost": cost_per_kg,
+                "reorder_level": 10,
+                "last_restock_date": restock_date_str
+            }).execute()
+        
+        return True
+    except Exception as e:
+        print(f"Error recording restock: {str(e)}")
+        return False
+
+def record_material_usage_with_balance(batch_id: str, material_name: str, quantity_used_kg: float, usage_date):
+    """Record material usage and update inventory balance"""
+    try:
+        # Convert date if needed
+        if hasattr(usage_date, 'strftime'):
+            usage_date_str = usage_date.strftime('%Y-%m-%d')
+        else:
+            usage_date_str = str(usage_date)
+        
+        # Check if enough stock is available
+        current_stock = get_current_material_balance(material_name)
+        
+        if current_stock < quantity_used_kg:
+            print(f"Insufficient {material_name}! Need {quantity_used_kg:.2f}kg, have {current_stock:.2f}kg")
+            return False
+        
+        # Get restocks with remaining stock (oldest first for FIFO)
+        response = supabase.table("STOCK_RESTOCK")\
+            .select("*")\
+            .eq("material_name", material_name)\
+            .gt("remaining_kg", 0)\
+            .order("restock_date", asc=True)\
+            .execute()
+        
+        if not response.data:
+            print(f"No stock available for {material_name}!")
+            return False
+        
+        remaining_to_use = quantity_used_kg
+        
+        # Deduct from restocks using FIFO
+        for restock in response.data:
+            if remaining_to_use <= 0:
+                break
+            
+            available = restock['remaining_kg']
+            use_from_this = min(remaining_to_use, available)
+            new_remaining = available - use_from_this
+            
+            supabase.table("STOCK_RESTOCK")\
+                .update({"remaining_kg": new_remaining})\
+                .eq("id", restock['id'])\
+                .execute()
+            
+            remaining_to_use -= use_from_this
+        
+        # Record material usage
+        usage_data = {
+            "id": str(uuid.uuid4()),
+            "batch_id": batch_id,
+            "material_name": material_name,
+            "quantity_used_kg": quantity_used_kg,
+            "usage_date": usage_date_str
+        }
+        supabase.table("MATERIAL_USAGE").insert(usage_data).execute()
+        
+        # Update raw materials inventory
+        inv_response = supabase.table("RAW_MATERIALS_INVENTORY").select("*").eq("material_name", material_name).execute()
+        if inv_response.data:
+            current = inv_response.data[0]
+            new_used = current.get('total_used_kg', 0) + quantity_used_kg
+            new_stock = current.get('current_stock_kg', 0) - quantity_used_kg
+            
+            supabase.table("RAW_MATERIALS_INVENTORY").update({
+                "total_used_kg": new_used,
+                "current_stock_kg": new_stock
+            }).eq("material_name", material_name).execute()
+        
+        return True
+    except Exception as e:
+        print(f"Error recording usage: {str(e)}")
+        return False
+
+def get_current_material_balance(material_name: str):
+    """Get current balance for a material"""
+    try:
+        response = supabase.table("RAW_MATERIALS_INVENTORY")\
+            .select("current_stock_kg")\
+            .eq("material_name", material_name)\
+            .execute()
+        
+        if response.data:
+            return float(response.data[0]['current_stock_kg'])
+        return 0.0
+    except Exception as e:
+        print(f"Error getting balance: {str(e)}")
+        return 0.0
+
+def get_material_restock_history(material_name: str):
+    """Get all restock history for a material"""
+    try:
+        response = supabase.table("STOCK_RESTOCK")\
+            .select("*")\
+            .eq("material_name", material_name)\
+            .order("restock_date", desc=True)\
+            .execute()
+        return response.data if response.data else []
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return []
+
+def get_inventory_balance_history(material_name: str):
+    """Get the balance history over time"""
+    try:
+        response = supabase.table("INVENTORY_BALANCE")\
+            .select("*")\
+            .eq("material_name", material_name)\
+            .order("transaction_date", asc=True)\
+            .execute()
+        return response.data if response.data else []
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return []

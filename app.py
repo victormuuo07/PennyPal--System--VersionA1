@@ -51,11 +51,13 @@ from supabase_client import (
     get_inventory_transactions,
     get_material_usage_summary,
     get_all_material_usage,
-     record_restock_with_balance,
+    record_restock_with_balance,
     record_material_usage_with_balance,
     get_current_material_balance,
     get_material_restock_history,
-    get_inventory_balance_history
+    get_inventory_balance_history,
+    update_finished_goods_production,
+    update_finished_goods_sale
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -1627,7 +1629,7 @@ with prod_tab4:  # Finished Goods tab
                 st.write(f"- {item['product_type']}: {item['current_stock']} units left (Reorder at {item['reorder_level']})")
     else:
         st.info("No finished goods data available")
-        
+
     # ========== TAB 5: INVENTORY REPORTS ==========
     with prod_tab5:
         st.markdown("### 📈 Inventory Movement Reports")
