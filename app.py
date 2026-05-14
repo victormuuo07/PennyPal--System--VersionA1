@@ -1572,28 +1572,43 @@ with tab6:
         else:
             st.info("No raw materials data")
     
-    # ========== TAB 4: FINISHED GOODS ==========
-    # In your Production tab, under Finished Goods section:
-with prod_tab4:  # Finished Goods tab
+    # ========== FINISHED GOODS TAB ==========
+with prod_tab4:
     st.markdown("### 📦 Finished Goods Inventory")
     
     finished_goods = get_finished_goods()
     if finished_goods:
         df_finished = pd.DataFrame(finished_goods)
         
-        # Display current stock
+        # Display current stock metrics
         st.subheader("📊 Current Stock Levels")
         
-        # Metrics row
-        col1, col2, col3, col4 = st.columns(4)
-        for idx, row in df_finished.iterrows():
-            cols = [col1, col2, col3, col4]
-            with cols[idx]:
-                st.metric(
-                    row['product_type'], 
-                    f"{row['current_stock']} units",
-                    delta=f"Sold: {row.get('total_sold', 0)}"
-                )
+        # Fixed: Handle any number of products (1-4)
+        num_products = len(df_finished)
+        if num_products <= 4:
+            cols = st.columns(num_products)
+            for idx, row in df_finished.iterrows():
+                with cols[idx]:
+                    st.metric(
+                        row['product_type'], 
+                        f"{row['current_stock']} units",
+                        delta=f"Sold: {row.get('total_sold', 0)}"
+                    )
+        else:
+            # If more than 4 products, show in rows of 4
+            rows = (num_products + 3) // 4
+            for r in range(rows):
+                cols = st.columns(4)
+                for c in range(4):
+                    product_idx = r * 4 + c
+                    if product_idx < num_products:
+                        row = df_finished.iloc[product_idx]
+                        with cols[c]:
+                            st.metric(
+                                row['product_type'], 
+                                f"{row['current_stock']} units",
+                                delta=f"Sold: {row.get('total_sold', 0)}"
+                            )
         
         # Stock table
         st.dataframe(
