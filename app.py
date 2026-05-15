@@ -527,7 +527,7 @@ with tab2:
                     price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
                     product_name = "SpiseUp Spicy Salt Bottle (100g New) - Hotel"
             else:
-                price, min_qty, default_qty, unit = 120.0, 1, 5, "refills"
+                price, min_qty, default_qty, unit = 120.0, 1, 1, "refills"
                 product_name = f"SpiseUp Spicy Salt Bottle (100g Refill) - {customer_type}"
                 st.success("🔄 **REFILL BENEFIT:** Pay KES 120 and get 100g (save KES 30, get 20% more!)")
             
@@ -540,12 +540,15 @@ with tab2:
             st.success(f"**Total Amount:** KES {total:,.2f}")
             
             hotel_name, mama_name = None, None
+
             if customer_type == "Hotel/Restaurant":
                 st.markdown("---")
                 st.subheader("🏨 Hotel Tracking")
                 hotel_name = st.text_input("Hotel Name", placeholder="Enter hotel name", key="hotel_track")
                 if hotel_name:
                     col_a, col_b = st.columns(2)
+                    with col_a:
+                        last_purchase = st.date_input("Last purchase date", value=date.today(), key="last_purchase")
                     with col_b:
                         refill_count = st.number_input("Times refilled this month", min_value=0, value=1, key="refill_count")
                         if refill_count > 0:
@@ -556,13 +559,18 @@ with tab2:
                                 st.info("📈 Medium frequency")
                             else:
                                 st.warning("⏰ Low frequency - consider follow-up")
-            
+        # Store tracking info in session state
+                    st.session_state.hotel_name = hotel_name
+                    st.session_state.last_purchase = last_purchase
+                    st.session_state.refill_count = refill_count
+
             if customer_type == "Shop/Mama Mboga (B2B)":
                 st.markdown("---")
                 st.subheader("🏪 Mama Mboga/Shop Tracking")
                 mama_name = st.text_input("Mama Mboga/Shop Name", placeholder="Enter shop name", key="mama_track")
                 if mama_name:
                     st.caption("💡 They buy at KES 2.9, sell at KES 5 - KES 2.1 profit per sachet!")
+                    st.session_state.mama_name = mama_name
             
             payment_status = st.selectbox("Payment Status", ["Cash", "Credit / Pending"])
             
@@ -616,7 +624,10 @@ with tab2:
             }
             
             sale_id = save_sale(sale_record)
-            
+            if submitted_sale:
+                st.write(f"🔍 DEBUG: Hotel Name = {hotel_name}")
+                st.write(f"🔍 DEBUG: Mama Name = {mama_name}")
+                st.write(f"🔍 DEBUG: Customer Type = {customer_type}")
             if sale_id:
                 st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
                  # Map product to finished goods type and deduct from inventory
