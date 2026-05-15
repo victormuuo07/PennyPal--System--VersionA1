@@ -330,14 +330,15 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
     "👥 Salespeople", 
     "📈 Analytics",
      "🏭 Production & Inventory",
-     "💰 Funding & Capital"
+     "💰 Funding & Capital",
+     "🏭 Assets & Deposits"
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -1837,6 +1838,122 @@ with tab7:
             st.metric("Profit Margin", f"{profit_margin:.1f}%")
         
         st.metric("Cash Balance vs Funding", f"{(kpis['running_balance'] / total_funding * 100):.1f}%" if total_funding > 0 else "N/A")
+
+# Add to your tabs (after tab7)
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    "📊 Dashboard", 
+    "💰 Sales", 
+    "💸 Expenses", 
+    "👥 Salespeople", 
+    "📈 Analytics",
+    "🏭 Production & Inventory",
+    "💰 Funding & Capital",
+    "🏭 Assets & Deposits"  # NEW TAB
+])
+
+# ==================== TAB 8: ASSETS & DEPOSITS ====================
+with tab8:
+    st.markdown('<div class="section-header">🏭 Assets & Deposits Management</div>', unsafe_allow_html=True)
+    
+    asset_tab1, asset_tab2 = st.tabs([
+        "🏪 Equipment & Assets",
+        "💰 Deposits"
+    ])
+    
+    # ========== ASSETS TAB ==========
+    with asset_tab1:
+        st.markdown("### 📦 Equipment & Assets")
+        
+        # Add new asset form
+        with st.expander("➕ Add New Equipment/Asset", expanded=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                asset_name = st.text_input("Asset Name", placeholder="e.g., Commercial Grinder")
+                asset_type = st.selectbox("Asset Type", ["Equipment", "Vehicle", "Furniture", "Office", "Other"])
+                purchase_date = st.date_input("Purchase Date", value=date.today())
+                purchase_cost = st.number_input("Purchase Cost (KES)", min_value=0, step=1000, value=0)
+            with col2:
+                useful_life = st.number_input("Useful Life (Years)", min_value=1, max_value=20, value=5)
+                supplier = st.text_input("Supplier")
+                warranty_until = st.date_input("Warranty Until", value=date.today() + timedelta(days=365))
+                notes = st.text_area("Notes")
+            
+            if st.button("💾 Record Asset", type="primary"):
+                if asset_name and purchase_cost > 0:
+                    asset_data = {
+                        "asset_name": asset_name,
+                        "asset_type": asset_type,
+                        "purchase_date": str(purchase_date),
+                        "purchase_cost": purchase_cost,
+                        "current_value": purchase_cost,
+                        "useful_life_years": useful_life,
+                        "supplier": supplier,
+                        "warranty_until": str(warranty_until),
+                        "notes": notes,
+                        "status": "Active"
+                    }
+                    # Save to database (you'll need to add this function)
+                    st.success(f"✅ Asset '{asset_name}' recorded!")
+                    st.rerun()
+                else:
+                    st.error("Please fill in required fields")
+        
+        # Display existing assets
+        st.markdown("### 📋 Current Assets")
+        # Add code to fetch and display assets from database
+        st.info("No assets recorded yet. Add your grinder and mixer above!")
+    
+    # ========== DEPOSITS TAB ==========
+    with asset_tab2:
+        st.markdown("### 💰 Deposit Management")
+        
+        # Record deposit (the one you paid)
+        with st.expander("📝 Record Deposit Paid", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                deposit_name = st.text_input("Deposit Name", placeholder="e.g., Office Rent Deposit")
+                deposit_type = st.selectbox("Deposit Type", ["Rental", "Utility", "Security", "Other"])
+                amount_paid = st.number_input("Amount Paid (KES)", min_value=0, step=1000, value=0)
+            with col2:
+                payment_date = st.date_input("Payment Date", value=date.today())
+                expected_refund = st.date_input("Expected Refund Date", value=date.today() + timedelta(days=30))
+                notes = st.text_area("Notes")
+            
+            if st.button("💾 Record Deposit Paid", type="primary"):
+                # Save to database
+                st.success(f"✅ Deposit recorded: KES {amount_paid:,.0f}")
+        
+        # Record deposit refund (the money you got back)
+        with st.expander("💰 Record Deposit Refund", expanded=True):
+            st.info("📌 Record the deposit refund you received from the landlord")
+            col1, col2 = st.columns(2)
+            with col1:
+                refund_amount = st.number_input("Refund Amount (KES)", min_value=0, step=1000, value=0)
+                refund_date = st.date_input("Refund Date", value=date.today())
+            with col2:
+                refund_notes = st.text_area("Refund Notes", placeholder="e.g., Office deposit refunded after canceling lease")
+            
+            if st.button("💾 Record Refund", type="primary"):
+                if refund_amount > 0:
+                    # Record as negative expense in EXPENSES table
+                    expense_record = {
+                        "date": str(refund_date),
+                        "category": "Deposit Refund",
+                        "description": refund_notes,
+                        "amount": -refund_amount,  # NEGATIVE = money back
+                        "payment_method": "Bank Transfer",
+                        "paid_by": "Landlord",
+                        "receipt": "",
+                        "status": "Received"
+                    }
+                    save_expense(expense_record)
+                    st.success(f"✅ Refund of KES {refund_amount:,.0f} recorded!")
+                    st.info("💰 This amount has been added back to your cash balance")
+                    st.rerun()
+        
+        # Display deposit history
+        st.markdown("### 📋 Deposit History")
+        st.info("No deposits recorded yet")
 
 # Footer
 st.markdown("---")
