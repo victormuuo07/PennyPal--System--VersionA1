@@ -338,7 +338,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📈 Analytics",
      "🏭 Production & Inventory",
      "💰 Funding & Capital",
-     "🏭 Assets & Equipment""
+     "🏭 Assets & Equipment"
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -1839,7 +1839,109 @@ with tab7:
         
         st.metric("Cash Balance vs Funding", f"{(kpis['running_balance'] / total_funding * 100):.1f}%" if total_funding > 0 else "N/A")
 
-
+# ==================== TAB 8: ASSETS & EQUIPMENT ====================
+with tab8:
+    st.markdown('<div class="section-header">🏭 Assets & Equipment Management</div>', unsafe_allow_html=True)
+    
+    # ========== REFUND SECTION ==========
+    with st.expander("💰 Record Refund (Money Coming Back)", expanded=True):
+        st.info("📌 Use this for deposit refunds, supplier refunds, or any money you receive back")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            refund_amount = st.number_input("Refund Amount (KES)", min_value=0, step=1000, value=0, key="refund_amount")
+            refund_date = st.date_input("Refund Date", value=date.today(), key="refund_date")
+            refund_category = st.selectbox("Refund Type", ["Deposit Refund", "Supplier Refund", "Customer Refund", "Other"], key="refund_category")
+        with col2:
+            refund_source = st.text_input("Refund From", placeholder="e.g., Landlord, Supplier", key="refund_source")
+            refund_description = st.text_area("Description", placeholder="e.g., Office deposit refund after canceling lease", key="refund_description")
+        
+        if st.button("💾 Record Refund", type="primary", use_container_width=True):
+            if refund_amount > 0:
+                expense_record = {
+                    "date": str(refund_date),
+                    "category": refund_category,
+                    "description": f"Refund from {refund_source} - {refund_description}",
+                    "amount": -refund_amount,
+                    "payment_method": "Bank Transfer",
+                    "paid_by": refund_source,
+                    "receipt": "",
+                    "status": "Received"
+                }
+                save_expense(expense_record)
+                st.success(f"✅ Refund of KES {refund_amount:,.0f} recorded!")
+                st.info("💰 Money ADDED back to your cash balance")
+                st.balloons()
+                st.rerun()
+            else:
+                st.error("Please enter a refund amount")
+    
+    st.markdown("---")
+    
+    # ========== ADD NEW ASSET ==========
+    with st.expander("➕ Add New Equipment/Asset", expanded=True):
+        st.markdown("Record new equipment like grinder, mixer, etc.")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            asset_name = st.text_input("Asset Name", placeholder="e.g., Commercial Grinder, Industrial Mixer", key="asset_name")
+            asset_type = st.selectbox("Asset Type", ["Equipment", "Machinery", "Vehicle", "Furniture", "Office", "Other"], key="asset_type")
+            purchase_date = st.date_input("Purchase Date", value=date.today(), key="purchase_date")
+            purchase_cost = st.number_input("Purchase Cost (KES)", min_value=0, step=1000, value=0, key="purchase_cost")
+        
+        with col2:
+            useful_life = st.number_input("Useful Life (Years)", min_value=1, max_value=20, value=5, key="useful_life")
+            supplier = st.text_input("Supplier", placeholder="e.g., Jumia, Local Store", key="supplier")
+            warranty_until = st.date_input("Warranty Until", value=date.today() + timedelta(days=365), key="warranty")
+            asset_notes = st.text_area("Notes", placeholder="Model number, specifications, etc.", key="asset_notes")
+        
+        if st.button("💾 Save Asset", type="primary", use_container_width=True):
+            if asset_name and purchase_cost > 0:
+                # Record as expense
+                expense_record = {
+                    "date": str(purchase_date),
+                    "category": "Equipment Purchase",
+                    "description": f"Purchased {asset_name} from {supplier} - {asset_notes}",
+                    "amount": purchase_cost,
+                    "payment_method": "Bank Transfer",
+                    "paid_by": "Business",
+                    "receipt": "",
+                    "status": "Paid"
+                }
+                save_expense(expense_record)
+                
+                st.success(f"✅ Asset '{asset_name}' recorded successfully!")
+                st.info(f"💰 KES {purchase_cost:,.0f} recorded as equipment expense")
+                st.balloons()
+                st.rerun()
+            else:
+                st.error("Please enter Asset Name and Purchase Cost")
+    
+    # ========== DISPLAY ASSETS ==========
+    st.markdown("---")
+    st.markdown("### 📋 Current Assets & Equipment")
+    
+    if not expenses_df.empty:
+        equipment_expenses = expenses_df[expenses_df['category'].str.contains('Equipment', case=False, na=False)]
+        
+        if not equipment_expenses.empty:
+            display_df = equipment_expenses.copy()
+            display_df['date'] = pd.to_datetime(display_df['date']).dt.strftime('%Y-%m-%d')
+            display_df['amount'] = display_df['amount'].apply(lambda x: f"KES {x:,.0f}")
+            
+            st.dataframe(
+                display_df[['date', 'description', 'amount', 'payment_method']],
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            total_equipment = equipment_expenses['amount'].sum()
+            st.metric("💰 Total Equipment Investment", f"KES {total_equipment:,.0f}")
+        else:
+            st.info("No equipment/assets recorded yet. Add your grinder and mixer using the form above!")
+    else:
+        st.info("No equipment/assets recorded yet. Add your grinder and mixer using the form above!")
 
 # Footer
 st.markdown("---")
