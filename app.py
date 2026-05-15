@@ -624,10 +624,6 @@ with tab2:
             }
             
             sale_id = save_sale(sale_record)
-            if submitted_sale:
-                st.write(f"🔍 DEBUG: Hotel Name = {hotel_name}")
-                st.write(f"🔍 DEBUG: Mama Name = {mama_name}")
-                st.write(f"🔍 DEBUG: Customer Type = {customer_type}")
             if sale_id:
                 st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
                  # Map product to finished goods type and deduct from inventory
