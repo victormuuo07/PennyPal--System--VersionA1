@@ -473,7 +473,7 @@ with tab1:
                 st.write(f"💰 KES {row['Total']:,.0f}")
             st.divider()
 
-# ==================== TAB 2: SALES ====================
+
 # ==================== TAB 2: SALES ====================
 with tab2:
     st.markdown('<div class="section-header">💰 Record New Sale</div>', unsafe_allow_html=True)
@@ -1357,9 +1357,9 @@ with tab6:
         with col3:
             bottle_100g_qty = st.number_input("100g Bottles (KES 150)", min_value=0, step=10, value=0, key="bottle_100")
         with col4:
-            refill_100g_qty = st.number_input("100g Refills (KES 120)", min_value=0, step=10, value=0, key="refill_120")
+            refill_100g_qty = st.number_input("100g Refills (KES 120)", min_value=0, step=10, value=0, key="refill_100")
         
-        total_units = sachet_5_qty + sachet_30_qty + bottle_100g_qty + refill_120g_qty
+        total_units = sachet_5_qty + sachet_30_qty + bottle_100g_qty + refill_100g_qty
         st.info(f"📦 **Total Units Produced:** {total_units:,}")
         
         notes = st.text_area("Production Notes", placeholder="Any issues or observations?", key="prod_notes")
