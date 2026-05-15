@@ -56,7 +56,11 @@ from supabase_client import (
     get_material_restock_history,
     get_inventory_balance_history,
     update_finished_goods_production,
-    update_finished_goods_sale
+    update_finished_goods_sale,
+    save_asset,
+    get_assets,
+    delete_asset,
+    update_asset
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
