@@ -511,20 +511,20 @@ with tab2:
                     price, min_qty, default_qty, unit = 2.9, 18, 18, "sachets"
                     product_name = "SpiseUp Spicy Salt Sachet (2.9 KES) - Wholesale"
                 else:
-                    price, min_qty, default_qty, unit = 2.9, 18, 200, "sachets"
+                    price, min_qty, default_qty, unit = 2.9, 18, 18, "sachets"
                     product_name = "SpiseUp Spicy Salt Sachet (2.9 KES) - Hotel"
             elif product_main == "Sachet - Premium (30 KES)":
-                price, min_qty, default_qty, unit = 30.0, 1, 5, "sachets"
+                price, min_qty, default_qty, unit = 30.0, 1, 1, "sachets"
                 product_name = f"SpiseUp Spicy Salt Sachet (30 KES) - {customer_type}"
             elif product_main == "Bottle (100g New)":
                 if customer_type == "Consumer (B2C)":
-                    price, min_qty, default_qty, unit = 150.0, 1, 2, "bottles"
+                    price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
                     product_name = "SpiseUp Spicy Salt Bottle (100g New) - Consumer"
                 elif customer_type == "Shop/Mama Mboga (B2B)":
-                    price, min_qty, default_qty, unit = 150.0, 1, 10, "bottles"
+                    price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
                     product_name = "SpiseUp Spicy Salt Bottle (100g New) - Wholesale"
                 else:
-                    price, min_qty, default_qty, unit = 150.0, 1, 20, "bottles"
+                    price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
                     product_name = "SpiseUp Spicy Salt Bottle (100g New) - Hotel"
             else:
                 price, min_qty, default_qty, unit = 120.0, 1, 5, "refills"
