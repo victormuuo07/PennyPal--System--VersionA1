@@ -539,89 +539,80 @@ with tab2:
             total = quantity * price
             st.success(f"**Total Amount:** KES {total:,.2f}")
             
-            hotel_name, mama_name = None, None
+            # Initialize tracking variables
+            hotel_name = None
+            mama_name = None
+            last_purchase = None
+            refill_count = 0
 
+# Hotel Tracking
             if customer_type == "Hotel/Restaurant":
                 st.markdown("---")
                 st.subheader("🏨 Hotel Tracking")
-                hotel_name = st.text_input("Hotel Name", placeholder="Enter hotel name", key="hotel_track")
+    
+                col_hotel1, col_hotel2 = st.columns(2)
+                with col_hotel1:
+                    hotel_name = st.text_input("Hotel Name", placeholder="Enter hotel name", key="hotel_track")
+                with col_hotel2:
+                    last_purchase = st.date_input("Last purchase date", value=date.today(), key="last_purchase")
+    
                 if hotel_name:
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        last_purchase = st.date_input("Last purchase date", value=date.today(), key="last_purchase")
-                    with col_b:
+                    col_freq1, col_freq2 = st.columns(2)
+                    with col_freq1:
                         refill_count = st.number_input("Times refilled this month", min_value=0, value=1, key="refill_count")
+                    with col_freq2:
                         if refill_count > 0:
                             avg_days = 30 / refill_count
                             if avg_days < 7:
-                                st.success("🔥 High frequency customer!")
+                                st.success("🔥 High frequency customer - excellent!")
                             elif avg_days < 14:
-                                st.info("📈 Medium frequency")
+                                st.info("📈 Medium frequency - good customer")
                             else:
                                 st.warning("⏰ Low frequency - consider follow-up")
-        # Store tracking info in session state
-                    st.session_state.hotel_name = hotel_name
-                    st.session_state.last_purchase = last_purchase
-                    st.session_state.refill_count = refill_count
+        
+        # Show hotel summary
+                    st.caption(f"📊 Tracking: {hotel_name} - {refill_count} refills this month")
 
+# Mama Mboga Tracking
             if customer_type == "Shop/Mama Mboga (B2B)":
                 st.markdown("---")
                 st.subheader("🏪 Mama Mboga/Shop Tracking")
+    
                 mama_name = st.text_input("Mama Mboga/Shop Name", placeholder="Enter shop name", key="mama_track")
+    
                 if mama_name:
-                    st.caption("💡 They buy at KES 2.9, sell at KES 5 - KES 2.1 profit per sachet!")
-                    st.session_state.mama_name = mama_name
-            
-            payment_status = st.selectbox("Payment Status", ["Cash", "Credit / Pending"])
-            
-            if sales_person_options:
-                sales_person_name = st.selectbox("Sales Person", ["Select..."] + list(sales_person_options.keys()))
-            else:
-                sales_person_name = "N/A"
-                st.warning("No salespeople added yet.")
-    
-    with st.expander("📝 Additional Details"):
-        feedback = st.text_area("Customer Feedback", placeholder="Any feedback from the customer...")
-        follow_up = st.text_input("Follow-up Action", placeholder="Next steps or follow-up required...")
-    
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        submitted_sale = st.button("💾 Save Sale", type="primary", use_container_width=True)
-    with col2:
-        clear_form = st.button("🗑️ Clear Form", use_container_width=True)
-    
-    if clear_form:
-        for key in ['shop_name', 'phone', 'location', 'product', 'quantity', 'price', 'payment_status', 'sales_person_name', 'feedback', 'follow_up']:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.success("✅ Form cleared!")
-        st.rerun()
-    
-    if submitted_sale:
-        if not shop_name.strip():
-            st.error("Please enter a Shop/Contact Name!")
-        elif sales_person_name == "Select...":
-            st.error("Please select a salesperson!")
-        else:
+                    col_resell1, col_resell2 = st.columns(2)
+                with col_resell1:
+                    is_reseller = st.checkbox("They resell to consumers", value=True)
+                with col_resell2:
+                    monthly_volume = st.number_input("Estimated monthly volume (sachets)", min_value=0, value=100, step=50)
+        
+                if is_reseller:
+                    st.caption(f"💡 **Profit potential:** They buy at KES 2.9, sell at KES 5 = KES 2.1 profit per sachet")
+                    st.caption(f"📊 Estimated monthly profit: KES {monthly_volume * 2.1:,.0f}")
+
+# After collecting all data, create sale_record with tracking info
             sale_record = {
-                "Date": str(sale_date),
-                "Name": shop_name,
-                "Phone": phone,
-                "Location": location,
-                "Product": product_name,
-                "Product_Type": product_main,
-                "Customer_Type": customer_type,
-                "Unit": unit,
-                "Quantity": quantity,
-                "Price_per_Unit": price,
-                "Total": total,
-                "Payment_Status": payment_status,
-                "Feedback": feedback,
-                "Follow_Up": follow_up,
-                "Is_Refill": "Refill" in product_main,
-                "Tracking_Hotel": hotel_name if hotel_name else None,
-                "Tracking_Mama": mama_name if mama_name else None
-            }
+    "Date": str(sale_date),
+    "Name": shop_name,
+    "Phone": phone,
+    "Location": location,
+    "Product": product_name,
+    "Product_Type": product_main,
+    "Customer_Type": customer_type,
+    "Unit": unit,
+    "Quantity": quantity,
+    "Price_per_Unit": price,
+    "Total": total,
+    "Payment_Status": payment_status,
+    "Feedback": feedback,
+    "Follow_Up": follow_up,
+    "Is_Refill": "Refill" in product_main,
+    "Tracking_Hotel": hotel_name if hotel_name else None,
+    "Tracking_Mama": mama_name if mama_name else None,
+    "Last_Purchase": str(last_purchase) if last_purchase else None,
+    "Refill_Count": refill_count if refill_count > 0 else None
+}
             
             sale_id = save_sale(sale_record)
             if sale_id:
