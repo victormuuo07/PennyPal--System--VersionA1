@@ -1849,14 +1849,14 @@ with tab8:
         
         col1, col2 = st.columns(2)
         with col1:
-            refund_amount = st.number_input("Refund Amount (KES)", min_value=0, step=1000, value=0, key="refund_amount")
-            refund_date = st.date_input("Refund Date", value=date.today(), key="refund_date")
-            refund_category = st.selectbox("Refund Type", ["Deposit Refund", "Supplier Refund", "Customer Refund", "Other"], key="refund_category")
+            refund_amount = st.number_input("Refund Amount (KES)", min_value=0, step=1000, value=0, key="refund_amount_input")
+            refund_date = st.date_input("Refund Date", value=date.today(), key="refund_date_input")
+            refund_category = st.selectbox("Refund Type", ["Deposit Refund", "Supplier Refund", "Customer Refund", "Other"], key="refund_category_select")
         with col2:
-            refund_source = st.text_input("Refund From", placeholder="e.g., Landlord, Supplier", key="refund_source")
-            refund_description = st.text_area("Description", placeholder="e.g., Office deposit refund after canceling lease", key="refund_description")
+            refund_source = st.text_input("Refund From", placeholder="e.g., Landlord, Supplier", key="refund_source_input")
+            refund_description = st.text_area("Description", placeholder="e.g., Office deposit refund after canceling lease", key="refund_description_area")
         
-        if st.button("💾 Record Refund", type="primary", use_container_width=True):
+        if st.button("💾 Record Refund", type="primary", use_container_width=True, key="record_refund_btn"):
             if refund_amount > 0:
                 expense_record = {
                     "date": str(refund_date),
@@ -1885,24 +1885,24 @@ with tab8:
         col1, col2 = st.columns(2)
         
         with col1:
-            asset_name = st.text_input("Asset Name", placeholder="e.g., Commercial Grinder, Industrial Mixer", key="asset_name")
-            asset_type = st.selectbox("Asset Type", ["Equipment", "Machinery", "Vehicle", "Furniture", "Office", "Other"], key="asset_type")
-            purchase_date = st.date_input("Purchase Date", value=date.today(), key="purchase_date")
-            purchase_cost = st.number_input("Purchase Cost (KES)", min_value=0, step=1000, value=0, key="purchase_cost")
+            asset_name = st.text_input("Asset Name", placeholder="e.g., Commercial Grinder, Industrial Mixer", key="asset_name_input")
+            asset_type = st.selectbox("Asset Type", ["Equipment", "Machinery", "Vehicle", "Furniture", "Office", "Other"], key="asset_type_select")
+            purchase_date = st.date_input("Purchase Date", value=date.today(), key="asset_purchase_date")
+            purchase_cost = st.number_input("Purchase Cost (KES)", min_value=0, step=1000, value=0, key="asset_purchase_cost")
         
         with col2:
-            useful_life = st.number_input("Useful Life (Years)", min_value=1, max_value=20, value=5, key="useful_life")
-            supplier = st.text_input("Supplier", placeholder="e.g., Jumia, Local Store", key="supplier")
-            warranty_until = st.date_input("Warranty Until", value=date.today() + timedelta(days=365), key="warranty")
-            asset_notes = st.text_area("Notes", placeholder="Model number, specifications, etc.", key="asset_notes")
+            useful_life = st.number_input("Useful Life (Years)", min_value=1, max_value=20, value=5, key="asset_useful_life")
+            supplier_name = st.text_input("Supplier", placeholder="e.g., Jumia, Local Store", key="asset_supplier_input")  # CHANGED KEY
+            warranty_until = st.date_input("Warranty Until", value=date.today() + timedelta(days=365), key="asset_warranty_date")
+            asset_notes = st.text_area("Notes", placeholder="Model number, specifications, etc.", key="asset_notes_area")
         
-        if st.button("💾 Save Asset", type="primary", use_container_width=True):
+        if st.button("💾 Save Asset", type="primary", use_container_width=True, key="save_asset_btn"):
             if asset_name and purchase_cost > 0:
                 # Record as expense
                 expense_record = {
                     "date": str(purchase_date),
                     "category": "Equipment Purchase",
-                    "description": f"Purchased {asset_name} from {supplier} - {asset_notes}",
+                    "description": f"Purchased {asset_name} from {supplier_name} - {asset_notes}",
                     "amount": purchase_cost,
                     "payment_method": "Bank Transfer",
                     "paid_by": "Business",
