@@ -1843,8 +1843,31 @@ with tab7:
 with tab8:
     st.markdown('<div class="section-header">🏭 Assets & Equipment Management</div>', unsafe_allow_html=True)
     
+    # Summary Cards at the top
+    st.subheader("📊 Asset Summary")
+    
+    # Get assets from database
+    assets_list = get_assets()
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        total_assets = len(assets_list)
+        st.metric("Total Assets", total_assets)
+    with col2:
+        total_value = sum([a.get('purchase_cost', 0) for a in assets_list]) if assets_list else 0
+        st.metric("Total Asset Value", f"KES {total_value:,.0f}")
+    with col3:
+        # Calculate total depreciation
+        total_depreciation = sum([a.get('purchase_cost', 0) - a.get('current_value', a.get('purchase_cost', 0)) for a in assets_list]) if assets_list else 0
+        st.metric("Total Depreciation", f"KES {total_depreciation:,.0f}")
+    with col4:
+        current_value = total_value - total_depreciation
+        st.metric("Current Value", f"KES {current_value:,.0f}")
+    
+    st.markdown("---")
+    
     # ========== REFUND SECTION ==========
-    with st.expander("💰 Record Refund (Money Coming Back)", expanded=True):
+    with st.expander("💰 Record Refund (Money Coming Back)", expanded=False):
         st.info("📌 Use this for deposit refunds, supplier refunds, or any money you receive back")
         
         col1, col2 = st.columns(2)
@@ -1856,8 +1879,9 @@ with tab8:
             refund_source = st.text_input("Refund From", placeholder="e.g., Landlord, Supplier", key="refund_source_input")
             refund_description = st.text_area("Description", placeholder="e.g., Office deposit refund after canceling lease", key="refund_description_area")
         
-        if st.button("💾 Record Refund", type="primary", use_container_width=True, key="record_refund_btn"):
+        if st.button("💰 Record Refund", type="primary", use_container_width=True, key="record_refund_btn"):
             if refund_amount > 0:
+                # Record as negative expense
                 expense_record = {
                     "date": str(refund_date),
                     "category": refund_category,
@@ -1879,7 +1903,7 @@ with tab8:
     st.markdown("---")
     
     # ========== ADD NEW ASSET ==========
-    with st.expander("➕ Add New Equipment/Asset", expanded=True):
+    with st.expander("➕ Add New Equipment/Asset", expanded=False):
         st.markdown("Record new equipment like grinder, mixer, etc.")
         
         col1, col2 = st.columns(2)
@@ -1892,57 +1916,130 @@ with tab8:
         
         with col2:
             useful_life = st.number_input("Useful Life (Years)", min_value=1, max_value=20, value=5, key="asset_useful_life")
-            supplier_name = st.text_input("Supplier", placeholder="e.g., Jumia, Local Store", key="asset_supplier_input")  # CHANGED KEY
+            supplier_name = st.text_input("Supplier", placeholder="e.g., Jumia, Local Store", key="asset_supplier_input")
             warranty_until = st.date_input("Warranty Until", value=date.today() + timedelta(days=365), key="asset_warranty_date")
             asset_notes = st.text_area("Notes", placeholder="Model number, specifications, etc.", key="asset_notes_area")
         
         if st.button("💾 Save Asset", type="primary", use_container_width=True, key="save_asset_btn"):
             if asset_name and purchase_cost > 0:
-                # Record as expense
-                expense_record = {
-                    "date": str(purchase_date),
-                    "category": "Equipment Purchase",
-                    "description": f"Purchased {asset_name} from {supplier_name} - {asset_notes}",
-                    "amount": purchase_cost,
-                    "payment_method": "Bank Transfer",
-                    "paid_by": "Business",
-                    "receipt": "",
-                    "status": "Paid"
+                # Save to ASSETS table
+                asset_data = {
+                    "asset_name": asset_name,
+                    "asset_type": asset_type,
+                    "purchase_date": str(purchase_date),
+                    "purchase_cost": purchase_cost,
+                    "current_value": purchase_cost,
+                    "useful_life_years": useful_life,
+                    "supplier": supplier_name,
+                    "warranty_until": str(warranty_until),
+                    "notes": asset_notes,
+                    "status": "Active"
                 }
-                save_expense(expense_record)
                 
-                st.success(f"✅ Asset '{asset_name}' recorded successfully!")
-                st.info(f"💰 KES {purchase_cost:,.0f} recorded as equipment expense")
-                st.balloons()
-                st.rerun()
+                asset_id = save_asset(asset_data)
+                
+                if asset_id:
+                    # Also record as expense
+                    expense_record = {
+                        "date": str(purchase_date),
+                        "category": "Equipment Purchase",
+                        "description": f"Purchased {asset_name} from {supplier_name} - {asset_notes}",
+                        "amount": purchase_cost,
+                        "payment_method": "Bank Transfer",
+                        "paid_by": "Business",
+                        "receipt": "",
+                        "status": "Paid"
+                    }
+                    save_expense(expense_record)
+                    
+                    st.success(f"✅ Asset '{asset_name}' recorded successfully!")
+                    st.info(f"💰 KES {purchase_cost:,.0f} recorded as equipment expense")
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("Failed to save asset to database")
             else:
                 st.error("Please enter Asset Name and Purchase Cost")
     
-    # ========== DISPLAY ASSETS ==========
     st.markdown("---")
+    
+    # ========== DISPLAY ASSETS ==========
     st.markdown("### 📋 Current Assets & Equipment")
     
-    if not expenses_df.empty:
-        equipment_expenses = expenses_df[expenses_df['category'].str.contains('Equipment', case=False, na=False)]
+    if assets_list:
+        # Create DataFrame for display
+        df_assets = pd.DataFrame(assets_list)
+        df_assets['purchase_date'] = pd.to_datetime(df_assets['purchase_date']).dt.strftime('%Y-%m-%d')
+        df_assets['purchase_cost'] = df_assets['purchase_cost'].apply(lambda x: f"KES {x:,.0f}")
         
-        if not equipment_expenses.empty:
-            display_df = equipment_expenses.copy()
-            display_df['date'] = pd.to_datetime(display_df['date']).dt.strftime('%Y-%m-%d')
-            display_df['amount'] = display_df['amount'].apply(lambda x: f"KES {x:,.0f}")
-            
-            st.dataframe(
-                display_df[['date', 'description', 'amount', 'payment_method']],
-                use_container_width=True,
-                hide_index=True
-            )
-            
-            total_equipment = equipment_expenses['amount'].sum()
-            st.metric("💰 Total Equipment Investment", f"KES {total_equipment:,.0f}")
-        else:
-            st.info("No equipment/assets recorded yet. Add your grinder and mixer using the form above!")
+        # Calculate depreciation
+        df_assets['current_value'] = df_assets['current_value'].apply(lambda x: f"KES {x:,.0f}" if x else "N/A")
+        
+        st.dataframe(
+            df_assets[['asset_name', 'asset_type', 'purchase_date', 'purchase_cost', 'current_value', 'supplier', 'status']],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "asset_name": "Asset Name",
+                "asset_type": "Type",
+                "purchase_date": "Purchase Date",
+                "purchase_cost": "Purchase Cost",
+                "current_value": "Current Value",
+                "supplier": "Supplier",
+                "status": "Status"
+            }
+        )
+        
+        # Asset type distribution chart
+        st.markdown("### 📊 Asset Distribution")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Pie chart by asset type
+            asset_type_summary = df_assets.groupby('asset_type').size().reset_index(name='count')
+            fig = px.pie(asset_type_summary, values='count', names='asset_type', title='Assets by Type')
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # Bar chart of asset values
+            asset_value_data = pd.DataFrame(assets_list)
+            asset_value_data['value'] = asset_value_data['purchase_cost']
+            fig = px.bar(asset_value_data, x='asset_name', y='value', title='Asset Values',
+                        color='asset_type', text='value')
+            fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+            fig.update_layout(xaxis_title='Asset', yaxis_title='Value (KES)')
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Depreciation schedule
+        st.markdown("### 📉 Depreciation Schedule")
+        st.info("Linear depreciation over useful life")
+        
+        depreciation_data = []
+        for asset in assets_list:
+            annual_dep = asset['purchase_cost'] / asset['useful_life_years']
+            monthly_dep = annual_dep / 12
+            depreciation_data.append({
+                'Asset': asset['asset_name'],
+                'Cost': f"KES {asset['purchase_cost']:,.0f}",
+                'Useful Life': f"{asset['useful_life_years']} years",
+                'Annual Depreciation': f"KES {annual_dep:,.0f}",
+                'Monthly Depreciation': f"KES {monthly_dep:,.0f}"
+            })
+        
+        st.dataframe(pd.DataFrame(depreciation_data), use_container_width=True, hide_index=True)
+        
     else:
-        st.info("No equipment/assets recorded yet. Add your grinder and mixer using the form above!")
-
+        st.info("No assets recorded yet. Add your grinder and mixer using the form above!")
+        
+        # Show equipment purchases from expenses as fallback
+        if not expenses_df.empty:
+            equipment_expenses = expenses_df[expenses_df['category'].str.contains('Equipment', case=False, na=False)]
+            if not equipment_expenses.empty:
+                st.markdown("### 📋 Recent Equipment Purchases (from Expenses)")
+                display_df = equipment_expenses.copy()
+                display_df['date'] = pd.to_datetime(display_df['date']).dt.strftime('%Y-%m-%d')
+                display_df['amount'] = display_df['amount'].apply(lambda x: f"KES {x:,.0f}")
+                st.dataframe(display_df[['date', 'description', 'amount']], use_container_width=True, hide_index=True)
 # Footer
 st.markdown("---")
 st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")

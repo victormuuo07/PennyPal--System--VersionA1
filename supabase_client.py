@@ -1126,11 +1126,18 @@ def get_inventory_balance_history(material_name: str):
         print(f"Error: {str(e)}")
         return []
     
+# -------------------------------
+# ASSETS FUNCTIONS
+# -------------------------------
+
 def save_asset(asset_data: dict):
     """Save an asset to the ASSETS table"""
     try:
         asset_data["id"] = str(uuid.uuid4())
         response = supabase.table("ASSETS").insert(asset_data).execute()
+        if hasattr(response, 'error') and response.error:
+            st.error(f"Error saving asset: {response.error.message}")
+            return None
         return response.data[0]["id"] if response.data else None
     except Exception as e:
         st.error(f"Error saving asset: {str(e)}")
@@ -1142,4 +1149,23 @@ def get_assets():
         response = supabase.table("ASSETS").select("*").order("purchase_date", desc=True).execute()
         return response.data if response.data else []
     except Exception as e:
+        st.error(f"Error fetching assets: {str(e)}")
         return []
+
+def delete_asset(asset_id: str):
+    """Delete an asset"""
+    try:
+        response = supabase.table("ASSETS").delete().eq("id", asset_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error deleting asset: {str(e)}")
+        return False
+
+def update_asset(asset_id: str, updates: dict):
+    """Update an asset"""
+    try:
+        response = supabase.table("ASSETS").update(updates).eq("id", asset_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error updating asset: {str(e)}")
+        return False
