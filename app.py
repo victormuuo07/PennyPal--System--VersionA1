@@ -521,10 +521,10 @@ with tab2:
                     price, min_qty, default_qty, unit = 150.0, 1, 2, "bottles"
                     product_name = "SpiseUp Spicy Salt Bottle (100g New) - Consumer"
                 elif customer_type == "Shop/Mama Mboga (B2B)":
-                    price, min_qty, default_qty, unit = 130.0, 1, 10, "bottles"
+                    price, min_qty, default_qty, unit = 150.0, 1, 10, "bottles"
                     product_name = "SpiseUp Spicy Salt Bottle (100g New) - Wholesale"
                 else:
-                    price, min_qty, default_qty, unit = 130.0, 1, 20, "bottles"
+                    price, min_qty, default_qty, unit = 150.0, 1, 20, "bottles"
                     product_name = "SpiseUp Spicy Salt Bottle (100g New) - Hotel"
             else:
                 price, min_qty, default_qty, unit = 120.0, 1, 5, "refills"
@@ -628,7 +628,7 @@ with tab2:
         "SpiseUp Spicy Salt Bottle (100g New) - Consumer": "Bottle 100g",
         "SpiseUp Spicy Salt Bottle (100g New) - Wholesale": "Bottle 100g",
         "SpiseUp Spicy Salt Bottle (100g New) - Hotel": "Bottle 100g",
-        "SpiseUp Spicy Salt Bottle (120g Refill)": "Refill 120g"
+        "SpiseUp Spicy Salt Bottle (100g Refill)": "Refill 100g"
     }
     
     # Get the base product name (before the dash)
@@ -1346,7 +1346,7 @@ with tab6:
         with col3:
             bottle_100g_qty = st.number_input("100g Bottles (KES 150)", min_value=0, step=10, value=0, key="bottle_100")
         with col4:
-            refill_120g_qty = st.number_input("120g Refills (KES 120)", min_value=0, step=10, value=0, key="refill_120")
+            refill_100g_qty = st.number_input("100g Refills (KES 120)", min_value=0, step=10, value=0, key="refill_120")
         
         total_units = sachet_5_qty + sachet_30_qty + bottle_100g_qty + refill_120g_qty
         st.info(f"📦 **Total Units Produced:** {total_units:,}")
