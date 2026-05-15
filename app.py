@@ -591,6 +591,8 @@ with tab2:
                     st.caption(f"💡 **Profit potential:** They buy at KES 2.9, sell at KES 5 = KES 2.1 profit per sachet")
                     st.caption(f"📊 Estimated monthly profit: KES {monthly_volume * 2.1:,.0f}")
 
+            payment_status = st.selectbox("Payment Status", ["Cash", "Credit / Pending"])
+            
 # After collecting all data, create sale_record with tracking info
             sale_record = {
     "Date": str(sale_date),
