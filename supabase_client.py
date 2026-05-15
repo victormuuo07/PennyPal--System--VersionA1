@@ -1125,3 +1125,21 @@ def get_inventory_balance_history(material_name: str):
     except Exception as e:
         print(f"Error: {str(e)}")
         return []
+    
+def save_asset(asset_data: dict):
+    """Save an asset to the ASSETS table"""
+    try:
+        asset_data["id"] = str(uuid.uuid4())
+        response = supabase.table("ASSETS").insert(asset_data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving asset: {str(e)}")
+        return None
+
+def get_assets():
+    """Get all assets"""
+    try:
+        response = supabase.table("ASSETS").select("*").order("purchase_date", desc=True).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
