@@ -474,6 +474,7 @@ with tab1:
             st.divider()
 
 # ==================== TAB 2: SALES ====================
+# ==================== TAB 2: SALES ====================
 with tab2:
     st.markdown('<div class="section-header">💰 Record New Sale</div>', unsafe_allow_html=True)
     
@@ -503,6 +504,7 @@ with tab2:
                 horizontal=True
             )
             
+            # Pricing logic based on selections
             if product_main == "Sachet - Standard (5 KES)":
                 if customer_type == "Consumer (B2C)":
                     price, min_qty, default_qty, unit = 5.0, 1, 1, "sachets"
@@ -529,7 +531,7 @@ with tab2:
             else:
                 price, min_qty, default_qty, unit = 120.0, 1, 1, "refills"
                 product_name = f"SpiseUp Spicy Salt Bottle (100g Refill) - {customer_type}"
-                st.success("🔄 **REFILL BENEFIT:** Pay KES 120 and get 100g (save KES 30, get 20% more!)")
+                st.success("🔄 **REFILL BENEFIT:** Pay KES 120 and get 100g (save KES 30!)")
             
             if min_qty > 1:
                 st.info(f"📦 Minimum order: {min_qty} {unit}")
@@ -539,105 +541,114 @@ with tab2:
             total = quantity * price
             st.success(f"**Total Amount:** KES {total:,.2f}")
             
-            # Initialize tracking variables
+            # Hotel Tracking
             hotel_name = None
-            mama_name = None
-            last_purchase = None
-            refill_count = 0
-
-# Hotel Tracking
             if customer_type == "Hotel/Restaurant":
                 st.markdown("---")
                 st.subheader("🏨 Hotel Tracking")
-    
-                col_hotel1, col_hotel2 = st.columns(2)
-                with col_hotel1:
-                    hotel_name = st.text_input("Hotel Name", placeholder="Enter hotel name", key="hotel_track")
-                with col_hotel2:
-                    last_purchase = st.date_input("Last purchase date", value=date.today(), key="last_purchase")
-    
+                hotel_name = st.text_input("Hotel Name", placeholder="Enter hotel name", key="hotel_track")
                 if hotel_name:
-                    col_freq1, col_freq2 = st.columns(2)
-                    with col_freq1:
-                        refill_count = st.number_input("Times refilled this month", min_value=0, value=1, key="refill_count")
-                    with col_freq2:
-                        if refill_count > 0:
-                            avg_days = 30 / refill_count
-                            if avg_days < 7:
-                                st.success("🔥 High frequency customer - excellent!")
-                            elif avg_days < 14:
-                                st.info("📈 Medium frequency - good customer")
-                            else:
-                                st.warning("⏰ Low frequency - consider follow-up")
-        
-        # Show hotel summary
-                    st.caption(f"📊 Tracking: {hotel_name} - {refill_count} refills this month")
-
-# Mama Mboga Tracking
+                    refill_count = st.number_input("Times refilled this month", min_value=0, value=1, key="refill_count")
+                    if refill_count > 0:
+                        avg_days = 30 / refill_count
+                        if avg_days < 7:
+                            st.success("🔥 High frequency customer!")
+                        elif avg_days < 14:
+                            st.info("📈 Medium frequency")
+                        else:
+                            st.warning("⏰ Low frequency - consider follow-up")
+            
+            # Mama Mboga Tracking
+            mama_name = None
             if customer_type == "Shop/Mama Mboga (B2B)":
                 st.markdown("---")
                 st.subheader("🏪 Mama Mboga/Shop Tracking")
-    
                 mama_name = st.text_input("Mama Mboga/Shop Name", placeholder="Enter shop name", key="mama_track")
-    
                 if mama_name:
-                    col_resell1, col_resell2 = st.columns(2)
-                with col_resell1:
-                    is_reseller = st.checkbox("They resell to consumers", value=True)
-                with col_resell2:
-                    monthly_volume = st.number_input("Estimated monthly volume (sachets)", min_value=0, value=100, step=50)
-        
-                if is_reseller:
-                    st.caption(f"💡 **Profit potential:** They buy at KES 2.9, sell at KES 5 = KES 2.1 profit per sachet")
-                    st.caption(f"📊 Estimated monthly profit: KES {monthly_volume * 2.1:,.0f}")
-
+                    st.caption("💡 They buy at KES 2.9, sell at KES 5 - KES 2.1 profit per sachet")
+            
+            # Payment Status
             payment_status = st.selectbox("Payment Status", ["Cash", "Credit / Pending"])
             
-# After collecting all data, create sale_record with tracking info
+            # Sales Person selection
+            if sales_person_options:
+                sales_person_name = st.selectbox("Sales Person", ["Select..."] + list(sales_person_options.keys()))
+            else:
+                sales_person_name = "N/A"
+                st.warning("No salespeople added yet.")
+            
+            # Additional Details - NOW INSIDE the same block
+            st.markdown("---")
+            st.markdown("### 📝 Additional Details")
+            feedback = st.text_area("Customer Feedback", placeholder="Any feedback from the customer...", key="feedback")
+            follow_up = st.text_input("Follow-up Action", placeholder="Next steps or follow-up required...", key="follow_up")
+            
+            # Buttons
+            col_btn1, col_btn2 = st.columns([1, 1])
+            with col_btn1:
+                submitted_sale = st.button("💾 Save Sale", type="primary", use_container_width=True)
+            with col_btn2:
+                clear_form = st.button("🗑️ Clear Form", use_container_width=True)
+    
+    # Clear form logic (outside columns but using session state)
+    if clear_form:
+        for key in ['shop_name', 'phone', 'location', 'quantity', 'price', 'payment_status', 'sales_person_name', 'feedback', 'follow_up']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.success("✅ Form cleared!")
+        st.rerun()
+    
+    # Save sale logic
+    if submitted_sale:
+        if not shop_name.strip():
+            st.error("Please enter a Shop/Contact Name!")
+        elif sales_person_name == "Select...":
+            st.error("Please select a salesperson!")
+        else:
             sale_record = {
-    "Date": str(sale_date),
-    "Name": shop_name,
-    "Phone": phone,
-    "Location": location,
-    "Product": product_name,
-    "Product_Type": product_main,
-    "Customer_Type": customer_type,
-    "Unit": unit,
-    "Quantity": quantity,
-    "Price_per_Unit": price,
-    "Total": total,
-    "Payment_Status": payment_status,
-    "Feedback": feedback,
-    "Follow_Up": follow_up,
-    "Is_Refill": "Refill" in product_main,
-    "Tracking_Hotel": hotel_name if hotel_name else None,
-    "Tracking_Mama": mama_name if mama_name else None,
-    "Last_Purchase": str(last_purchase) if last_purchase else None,
-    "Refill_Count": refill_count if refill_count > 0 else None
-}
+                "Date": str(sale_date),
+                "Name": shop_name,
+                "Phone": phone,
+                "Location": location,
+                "Product": product_name,
+                "Product_Type": product_main,
+                "Customer_Type": customer_type,
+                "Unit": unit,
+                "Quantity": quantity,
+                "Price_per_Unit": price,
+                "Total": total,
+                "Payment_Status": payment_status,
+                "Feedback": feedback,
+                "Follow_Up": follow_up,
+                "Is_Refill": "Refill" in product_main,
+                "Tracking_Hotel": hotel_name if hotel_name else None,
+                "Tracking_Mama": mama_name if mama_name else None
+            }
             
             sale_id = save_sale(sale_record)
+            
             if sale_id:
                 st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
-                 # Map product to finished goods type and deduct from inventory
+                
+                # Map product for inventory
                 product_mapping = {
-        "SpiseUp Spicy Salt Sachet (5 KES) - Consumer": "Sachet 5",
-        "SpiseUp Spicy Salt Sachet (5 KES) - Wholesale": "Sachet 5",
-        "SpiseUp Spicy Salt Sachet (5 KES) - Hotel": "Sachet 5",
-        "SpiseUp Spicy Salt Sachet (30 KES)": "Sachet 30",
-        "SpiseUp Spicy Salt Bottle (100g New) - Consumer": "Bottle 100g",
-        "SpiseUp Spicy Salt Bottle (100g New) - Wholesale": "Bottle 100g",
-        "SpiseUp Spicy Salt Bottle (100g New) - Hotel": "Bottle 100g",
-        "SpiseUp Spicy Salt Bottle (100g Refill)": "Refill 100g"
-    }
-    
-    # Get the base product name (before the dash)
+                    "SpiseUp Spicy Salt Sachet (5 KES) - Consumer": "Sachet 5",
+                    "SpiseUp Spicy Salt Sachet (5 KES) - Wholesale": "Sachet 5",
+                    "SpiseUp Spicy Salt Sachet (5 KES) - Hotel": "Sachet 5",
+                    "SpiseUp Spicy Salt Sachet (30 KES)": "Sachet 30",
+                    "SpiseUp Spicy Salt Bottle (100g New) - Consumer": "Bottle 100g",
+                    "SpiseUp Spicy Salt Bottle (100g New) - Wholesale": "Bottle 100g",
+                    "SpiseUp Spicy Salt Bottle (100g New) - Hotel": "Bottle 100g",
+                    "SpiseUp Spicy Salt Bottle (100g Refill)": "Refill 100g"
+                }
+                
                 base_product = product_name.split(' - ')[0] if ' - ' in product_name else product_name
                 mapped_product = product_mapping.get(base_product, None)
-    
+                
                 if mapped_product:
                     update_finished_goods_sale(mapped_product, quantity)
                     st.caption(f"📦 Updated inventory: -{quantity} {mapped_product}(s)")
+                
                 if sales_person_name not in ["Select...", "N/A"] and sales_person_name in sales_person_options:
                     success = save_distribution(
                         sale_id=sale_id,
