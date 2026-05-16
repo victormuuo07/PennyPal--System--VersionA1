@@ -779,6 +779,233 @@ with tab4:
 # ==================== TAB 5: ADVANCED ANALYTICS ====================
 with tab5:
     st.markdown('<div class="section-header">📈 Advanced Analytics</div>', unsafe_allow_html=True)
+
+    
+    # ========== NEW: SALES TREND DASHBOARD ==========
+    st.markdown("### 📊 Sales Performance Dashboard")
+    
+    if not sales_df.empty:
+        
+        # Period selector
+        period = st.radio(
+            "Select Time Period",
+            ["Daily", "Weekly", "Monthly", "Quarterly"],
+            horizontal=True
+        )
+        
+        # Create time-based aggregations
+        if period == "Daily":
+            sales_trend = sales_df.groupby('Date')['Total'].sum().reset_index()
+            sales_trend.columns = ['Period', 'Sales']
+            x_title = "Date"
+            
+            # Add moving average for daily
+            sales_trend['7_Day_Avg'] = sales_trend['Sales'].rolling(window=7, min_periods=1).mean()
+            
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=sales_trend['Period'], y=sales_trend['Sales'], name='Daily Sales', marker_color='#36B37E'))
+            fig.add_trace(go.Scatter(x=sales_trend['Period'], y=sales_trend['7_Day_Avg'], name='7-Day Average', line=dict(color='#FF9800', width=3)))
+            fig.update_layout(title='Daily Sales Trend with Moving Average', xaxis_title='Date', yaxis_title='Sales (KES)', hovermode='x unified')
+            st.plotly_chart(fig, use_container_width=True)
+            
+        elif period == "Weekly":
+            # Group by week
+            sales_df['Week'] = sales_df['Date'].dt.isocalendar().week
+            sales_df['Year'] = sales_df['Date'].dt.year
+            sales_trend = sales_df.groupby(['Year', 'Week'])['Total'].sum().reset_index()
+            sales_trend['Period'] = sales_trend.apply(lambda x: f"W{x['Week']} ({x['Year']})", axis=1)
+            x_title = "Week"
+            
+            fig = px.bar(sales_trend, x='Period', y='Total', title='Weekly Sales Trend',
+                        color='Total', color_continuous_scale='Viridis', text='Total')
+            fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+            st.plotly_chart(fig, use_container_width=True)
+            
+        elif period == "Monthly":
+            # Group by month
+            sales_df['Month'] = sales_df['Date'].dt.strftime('%Y-%m')
+            sales_trend = sales_df.groupby('Month')['Total'].sum().reset_index()
+            sales_trend.columns = ['Period', 'Sales']
+            
+            fig = px.line(sales_trend, x='Period', y='Sales', title='Monthly Sales Trend',
+                         markers=True, line_shape='spline')
+            fig.update_traces(line=dict(color='#4CAF50', width=3), marker=dict(size=10))
+            st.plotly_chart(fig, use_container_width=True)
+            
+        else:  # Quarterly
+            sales_df['Quarter'] = sales_df['Date'].dt.quarter
+            sales_df['Year'] = sales_df['Date'].dt.year
+            sales_trend = sales_df.groupby(['Year', 'Quarter'])['Total'].sum().reset_index()
+            sales_trend['Period'] = sales_trend.apply(lambda x: f"Q{x['Quarter']} {x['Year']}", axis=1)
+            
+            fig = px.bar(sales_trend, x='Period', y='Total', title='Quarterly Sales Trend',
+                        color='Total', color_continuous_scale='Blues', text='Total')
+            fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Key Metrics Cards
+        st.markdown("### 📈 Key Performance Indicators")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        # Calculate metrics based on period
+        if period == "Daily":
+            avg_sales = sales_trend['Sales'].mean()
+            best_day = sales_trend.loc[sales_trend['Sales'].idxmax()]
+            worst_day = sales_trend.loc[sales_trend['Sales'].idxmin()]
+            total_period = sales_trend['Sales'].sum()
+            
+            with col1:
+                st.metric("📊 Avg Daily Sales", f"KES {avg_sales:,.0f}")
+            with col2:
+                st.metric("🏆 Best Day", f"KES {best_day['Sales']:,.0f}")
+                st.caption(f"{best_day['Period']}")
+            with col3:
+                st.metric("📉 Worst Day", f"KES {worst_day['Sales']:,.0f}")
+                st.caption(f"{worst_day['Period']}")
+            with col4:
+                st.metric("💰 Total Period", f"KES {total_period:,.0f}")
+                
+        elif period == "Weekly":
+            avg_sales = sales_trend['Total'].mean()
+            best_week = sales_trend.loc[sales_trend['Total'].idxmax()]
+            total_period = sales_trend['Total'].sum()
+            
+            with col1:
+                st.metric("📊 Avg Weekly Sales", f"KES {avg_sales:,.0f}")
+            with col2:
+                st.metric("🏆 Best Week", f"KES {best_week['Total']:,.0f}")
+                st.caption(f"{best_week['Period']}")
+            with col3:
+                # Calculate week-over-week growth
+                if len(sales_trend) >= 2:
+                    recent = sales_trend.iloc[-1]['Total']
+                    previous = sales_trend.iloc[-2]['Total']
+                    growth = ((recent - previous) / previous * 100) if previous > 0 else 0
+                    st.metric("📈 Week-over-Week", f"{growth:.1f}%", delta=f"{growth:.1f}%" if growth != 0 else None)
+                else:
+                    st.metric("📈 Week-over-Week", "N/A")
+            with col4:
+                st.metric("💰 Total Period", f"KES {total_period:,.0f}")
+                
+        else:  # Monthly/Quarterly
+            avg_sales = sales_trend['Sales'].mean()
+            best_period = sales_trend.loc[sales_trend['Sales'].idxmax()]
+            total_period = sales_trend['Sales'].sum()
+            
+            with col1:
+                st.metric(f"📊 Avg {period} Sales", f"KES {avg_sales:,.0f}")
+            with col2:
+                st.metric(f"🏆 Best {period}", f"KES {best_period['Sales']:,.0f}")
+                st.caption(f"{best_period['Period']}")
+            with col3:
+                # Calculate growth
+                if len(sales_trend) >= 2:
+                    recent = sales_trend.iloc[-1]['Sales']
+                    previous = sales_trend.iloc[-2]['Sales']
+                    growth = ((recent - previous) / previous * 100) if previous > 0 else 0
+                    st.metric(f"📈 {period} Growth", f"{growth:.1f}%", delta=f"{growth:.1f}%" if growth != 0 else None)
+                else:
+                    st.metric(f"📈 {period} Growth", "N/A")
+            with col4:
+                st.metric("💰 Total Period", f"KES {total_period:,.0f}")
+        
+        # Sales Insights
+        st.markdown("### 💡 Sales Insights & Recommendations")
+        
+        # Generate insights based on data
+        insights = []
+        
+        # Best selling day of week
+        sales_df['DayName'] = sales_df['Date'].dt.day_name()
+        day_sales = sales_df.groupby('DayName')['Total'].sum().reindex(
+            ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        )
+        best_day = day_sales.idxmax()
+        best_day_value = day_sales.max()
+        
+        insights.append(f"📌 **Best selling day:** {best_day} with KES {best_day_value:,.0f} in sales")
+        
+        # Sales trend direction
+        if len(sales_trend) >= 3:
+            recent_avg = sales_trend.tail(3)['Sales' if period != "Weekly" else 'Total'].mean()
+            previous_avg = sales_trend.head(3)['Sales' if period != "Weekly" else 'Total'].mean()
+            if recent_avg > previous_avg:
+                insights.append(f"📈 **Sales are growing!** +{((recent_avg - previous_avg) / previous_avg * 100):.1f}% compared to previous period")
+            else:
+                insights.append(f"📉 **Sales are declining.** Consider promotional offers or reaching out to existing customers")
+        
+        # Average order value insight
+        avg_order = sales_df['Total'].mean()
+        if avg_order < 500:
+            insights.append(f"💡 **Average order is KES {avg_order:,.0f}** - Consider bundle offers to increase order value")
+        
+        # Top customer insight
+        top_customer = sales_df.groupby('Name')['Total'].sum().idxmax()
+        top_customer_value = sales_df.groupby('Name')['Total'].sum().max()
+        insights.append(f"🏆 **Your best customer is {top_customer}** with KES {top_customer_value:,.0f} in total purchases")
+        
+        # Display insights
+        for insight in insights:
+            st.info(insight)
+        
+        # Weekly Sales Calendar View
+        st.markdown("### 📅 Weekly Sales Calendar")
+        
+        # Create a heatmap of sales by day of week and hour
+        sales_df['Hour'] = sales_df['Date'].dt.hour
+        sales_df['DayOfWeek'] = sales_df['Date'].dt.day_name()
+        
+        # Pivot table for heatmap
+        heatmap_data = sales_df.pivot_table(
+            values='Total', 
+            index='DayOfWeek', 
+            columns='Hour', 
+            aggfunc='sum', 
+            fill_value=0
+        ).reindex(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+        
+        if not heatmap_data.empty:
+            fig = px.imshow(heatmap_data, 
+                           title='Sales Heatmap by Day and Hour',
+                           labels=dict(x="Hour of Day", y="Day of Week", color="Sales (KES)"),
+                           color_continuous_scale='Viridis',
+                           aspect='auto')
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+            st.caption("💡 **When to focus sales efforts:** Darker colors show when sales happen most")
+        
+        # Cumulative Sales Goal Tracker
+        st.markdown("### 🎯 Sales Goal Tracker")
+        
+        # Set monthly goal (adjustable)
+        monthly_goal = st.number_input("Set Monthly Sales Goal (KES)", min_value=0, step=10000, value=100000, key="sales_goal")
+        
+        # Calculate current month sales
+        current_month = date.today().month
+        current_year = date.today().year
+        month_sales = sales_df[(sales_df['Date'].dt.month == current_month) & 
+                                (sales_df['Date'].dt.year == current_year)]['Total'].sum()
+        
+        progress = (month_sales / monthly_goal * 100) if monthly_goal > 0 else 0
+        
+        st.progress(min(progress / 100, 1.0))
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Current Month Sales", f"KES {month_sales:,.0f}")
+        with col2:
+            st.metric("Monthly Goal", f"KES {monthly_goal:,.0f}")
+            st.caption(f"Progress: {progress:.1f}%")
+        
+        if month_sales >= monthly_goal:
+            st.success("🎉 **Congratulations! You've reached your monthly sales goal!** 🎉")
+        elif progress >= 75:
+            st.info("📈 **Almost there!** Keep pushing to reach your goal!")
+        elif progress <= 25 and (date.today().day > 15):
+            st.warning("⚠️ **Sales are behind target.** Consider running a promotion or reaching out to customers.")
+            
+    else:
+        st.info("No sales data available. Start recording sales to see trends!")
     
     analytics_tab1, analytics_tab2, analytics_tab3, analytics_tab4, analytics_tab5 = st.tabs([
         "🏆 Performance Leaderboards", 
@@ -1369,8 +1596,7 @@ with tab6:
         
         notes = st.text_area("Production Notes", placeholder="Any issues or observations?", key="prod_notes")
         
-        # ========== INSIDE THE NEW PRODUCTION BATCH TAB ==========
-# Find the button that says "Save Production Batch" and replace the entire block
+        
 
         if st.button("✅ Save Production Batch", type="primary", use_container_width=True):
             if not batch_number:
@@ -1439,7 +1665,7 @@ with tab6:
                         ("Sachet 5", sachet_5_qty, 5),
                         ("Sachet 30", sachet_30_qty, 30),
                         ("Bottle 100g", bottle_100g_qty, 150),
-                        ("Refill 120g", refill_120g_qty, 120)
+                        ("Refill 100g", refill_100g_qty, 120)
                     ]
                     
                     for product_type, qty, price in outputs:
