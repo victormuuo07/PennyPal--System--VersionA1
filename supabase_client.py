@@ -1169,3 +1169,51 @@ def update_asset(asset_id: str, updates: dict):
     except Exception as e:
         st.error(f"Error updating asset: {str(e)}")
         return False
+
+# -------------------------------
+# DAILY STOCK RECONCILIATION FUNCTIONS
+# -------------------------------
+
+def save_daily_stock_reconciliation(record: dict):
+    """Save daily stock reconciliation record"""
+    try:
+        record["id"] = str(uuid.uuid4())
+        response = supabase.table("DAILY_STOCK_RECONCILIATION").insert(record).execute()
+        if hasattr(response, 'error') and response.error:
+            st.error(f"Error saving stock reconciliation: {response.error.message}")
+            return None
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving stock reconciliation: {str(e)}")
+        return None
+
+def get_daily_stock_reconciliation(date_filter=None, product_filter=None):
+    """Get daily stock reconciliation records"""
+    try:
+        query = supabase.table("DAILY_STOCK_RECONCILIATION").select("*").order("reconciliation_date", desc=True)
+        if date_filter:
+            query = query.eq("reconciliation_date", str(date_filter))
+        if product_filter:
+            query = query.eq("product_name", product_filter)
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Error fetching stock reconciliation: {str(e)}")
+        return []
+
+def get_daily_summary(date):
+    """Get summary for a specific date"""
+    try:
+        response = supabase.table("DAILY_STOCK_RECONCILIATION").select("*").eq("reconciliation_date", str(date)).execute()
+        if response.data:
+            df = pd.DataFrame(response.data)
+            summary = {
+                'total_sold': df['sold_quantity'].sum(),
+                'total_revenue': df['total_revenue'].sum(),
+                'total_given_free': df['given_free'].sum(),
+                'products': len(df)
+            }
+            return summary
+        return None
+    except Exception as e:
+        return None

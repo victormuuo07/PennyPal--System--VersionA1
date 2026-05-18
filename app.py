@@ -60,7 +60,10 @@ from supabase_client import (
     save_asset,
     get_assets,
     delete_asset,
-    update_asset
+    update_asset,
+     save_daily_stock_reconciliation,
+    get_daily_stock_reconciliation,
+    get_daily_summary
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -334,7 +337,7 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
@@ -343,7 +346,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
      "🏭 Production & Inventory",
      "💰 Funding & Capital",
      "🏭 Assets & Equipment",
-     "📝 Daily Sales Entry"
+     "📝 Daily Sales Entry",
+     "📊 Stock Reconciliation"
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -2505,6 +2509,233 @@ with tab9:
                     st.error(f"❌ Failed to record: {', '.join(errors)}")
                 else:
                     st.error("❌ Failed to record sales. Please check and try again.")
+
+# ==================== TAB 10: STOCK RECONCILIATION ====================
+with tab10:
+    st.markdown('<div class="section-header">📊 Daily Stock Reconciliation</div>', unsafe_allow_html=True)
+    
+    st.info("📌 **Track your daily stock movement:** Record what you went out with, what you came back with, and what you gave for free")
+    
+    # Date selector
+    recon_date = st.date_input("Reconciliation Date", value=date.today(), key="recon_date")
+    
+    # Check if date already has records
+    existing_summary = get_daily_summary(recon_date)
+    if existing_summary:
+        st.warning(f"⚠️ Records already exist for {recon_date}. You can add more products or update existing ones.")
+    
+    st.markdown("---")
+    st.markdown("### 📦 Product Stock Entry")
+    
+    # Product selection
+    products = [
+        ("5 KES Sachet", 5),
+        ("10 KES Sachet", 10),
+        ("20 KES Sachet", 20),
+        ("30 KES Sachet", 30),
+        ("40 KES Sachet", 40),
+        ("100g Bottle", 150),
+        ("100g Refill", 120)
+    ]
+    
+    # Create expandable sections for each product
+    reconciliation_records = []
+    
+    for product_name, unit_price in products:
+        with st.expander(f"📦 {product_name} - KES {unit_price}", expanded=False):
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                opening = st.number_input(
+                    f"Opening Stock (went out with)", 
+                    min_value=0, 
+                    step=1, 
+                    value=0, 
+                    key=f"opening_{product_name.replace(' ', '_')}"
+                )
+            
+            with col2:
+                closing = st.number_input(
+                    f"Closing Stock (came back with)", 
+                    min_value=0, 
+                    step=1, 
+                    value=0, 
+                    key=f"closing_{product_name.replace(' ', '_')}"
+                )
+            
+            with col3:
+                given_free = st.number_input(
+                    f"Given for Free (promotions/damages)", 
+                    min_value=0, 
+                    step=1, 
+                    value=0, 
+                    key=f"free_{product_name.replace(' ', '_')}"
+                )
+            
+            # Calculate sold
+            sold = opening - closing - given_free
+            
+            if sold > 0:
+                st.success(f"📊 **Calculated Sold:** {sold} units = KES {sold * unit_price:,.0f}")
+                reconciliation_records.append({
+                    "product_name": product_name,
+                    "opening_stock": opening,
+                    "closing_stock": closing,
+                    "given_free": given_free,
+                    "sold_quantity": sold,
+                    "unit_price": unit_price,
+                    "total_revenue": sold * unit_price
+                })
+            elif sold < 0:
+                st.error(f"❌ **Error:** Closing stock + given free cannot exceed opening stock! (Opening: {opening}, Closing: {closing}, Free: {given_free})")
+            else:
+                st.info("📊 No sales recorded for this product.")
+    
+    # Summary of all products
+    st.markdown("---")
+    st.markdown("### 📊 Daily Summary")
+    
+    if reconciliation_records:
+        df_summary = pd.DataFrame(reconciliation_records)
+        total_sold = df_summary['sold_quantity'].sum()
+        total_revenue = df_summary['total_revenue'].sum()
+        total_free = df_summary['given_free'].sum()
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("📦 Total Units Sold", f"{total_sold:,}")
+        with col2:
+            st.metric("💰 Total Revenue", f"KES {total_revenue:,.0f}")
+        with col3:
+            st.metric("🎁 Given Free", f"{total_free:,}")
+        with col4:
+            avg_price = total_revenue / total_sold if total_sold > 0 else 0
+            st.metric("📊 Average Price", f"KES {avg_price:.2f}")
+        
+        # Display detailed table
+        st.dataframe(
+            df_summary[['product_name', 'opening_stock', 'closing_stock', 'given_free', 'sold_quantity', 'total_revenue']],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "product_name": "Product",
+                "opening_stock": "Opening",
+                "closing_stock": "Closing",
+                "given_free": "Given Free",
+                "sold_quantity": "Sold",
+                "total_revenue": st.column_config.NumberColumn("Revenue", format="KES %d")
+            }
+        )
+        
+        # Additional info
+        st.markdown("---")
+        st.markdown("### 📝 Additional Information")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            sales_person = st.selectbox("Sales Person", ["Select..."] + list(sales_person_options.keys()) if sales_person_options else ["N/A"], key="recon_sales_person")
+            location = st.text_input("Location", placeholder="e.g., Nairobi CBD", key="recon_location")
+        with col2:
+            notes = st.text_area("Daily Notes", placeholder="Any observations, challenges, or notable events...", key="recon_notes")
+        
+        # Save button
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            save_recon = st.button("💾 Save Stock Reconciliation", type="primary", use_container_width=True)
+        
+        if save_recon:
+            if sales_person == "Select...":
+                st.error("Please select a sales person!")
+            else:
+                saved_count = 0
+                for record in reconciliation_records:
+                    recon_data = {
+                        "reconciliation_date": str(recon_date),
+                        "product_name": record['product_name'],
+                        "opening_stock": record['opening_stock'],
+                        "closing_stock": record['closing_stock'],
+                        "given_free": record['given_free'],
+                        "unit_price": record['unit_price'],
+                        "notes": notes
+                    }
+                    
+                    result = save_daily_stock_reconciliation(recon_data)
+                    if result:
+                        saved_count += 1
+                        
+                        # Also create actual sale records for the sold items
+                        if record['sold_quantity'] > 0:
+                            sale_record = {
+                                "Date": str(recon_date),
+                                "Name": f"Daily Stock Sale - {recon_date}",
+                                "Phone": "",
+                                "Location": location,
+                                "Product": record['product_name'],
+                                "Product_Type": record['product_name'],
+                                "Customer_Type": "Consumer (B2C)",
+                                "Unit": "units",
+                                "Quantity": record['sold_quantity'],
+                                "Price_per_Unit": record['unit_price'],
+                                "Total": record['total_revenue'],
+                                "Payment_Status": "Cash",
+                                "Feedback": notes,
+                                "Follow_Up": "",
+                                "Is_Refill": "Refill" in record['product_name'],
+                                "Tracking_Hotel": None,
+                                "Tracking_Mama": None
+                            }
+                            save_sale(sale_record)
+                            
+                            # Update finished goods inventory
+                            product_mapping = {
+                                "5 KES Sachet": "Sachet 5",
+                                "10 KES Sachet": "Sachet 10",
+                                "20 KES Sachet": "Sachet 20",
+                                "30 KES Sachet": "Sachet 30",
+                                "40 KES Sachet": "Sachet 40",
+                                "100g Bottle": "Bottle 100g",
+                                "100g Refill": "Refill 100g"
+                            }
+                            mapped_product = product_mapping.get(record['product_name'], None)
+                            if mapped_product:
+                                update_finished_goods_sale(mapped_product, record['sold_quantity'])
+                
+                if saved_count > 0:
+                    st.success(f"✅ Successfully saved {saved_count} product records for {recon_date}!")
+                    st.balloons()
+                else:
+                    st.error("Failed to save records. Please try again.")
+    else:
+        st.warning("No products with valid sales data. Please enter stock information above.")
+    
+    # ========== VIEW HISTORY ==========
+    st.markdown("---")
+    st.markdown("### 📋 Reconciliation History")
+    
+    # Date filter for history
+    col1, col2 = st.columns(2)
+    with col1:
+        history_date = st.date_input("View History for Date", value=date.today(), key="history_date")
+    with col2:
+        show_history = st.button("📊 Show History", use_container_width=True)
+    
+    if show_history:
+        history_records = get_daily_stock_reconciliation(date_filter=history_date)
+        if history_records:
+            df_history = pd.DataFrame(history_records)
+            df_history['total_revenue'] = df_history['total_revenue'].apply(lambda x: f"KES {x:,.0f}")
+            st.dataframe(
+                df_history[['product_name', 'opening_stock', 'closing_stock', 'given_free', 'sold_quantity', 'total_revenue']],
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # Summary for the date
+            total_sold_history = df_history['sold_quantity'].sum()
+            total_revenue_history = df_history['total_revenue'].str.replace('KES ', '').str.replace(',', '').astype(float).sum()
+            st.metric(f"Total for {history_date}", f"KES {total_revenue_history:,.0f} from {total_sold_history} units")
+        else:
+            st.info(f"No records found for {history_date}")
 # Footer
 st.markdown("---")
 st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
