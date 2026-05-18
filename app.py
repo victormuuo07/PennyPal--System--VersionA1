@@ -2289,6 +2289,7 @@ with tab9:
     
     with col1:
         st.markdown("#### 🌅 Opening Stock (Morning)")
+        opening_3 = st.number_input("3 KES Sachet - Opening", min_value=0, step=1, value=0, key="opening_3")
         opening_5 = st.number_input("5 KES Sachet - Opening", min_value=0, step=1, value=0, key="opening_5")
         opening_10 = st.number_input("10 KES Sachet - Opening", min_value=0, step=1, value=0, key="opening_10")
         opening_20 = st.number_input("20 KES Sachet - Opening", min_value=0, step=1, value=0, key="opening_20")
@@ -2299,6 +2300,7 @@ with tab9:
     
     with col2:
         st.markdown("#### 🌇 Closing Stock (Afternoon)")
+        closing_3 = st.number_input("3 KES Sachet - Closing", min_value=0, step=1, value=0, key="closing_3")
         closing_5 = st.number_input("5 KES Sachet - Closing", min_value=0, step=1, value=0, key="closing_5")
         closing_10 = st.number_input("10 KES Sachet - Closing", min_value=0, step=1, value=0, key="closing_10")
         closing_20 = st.number_input("20 KES Sachet - Closing", min_value=0, step=1, value=0, key="closing_20")
@@ -2308,6 +2310,7 @@ with tab9:
         closing_refill = st.number_input("100g Refill - Closing", min_value=0, step=1, value=0, key="closing_refill")
     
     # Calculate what was sold (Opening - Closing)
+    sold_3 = opening_3 - closing_3
     sold_5 = opening_5 - closing_5
     sold_10 = opening_10 - closing_10
     sold_20 = opening_20 - closing_20
@@ -2318,7 +2321,7 @@ with tab9:
     
     # Validate that sold quantities are not negative
     valid = True
-    if sold_5 < 0 or sold_10 < 0 or sold_20 < 0 or sold_30 < 0 or sold_40 < 0 or sold_bottle < 0 or sold_refill < 0:
+    if sold_3 < 0 or sold_5 < 0 or sold_10 < 0 or sold_20 < 0 or sold_30 < 0 or sold_40 < 0 or sold_bottle < 0 or sold_refill < 0:
         st.error("❌ Closing stock cannot be greater than opening stock! Please check your numbers.")
         valid = False
     
@@ -2328,6 +2331,7 @@ with tab9:
         st.markdown("### 📊 Calculated Sales (Based on Stock Difference)")
         
         # Calculate revenue
+        revenue_3 = sold_3 * 3
         revenue_5 = sold_5 * 5
         revenue_10 = sold_10 * 10
         revenue_20 = sold_20 * 20
@@ -2341,6 +2345,8 @@ with tab9:
         
         # Display summary of what was sold
         summary_data = []
+        if sold_3 > 0:
+            summary_data.append({"Product": "3 KES Sachet", "Sold": sold_3, "Unit Price": 3, "Total": revenue_3})
         if sold_5 > 0:
             summary_data.append({"Product": "5 KES Sachet", "Sold": sold_5, "Unit Price": 5, "Total": revenue_5})
         if sold_10 > 0:
@@ -2443,7 +2449,7 @@ with tab9:
                         
                         if sale_id:
                             # Update finished goods inventory
-                            product_mapping = {
+                            product_mapping = { "3 KES Sachet": "Sachet 3",
                                 "5 KES Sachet": "Sachet 5",
                                 "10 KES Sachet": "Sachet 10",
                                 "20 KES Sachet": "Sachet 20",
@@ -2475,6 +2481,7 @@ with tab9:
                 # Save each product that was sold
                 success = True
                 sold_products = [
+                    (sold_3, "3 KES Sachet", 3, revenue_3),
                     (sold_5, "5 KES Sachet", 5, revenue_5),
                     (sold_10, "10 KES Sachet", 10, revenue_10),
                     (sold_20, "20 KES Sachet", 20, revenue_20),
