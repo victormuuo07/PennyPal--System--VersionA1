@@ -437,7 +437,7 @@ with tab1:
             fig.add_trace(go.Bar(x=combined_df['Date'], y=combined_df['amount'], name='Expenses', marker_color='#FF4B4B', opacity=0.7))
             fig.add_trace(go.Scatter(x=combined_df['Date'], y=combined_df['Net Profit'], name='Net Profit', mode='lines+markers', line=dict(color='#FFB020', width=3), marker=dict(size=8)))
             fig.update_layout(title='Sales vs Expenses vs Net Profit Over Time', xaxis_title='Date', yaxis_title='Amount (KES)', hovermode='x unified', barmode='group')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # Chart 2: Sales Trend with Moving Average
         if not sales_by_date.empty and len(sales_by_date) > 3:
@@ -446,14 +446,14 @@ with tab1:
             fig.add_trace(go.Scatter(x=sales_by_date['Date'], y=sales_by_date['Total'], name='Daily Sales', mode='lines+markers', line=dict(color='#1565C0', width=2), marker=dict(size=6)))
             fig.add_trace(go.Scatter(x=sales_by_date['Date'], y=sales_by_date['7_Day_MA'], name='7-Day Moving Average', line=dict(color='#FF9800', width=3, dash='dash')))
             fig.update_layout(title='Sales Trend with Moving Average', xaxis_title='Date', yaxis_title='Sales (KES)', hovermode='x unified')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # Chart 3: Cumulative Sales
         if not sales_by_date.empty:
             sales_by_date['Cumulative Sales'] = sales_by_date['Total'].cumsum()
             fig = px.area(sales_by_date, x='Date', y='Cumulative Sales', title='Cumulative Sales Over Time', color_discrete_sequence=['#4CAF50'])
             fig.update_layout(xaxis_title='Date', yaxis_title='Cumulative Sales (KES)')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
     
     # Quick Stats Row
     st.markdown('<div class="section-header">📋 Quick Statistics</div>', unsafe_allow_html=True)
@@ -733,13 +733,13 @@ with tab3:
         with col1:
             category_summary = expenses_df.groupby("category")['amount'].sum().reset_index()
             fig = px.pie(category_summary, values='amount', names='category', title='Expenses by Category', color_discrete_sequence=px.colors.qualitative.Set3)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         with col2:
             expenses_by_date = expenses_df.groupby('date')['amount'].sum().reset_index()
             fig = px.line(expenses_by_date, x='date', y='amount', title='Expense Trend Over Time', markers=True, line_shape='spline')
             fig.update_traces(line=dict(color='#FF4B4B', width=3))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
 # ==================== TAB 4: SALESPEOPLE ====================
 with tab4:
@@ -811,7 +811,7 @@ with tab5:
             fig.add_trace(go.Bar(x=sales_trend['Period'], y=sales_trend['Sales'], name='Daily Sales', marker_color='#36B37E'))
             fig.add_trace(go.Scatter(x=sales_trend['Period'], y=sales_trend['7_Day_Avg'], name='7-Day Average', line=dict(color='#FF9800', width=3)))
             fig.update_layout(title='Daily Sales Trend with Moving Average', xaxis_title='Date', yaxis_title='Sales (KES)', hovermode='x unified')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
         elif period == "Weekly":
             # Group by week
@@ -824,7 +824,7 @@ with tab5:
             fig = px.bar(sales_trend, x='Period', y='Total', title='Weekly Sales Trend',
                         color='Total', color_continuous_scale='Viridis', text='Total')
             fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
         elif period == "Monthly":
             # Group by month
@@ -835,7 +835,7 @@ with tab5:
             fig = px.line(sales_trend, x='Period', y='Sales', title='Monthly Sales Trend',
                          markers=True, line_shape='spline')
             fig.update_traces(line=dict(color='#4CAF50', width=3), marker=dict(size=10))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
         else:  # Quarterly
             sales_df['Quarter'] = sales_df['Date'].dt.quarter
@@ -846,7 +846,7 @@ with tab5:
             fig = px.bar(sales_trend, x='Period', y='Total', title='Quarterly Sales Trend',
                         color='Total', color_continuous_scale='Blues', text='Total')
             fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # Key Metrics Cards
         st.markdown("### 📈 Key Performance Indicators")
@@ -977,7 +977,7 @@ with tab5:
                            color_continuous_scale='Viridis',
                            aspect='auto')
             fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             st.caption("💡 **When to focus sales efforts:** Darker colors show when sales happen most")
         
         # Cumulative Sales Goal Tracker
@@ -1038,10 +1038,10 @@ with tab5:
             col1, col2 = st.columns(2)
             with col1:
                 fig = px.bar(sp_summary.head(10), x='Salesperson', y='Revenue (KES)', title='Top 10 Salespeople by Revenue', color='Revenue (KES)', color_continuous_scale='Viridis')
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             with col2:
                 fig = px.bar(sp_summary.head(10), x='Salesperson', y='Quantity', title='Top 10 Salespeople by Quantity', color='Quantity', color_continuous_scale='Plasma')
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
         
         # Shop Performance
         if not dist_df.empty and not sales_df.empty:
@@ -1063,7 +1063,7 @@ with tab5:
                 st.dataframe(shop_summary.head(10), use_container_width=True, hide_index=True)
                 
                 fig = px.scatter(shop_summary.head(20), x='Number of Visits', y='Total Revenue', size='Average Order Value', color='Total Quantity', hover_name='Shop Name', title='Shop Performance: Visits vs Revenue')
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
     
     with analytics_tab2:
         st.markdown("### 📊 Distribution Insights")
@@ -1091,14 +1091,14 @@ with tab5:
                     daily = dist_time.groupby('day_of_week')['quantity_distributed'].sum().reindex(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']).reset_index()
                     daily.columns = ['Day', 'Quantity']
                     fig = px.bar(daily, x='Day', y='Quantity', title='Sales by Day of Week', color='Quantity', color_continuous_scale='Viridis')
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                 
                 with col2:
                     monthly = dist_time.groupby(dist_time['date'].dt.strftime('%Y-%m'))['quantity_distributed'].sum().reset_index()
                     monthly.columns = ['Month', 'Quantity']
                     fig = px.line(monthly, x='Month', y='Quantity', title='Monthly Sales Trend', markers=True)
-                    st.plotly_chart(fig, use_container_width=True)
-    
+                    st.plotly_chart(fig, width='stretch')
+
     with analytics_tab3:
         # Hotel Refill Tracking Dashboard
         st.markdown("### 🏨 Hotel Refill Performance")
@@ -1123,7 +1123,7 @@ with tab5:
                 
                 fig = px.bar(hotel_summary, x='Hotel', y='Orders', title='Fastest Refilling Hotels', color='Revenue', text='Orders')
                 fig.update_traces(textposition='outside')
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             else:
                 st.info("No hotel sales recorded yet")
         
@@ -1151,7 +1151,7 @@ with tab5:
                 
                 fig = px.bar(mama_summary, x='Shop', y='Potential Profit', title='Top Shops by Reseller Profit Potential', color='Revenue', text='Potential Profit')
                 fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             else:
                 st.info("No Mama Mboga sales recorded yet")
         
@@ -1165,15 +1165,15 @@ with tab5:
                 product_summary = sales_df.groupby('Product_Type')['Total'].sum().reset_index() if 'Product_Type' in sales_df.columns else sales_df.groupby('Product')['Total'].sum().reset_index()
                 product_summary.columns = ['Product', 'Revenue']
                 fig = px.pie(product_summary, values='Revenue', names='Product', title='Revenue by Product Type', color_discrete_sequence=px.colors.qualitative.Set2)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             
             with col2:
                 if 'Price_per_Unit' in sales_df.columns:
                     price_analysis = sales_df.groupby('Price_per_Unit')['Quantity'].sum().reset_index()
                     price_analysis.columns = ['Price (KES)', 'Quantity Sold']
                     fig = px.bar(price_analysis, x='Price (KES)', y='Quantity Sold', title='Sales Volume by Price Point', color='Quantity Sold', color_continuous_scale='Viridis')
-                    st.plotly_chart(fig, use_container_width=True)
-    
+                    st.plotly_chart(fig, width='stretch')
+
     with analytics_tab4:
         st.markdown("### 📁 Data Export & Management")
         
@@ -1270,7 +1270,7 @@ with tab5:
                            x=cohort_pivot_display.columns.astype(str),
                            y=cohort_pivot_display.index.astype(str))
                 fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 st.caption("💡 **Insight:** Shows how many customers return month after month")
         
         # ============================================
@@ -1310,7 +1310,7 @@ with tab5:
                           labels={'total_spent': 'Total Spent (KES)', 'count': 'Number of Customers'},
                           color_discrete_sequence=['#36B37E'])
             fig.update_layout(bargap=0.1, height=400)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # ============================================
         # 3. RFM ANALYSIS (Recency, Frequency, Monetary)
@@ -1368,7 +1368,7 @@ with tab5:
                             text='Total')
                     fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
                     fig.update_layout(height=400)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
             
                 with col2:
                     fig = px.bar(product_margin, x='Product_Type', y='Margin_Percentage',
@@ -1379,7 +1379,7 @@ with tab5:
                     fig.add_hline(y=50, line_dash="dash", line_color="red", 
                             annotation_text="Target 50%", annotation_position="bottom right")
                     fig.update_layout(height=400)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
         
         # ============================================
         # 5. SEASONALITY & FORECASTING
@@ -1401,7 +1401,7 @@ with tab5:
                         title='Seasonal Pattern - Monthly Sales',
                         color='Total', color_continuous_scale='Viridis')
                 fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
         
             with col2:
                 quarterly_sales = sales_df.groupby('Quarter')['Total'].sum().reset_index()
@@ -1410,7 +1410,7 @@ with tab5:
                          markers=True, line_shape='spline')
                 fig.update_traces(line=dict(color='#FF9800', width=3))
                 fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
         
         # Simple forecast (without sklearn to avoid dependency issues)
             if len(sales_df) > 30:
@@ -1441,7 +1441,7 @@ with tab5:
                              markers=True)
                     fig.update_traces(line=dict(color='#4CAF50', width=3))
                     fig.update_layout(height=400)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
             except Exception as e:
                     st.info(f"Forecast not available: {str(e)}")
         
@@ -1880,7 +1880,7 @@ with prod_tab4:
         fig.update_traces(texttemplate='%{text} units', textposition='outside')
         fig.add_hline(y=100, line_dash="dash", line_color="red", 
                      annotation_text="Reorder Alert (100 units)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Low stock warnings
         low_stock = df_finished[df_finished['current_stock'] < df_finished['reorder_level']]
@@ -1953,7 +1953,7 @@ with prod_tab4:
                              title=f'Stock Level Over Time - {selected_material if selected_material != "All" else "All Materials"}',
                              markers=True)
                 fig.update_traces(line=dict(color='#4CAF50', width=3))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
         else:
             st.info("No inventory transactions in selected period")
 # ==================== TAB 7: FUNDING & CAPITAL ====================
@@ -2033,7 +2033,7 @@ with tab7:
                     text='amount')
         fig.update_traces(textposition='outside')
         fig.update_layout(yaxis_title='Amount (KES)')
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     else:
         st.info("No funding records yet. Add your first funding source above!")
     
@@ -2051,7 +2051,7 @@ with tab7:
                 text='Amount')
     fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
     fig.update_layout(yaxis_title='Amount (KES)')
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     
     # Business Health Summary
     st.markdown("### 📈 Business Health Summary")
@@ -2233,7 +2233,7 @@ with tab8:
             # Pie chart by asset type
             asset_type_summary = df_assets.groupby('asset_type').size().reset_index(name='count')
             fig = px.pie(asset_type_summary, values='count', names='asset_type', title='Assets by Type')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         with col2:
             # Bar chart of asset values
@@ -2243,7 +2243,7 @@ with tab8:
                         color='asset_type', text='value')
             fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
             fig.update_layout(xaxis_title='Asset', yaxis_title='Value (KES)')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # Depreciation schedule
         st.markdown("### 📉 Depreciation Schedule")
