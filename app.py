@@ -334,7 +334,7 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
@@ -342,7 +342,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📈 Analytics",
      "🏭 Production & Inventory",
      "💰 Funding & Capital",
-     "🏭 Assets & Equipment"
+     "🏭 Assets & Equipment",
+     "📝 Daily Sales Entry"
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -2270,6 +2271,233 @@ with tab8:
                 display_df['date'] = pd.to_datetime(display_df['date']).dt.strftime('%Y-%m-%d')
                 display_df['amount'] = display_df['amount'].apply(lambda x: f"KES {x:,.0f}")
                 st.dataframe(display_df[['date', 'description', 'amount']], use_container_width=True, hide_index=True)
+
+# ==================== TAB 9: DAILY SALES ENTRY ====================
+with tab9:
+    st.markdown('<div class="section-header">📝 Daily Sales Entry</div>', unsafe_allow_html=True)
+    
+    st.info("💡 **Quick Daily Sales Entry** - Record your opening stock (morning) and closing stock (afternoon) to calculate what you sold")
+    
+    # Date selector
+    sale_date = st.date_input("Sale Date", value=date.today(), key="daily_sale_date")
+    
+    # ========== STOCK TRACKING SECTION ==========
+    st.markdown("### 📦 Stock Tracking")
+    st.caption("Enter your stock levels to automatically calculate what you sold")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 🌅 Opening Stock (Morning)")
+        opening_5 = st.number_input("5 KES Sachet - Opening", min_value=0, step=1, value=0, key="opening_5")
+        opening_10 = st.number_input("10 KES Sachet - Opening", min_value=0, step=1, value=0, key="opening_10")
+        opening_20 = st.number_input("20 KES Sachet - Opening", min_value=0, step=1, value=0, key="opening_20")
+        opening_30 = st.number_input("30 KES Sachet - Opening", min_value=0, step=1, value=0, key="opening_30")
+        opening_40 = st.number_input("40 KES Sachet - Opening", min_value=0, step=1, value=0, key="opening_40")
+        opening_bottle = st.number_input("100g Bottle - Opening", min_value=0, step=1, value=0, key="opening_bottle")
+        opening_refill = st.number_input("100g Refill - Opening", min_value=0, step=1, value=0, key="opening_refill")
+    
+    with col2:
+        st.markdown("#### 🌇 Closing Stock (Afternoon)")
+        closing_5 = st.number_input("5 KES Sachet - Closing", min_value=0, step=1, value=0, key="closing_5")
+        closing_10 = st.number_input("10 KES Sachet - Closing", min_value=0, step=1, value=0, key="closing_10")
+        closing_20 = st.number_input("20 KES Sachet - Closing", min_value=0, step=1, value=0, key="closing_20")
+        closing_30 = st.number_input("30 KES Sachet - Closing", min_value=0, step=1, value=0, key="closing_30")
+        closing_40 = st.number_input("40 KES Sachet - Closing", min_value=0, step=1, value=0, key="closing_40")
+        closing_bottle = st.number_input("100g Bottle - Closing", min_value=0, step=1, value=0, key="closing_bottle")
+        closing_refill = st.number_input("100g Refill - Closing", min_value=0, step=1, value=0, key="closing_refill")
+    
+    # Calculate what was sold (Opening - Closing)
+    sold_5 = opening_5 - closing_5
+    sold_10 = opening_10 - closing_10
+    sold_20 = opening_20 - closing_20
+    sold_30 = opening_30 - closing_30
+    sold_40 = opening_40 - closing_40
+    sold_bottle = opening_bottle - closing_bottle
+    sold_refill = opening_refill - closing_refill
+    
+    # Validate that sold quantities are not negative
+    valid = True
+    if sold_5 < 0 or sold_10 < 0 or sold_20 < 0 or sold_30 < 0 or sold_40 < 0 or sold_bottle < 0 or sold_refill < 0:
+        st.error("❌ Closing stock cannot be greater than opening stock! Please check your numbers.")
+        valid = False
+    
+    # ========== CALCULATED SALES SECTION ==========
+    if valid:
+        st.markdown("---")
+        st.markdown("### 📊 Calculated Sales (Based on Stock Difference)")
+        
+        # Calculate revenue
+        revenue_5 = sold_5 * 5
+        revenue_10 = sold_10 * 10
+        revenue_20 = sold_20 * 20
+        revenue_30 = sold_30 * 30
+        revenue_40 = sold_40 * 40
+        revenue_bottle = sold_bottle * 150
+        revenue_refill = sold_refill * 120
+        
+        total_quantity = sold_5 + sold_10 + sold_20 + sold_30 + sold_40 + sold_bottle + sold_refill
+        total_revenue = revenue_5 + revenue_10 + revenue_20 + revenue_30 + revenue_40 + revenue_bottle + revenue_refill
+        
+        # Display summary of what was sold
+        summary_data = []
+        if sold_5 > 0:
+            summary_data.append({"Product": "5 KES Sachet", "Sold": sold_5, "Unit Price": 5, "Total": revenue_5})
+        if sold_10 > 0:
+            summary_data.append({"Product": "10 KES Sachet", "Sold": sold_10, "Unit Price": 10, "Total": revenue_10})
+        if sold_20 > 0:
+            summary_data.append({"Product": "20 KES Sachet", "Sold": sold_20, "Unit Price": 20, "Total": revenue_20})
+        if sold_30 > 0:
+            summary_data.append({"Product": "30 KES Sachet", "Sold": sold_30, "Unit Price": 30, "Total": revenue_30})
+        if sold_40 > 0:
+            summary_data.append({"Product": "40 KES Sachet", "Sold": sold_40, "Unit Price": 40, "Total": revenue_40})
+        if sold_bottle > 0:
+            summary_data.append({"Product": "100g Bottle", "Sold": sold_bottle, "Unit Price": 150, "Total": revenue_bottle})
+        if sold_refill > 0:
+            summary_data.append({"Product": "100g Refill", "Sold": sold_refill, "Unit Price": 120, "Total": revenue_refill})
+        
+        if summary_data:
+            df_summary = pd.DataFrame(summary_data)
+            st.dataframe(df_summary, use_container_width=True, hide_index=True)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📦 Total Units Sold", f"{total_quantity:,}")
+            with col2:
+                st.metric("💰 Total Revenue", f"KES {total_revenue:,.0f}")
+            with col3:
+                avg_price = total_revenue / total_quantity if total_quantity > 0 else 0
+                st.metric("📊 Average Price", f"KES {avg_price:.2f}")
+        else:
+            st.warning("No sales detected. Opening and closing stock are the same.")
+        
+        # ========== CUSTOMER & PAYMENT INFO ==========
+        st.markdown("---")
+        st.markdown("### 👤 Customer & Payment Information")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            customer_name = st.text_input("Customer Name", placeholder="e.g., Mama Mboga, Hotel Name", key="daily_customer")
+            customer_type = st.selectbox(
+                "Customer Type",
+                ["Consumer (B2C)", "Shop/Mama Mboga (B2B)", "Hotel/Restaurant"],
+                key="daily_customer_type"
+            )
+            payment_status = st.selectbox("Payment Status", ["Cash", "Credit / Pending"], key="daily_payment")
+            location = st.text_input("Location", placeholder="e.g., Nairobi CBD", key="daily_location")
+        
+        with col2:
+            if sales_person_options:
+                sales_person_name = st.selectbox("Sales Person", ["Select..."] + list(sales_person_options.keys()), key="daily_sales_person")
+            else:
+                sales_person_name = "N/A"
+                st.warning("No salespeople added yet.")
+            phone = st.text_input("Phone Number", placeholder="Optional", key="daily_phone")
+            feedback = st.text_area("Customer Feedback", placeholder="Any feedback from customer...", key="daily_feedback")
+        
+        # ========== SUBMIT BUTTON ==========
+                # ========== SUBMIT BUTTON ==========
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            submit_sale = st.button("💾 Save All Sales", type="primary", use_container_width=True)
+        
+        if submit_sale:
+            if total_quantity == 0:
+                st.error("No sales to record! Opening and closing stock are the same.")
+            elif customer_name.strip() == "":
+                st.error("Please enter customer name!")
+            elif sales_person_name == "Select...":
+                st.error("Please select a salesperson!")
+            else:
+                # Initialize counter OUTSIDE the function
+                sales_recorded = 0
+                errors = []
+                
+                # Helper function to save each sale
+                def save_individual_sale(product_name, quantity, price, total):
+                    # Use a mutable object or return value instead of nonlocal
+                    if quantity > 0:
+                        sale_record = {
+                            "Date": str(sale_date),
+                            "Name": customer_name,
+                            "Phone": phone,
+                            "Location": location,
+                            "Product": product_name,
+                            "Product_Type": product_name,
+                            "Customer_Type": customer_type,
+                            "Unit": "units",
+                            "Quantity": quantity,
+                            "Price_per_Unit": price,
+                            "Total": total,
+                            "Payment_Status": payment_status,
+                            "Feedback": feedback,
+                            "Follow_Up": "",
+                            "Is_Refill": "Refill" in product_name,
+                            "Tracking_Hotel": customer_name if customer_type == "Hotel/Restaurant" else None,
+                            "Tracking_Mama": customer_name if customer_type == "Shop/Mama Mboga (B2B)" else None
+                        }
+                        
+                        sale_id = save_sale(sale_record)
+                        
+                        if sale_id:
+                            # Update finished goods inventory
+                            product_mapping = {
+                                "5 KES Sachet": "Sachet 5",
+                                "10 KES Sachet": "Sachet 10",
+                                "20 KES Sachet": "Sachet 20",
+                                "30 KES Sachet": "Sachet 30",
+                                "40 KES Sachet": "Sachet 40",
+                                "100g Bottle": "Bottle 100g",
+                                "100g Refill": "Refill 100g"
+                            }
+                            mapped_product = product_mapping.get(product_name, None)
+                            if mapped_product:
+                                update_finished_goods_sale(mapped_product, quantity)
+                            
+                            # Save distribution if salesperson selected
+                            if sales_person_name not in ["Select...", "N/A"] and sales_person_name in sales_person_options:
+                                save_distribution(
+                                    sale_id=sale_id,
+                                    sales_person_id=sales_person_options[sales_person_name],
+                                    quantity=quantity,
+                                    sale_date=str(sale_date),
+                                    price=price,
+                                    sale_data=sale_record
+                                )
+                            return True
+                        else:
+                            errors.append(product_name)
+                            return False
+                    return True  # No sale to record is fine
+                
+                # Save each product that was sold
+                success = True
+                sold_products = [
+                    (sold_5, "5 KES Sachet", 5, revenue_5),
+                    (sold_10, "10 KES Sachet", 10, revenue_10),
+                    (sold_20, "20 KES Sachet", 20, revenue_20),
+                    (sold_30, "30 KES Sachet", 30, revenue_30),
+                    (sold_40, "40 KES Sachet", 40, revenue_40),
+                    (sold_bottle, "100g Bottle", 150, revenue_bottle),
+                    (sold_refill, "100g Refill", 120, revenue_refill)
+                ]
+                
+                for sold_qty, product_name, price, revenue in sold_products:
+                    if sold_qty > 0:
+                        if save_individual_sale(product_name, sold_qty, price, revenue):
+                            sales_recorded += 1
+                        else:
+                            success = False
+                
+                if success and sales_recorded > 0:
+                    st.success(f"✅ Successfully recorded {sales_recorded} sale(s) for {customer_name}!")
+                    st.balloons()
+                elif errors:
+                    st.error(f"❌ Failed to record: {', '.join(errors)}")
+                else:
+                    st.error("❌ Failed to record sales. Please check and try again.")
 # Footer
 st.markdown("---")
 st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
