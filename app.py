@@ -2846,45 +2846,86 @@ with tab11:
     )
     
     # ========== PROFIT SUMMARY CARDS ==========
+    # ========== PROFIT SUMMARY CARDS ==========
     st.markdown("---")
     st.markdown("### 📈 Profit Summary")
+
+# Fix: Convert margin values properly
+    margin_values = []
+    for r in results:
+        margin_str = r["Margin %"]
+        if margin_str != 'N/A' and margin_str.endswith('%'):
+            margin_num = float(margin_str.replace('%', ''))
+            margin_values.append(margin_num)
+        else:
+            margin_values.append(0)
+
+# Calculate summary statistics
+    if margin_values:
+        # Find highest margin product
+        best_idx = margin_values.index(max(margin_values))
+        best_product = results[best_idx]
     
+    # Find lowest margin product (excluding zeros)
+        valid_margins = [(i, v) for i, v in enumerate(margin_values) if v > 0]
+        if valid_margins:
+            worst_idx = min(valid_margins, key=lambda x: x[1])[0]
+            worst_product = results[worst_idx]
+        else:
+            worst_product = results[0]
+    
+        avg_margin = sum(margin_values) / len([v for v in margin_values if v > 0]) if [v for v in margin_values if v > 0] else 0
+    
+    # Find most profitable product (highest profit in KES)
+        profit_values = []
+        for r in results:
+            profit_str = r["Profit"]
+            if profit_str != 'N/A' and profit_str.startswith('KES '):
+                profit_num = float(profit_str.replace('KES ', '').replace(',', ''))
+                profit_values.append(profit_num)
+            else:
+                profit_values.append(0)
+        most_profitable_idx = profit_values.index(max(profit_values))
+        most_profitable = results[most_profitable_idx]
+    else:
+        best_product = results[0]
+        worst_product = results[0]
+        avg_margin = 0
+        most_profitable = results[0]
+
     col1, col2, col3, col4 = st.columns(4)
-    
-    # Calculate summary statistics
-    high_margin_products = [r for r in results if r["Margin %"].replace('%', '') and float(r["Margin %"].replace('%', '')) > 50]
-    low_margin_products = [r for r in results if r["Margin %"].replace('%', '') and float(r["Margin %"].replace('%', '')) < 20]
-    
+
     with col1:
-        best_product = max(results, key=lambda x: float(x["Margin %"].replace('%', '')) if x["Margin %"] != 'N/A' else 0)
-        st.metric("🏆 Highest Margin", best_product["Product"], best_product["Margin %"])
-    
+        st.metric("🏆 Highest Margin", best_product["Product"], f"{max(margin_values):.1f}%" if margin_values else "N/A")
+
     with col2:
-        worst_product = min(results, key=lambda x: float(x["Margin %"].replace('%', '')) if x["Margin %"] != 'N/A' else 100)
-        st.metric("📉 Lowest Margin", worst_product["Product"], worst_product["Margin %"])
-    
+        st.metric("📉 Lowest Margin", worst_product["Product"], f"{min([v for v in margin_values if v > 0]):.1f}%" if [v for v in margin_values if v > 0] else "N/A")
+
     with col3:
-        avg_margin = sum([float(r["Margin %"].replace('%', '')) for r in results if r["Margin %"] != 'N/A']) / len(results)
         st.metric("📊 Average Margin", f"{avg_margin:.1f}%")
-    
+
     with col4:
-        most_profitable = max(results, key=lambda x: float(x["Profit"].replace('KES ', '').replace(',', '')) if x["Profit"] != 'N/A' else 0)
         st.metric("💰 Most Profit per Unit", most_profitable["Product"], most_profitable["Profit"])
     
     # ========== CHARTS ==========
-    st.markdown("---")
-    st.markdown("### 📊 Visual Analysis")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Profit margin bar chart
-        chart_data = []
-        for r in results:
+st.markdown("---")
+st.markdown("### 📊 Visual Analysis")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    # Profit margin bar chart
+    chart_data = []
+    for r in results:
+        margin_str = r["Margin %"]
+        if margin_str != 'N/A' and margin_str.endswith('%'):
+            margin_num = float(margin_str.replace('%', ''))
             chart_data.append({
-                "Product": r["Product"][:20],  # Truncate long names
-                "Margin %": float(r["Margin %"].replace('%', ''))
+                "Product": r["Product"][:20],
+                "Margin %": margin_num
             })
+    
+    if chart_data:
         df_chart = pd.DataFrame(chart_data)
         fig = px.bar(df_chart, x='Product', y='Margin %', 
                     title='Profit Margin by Product',
@@ -2893,15 +2934,22 @@ with tab11:
         fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
         fig.update_layout(height=500, xaxis_tickangle=-45)
         st.plotly_chart(fig, width='stretch')
-    
-    with col2:
-        # Profit per unit chart
-        profit_data = []
-        for r in results:
+    else:
+        st.info("No margin data available")
+
+with col2:
+    # Profit per unit chart
+    profit_data = []
+    for r in results:
+        profit_str = r["Profit"]
+        if profit_str != 'N/A' and profit_str.startswith('KES '):
+            profit_num = float(profit_str.replace('KES ', '').replace(',', ''))
             profit_data.append({
                 "Product": r["Product"][:20],
-                "Profit (KES)": float(r["Profit"].replace('KES ', ''))
+                "Profit (KES)": profit_num
             })
+    
+    if profit_data:
         df_profit = pd.DataFrame(profit_data)
         fig = px.bar(df_profit, x='Product', y='Profit (KES)', 
                     title='Profit per Unit by Product',
@@ -2910,39 +2958,46 @@ with tab11:
         fig.update_traces(texttemplate='KES %{text:.2f}', textposition='outside')
         fig.update_layout(height=500, xaxis_tickangle=-45)
         st.plotly_chart(fig, width='stretch')
+    else:
+        st.info("No profit data available")
     
     # ========== COST BREAKDOWN ==========
-    st.markdown("---")
-    st.markdown("### 🔍 Cost Breakdown for Selected Product")
+st.markdown("---")
+st.markdown("### 🔍 Cost Breakdown for Selected Product")
+
+selected_product = st.selectbox("Select a product to see detailed cost breakdown", [r["Product"] for r in results])
+product_detail = next((r for r in results if r["Product"] == selected_product), None)
+
+if product_detail:
+    col1, col2 = st.columns(2)
     
-    selected_product = st.selectbox("Select a product to see detailed cost breakdown", [r["Product"] for r in results])
-    product_detail = next((r for r in results if r["Product"] == selected_product), None)
-    
-    if product_detail:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Cost breakdown pie chart
+    with col1:
+        # Cost breakdown pie chart
+        try:
+            ingredient_cost_val = float(product_detail["Ingredient Cost"].replace('KES ', '').replace(',', ''))
+            packaging_cost_val = float(product_detail["Packaging Cost"].replace('KES ', '').replace(',', ''))
+            
             cost_data = pd.DataFrame({
                 'Category': ['Ingredient Cost', 'Packaging Cost'],
-                'Amount': [
-                    float(product_detail["Ingredient Cost"].replace('KES ', '')),
-                    float(product_detail["Packaging Cost"].replace('KES ', ''))
-                ]
+                'Amount': [ingredient_cost_val, packaging_cost_val]
             })
             fig = px.pie(cost_data, values='Amount', names='Category', 
                         title=f'Cost Breakdown for {selected_product}',
                         color_discrete_sequence=['#FF9800', '#2196F3'])
             st.plotly_chart(fig, width='stretch')
+        except:
+            st.info("Cost breakdown not available")
+    
+    with col2:
+        st.markdown(f"### 📊 {selected_product}")
+        st.metric("💰 Selling Price", product_detail["Selling Price"])
+        st.metric("🏭 Total Cost", product_detail["Total Cost"])
+        st.metric("📈 Profit", product_detail["Profit"], delta=product_detail["Margin %"])
         
-        with col2:
-            st.markdown(f"### 📊 {selected_product}")
-            st.metric("💰 Selling Price", product_detail["Selling Price"])
-            st.metric("🏭 Total Cost", product_detail["Total Cost"])
-            st.metric("📈 Profit", product_detail["Profit"], delta=product_detail["Margin %"])
-            
-            # Show profit recommendation
-            margin_pct = float(product_detail["Margin %"].replace('%', ''))
+        # Show profit recommendation
+        margin_str = product_detail["Margin %"]
+        if margin_str != 'N/A' and margin_str.endswith('%'):
+            margin_pct = float(margin_str.replace('%', ''))
             if margin_pct > 50:
                 st.success(f"✅ Excellent margin! Keep this price point.")
             elif margin_pct > 30:
@@ -2951,6 +3006,8 @@ with tab11:
                 st.warning(f"⚠️ Low margin. Review costs or increase price.")
             else:
                 st.error(f"❌ Very low margin! Consider discontinuing or raising price significantly.")
+        else:
+            st.info("Margin data not available")
     
     # ========== WHAT-IF ANALYSIS ==========
     st.markdown("---")
