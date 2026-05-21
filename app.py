@@ -2806,7 +2806,7 @@ with tab11:
         
         # Calculate profit
         profit = selling_price - total_cost
-        profit_margin = (profit / selling_price) * 100 if selling_price > 0 else 0
+        profit_margin = (profit / selling_price) * 100 if selling_price and selling_price > 0 else 0
         
         results.append({
             "Product": product["name"],
@@ -2820,16 +2820,17 @@ with tab11:
             "Margin %": profit_margin
         })
     
-    # Display results table
+    # Display results table - format for display only
     df_results = pd.DataFrame(results)
     
-    # Format currency columns
+    # Create formatted version for display
+    df_display = df_results.copy()
     for col in ["Ingredient Cost", "Packaging Cost", "Total Cost", "Selling Price", "Profit"]:
-        df_results[col] = df_results[col].apply(lambda x: f"KES {x:.2f}")
-    df_results["Margin %"] = df_results["Margin %"].apply(lambda x: f"{x:.1f}%")
+        df_display[col] = df_display[col].apply(lambda x: f"KES {x:.2f}")
+    df_display["Margin %"] = df_display["Margin %"].apply(lambda x: f"{x:.1f}%")
     
     st.dataframe(
-        df_results,
+        df_display,
         use_container_width=True,
         hide_index=True,
         column_config={
@@ -2846,45 +2847,29 @@ with tab11:
     )
     
     # ========== PROFIT SUMMARY CARDS ==========
-    # ========== PROFIT SUMMARY CARDS ==========
     st.markdown("---")
     st.markdown("### 📈 Profit Summary")
-
-# Fix: Convert margin values properly
-    margin_values = []
-    for r in results:
-        margin_str = r["Margin %"]
-        if margin_str != 'N/A' and margin_str.endswith('%'):
-            margin_num = float(margin_str.replace('%', ''))
-            margin_values.append(margin_num)
-        else:
-            margin_values.append(0)
-
-# Calculate summary statistics
+    
+    # Use the numeric values from results (not formatted strings)
+    margin_values = [r["Margin %"] for r in results]
+    profit_values = [r["Profit"] for r in results]
+    
     if margin_values:
         # Find highest margin product
         best_idx = margin_values.index(max(margin_values))
         best_product = results[best_idx]
-    
-    # Find lowest margin product (excluding zeros)
+        
+        # Find lowest margin product (excluding zero)
         valid_margins = [(i, v) for i, v in enumerate(margin_values) if v > 0]
         if valid_margins:
             worst_idx = min(valid_margins, key=lambda x: x[1])[0]
             worst_product = results[worst_idx]
         else:
             worst_product = results[0]
-    
+        
         avg_margin = sum(margin_values) / len([v for v in margin_values if v > 0]) if [v for v in margin_values if v > 0] else 0
-    
-    # Find most profitable product (highest profit in KES)
-        profit_values = []
-        for r in results:
-            profit_str = r["Profit"]
-            if profit_str != 'N/A' and profit_str.startswith('KES '):
-                profit_num = float(profit_str.replace('KES ', '').replace(',', ''))
-                profit_values.append(profit_num)
-            else:
-                profit_values.append(0)
+        
+        # Find most profitable product
         most_profitable_idx = profit_values.index(max(profit_values))
         most_profitable = results[most_profitable_idx]
     else:
@@ -2892,40 +2877,36 @@ with tab11:
         worst_product = results[0]
         avg_margin = 0
         most_profitable = results[0]
-
+    
     col1, col2, col3, col4 = st.columns(4)
-
+    
     with col1:
         st.metric("🏆 Highest Margin", best_product["Product"], f"{max(margin_values):.1f}%" if margin_values else "N/A")
-
+    
     with col2:
         st.metric("📉 Lowest Margin", worst_product["Product"], f"{min([v for v in margin_values if v > 0]):.1f}%" if [v for v in margin_values if v > 0] else "N/A")
-
+    
     with col3:
         st.metric("📊 Average Margin", f"{avg_margin:.1f}%")
-
+    
     with col4:
-        st.metric("💰 Most Profit per Unit", most_profitable["Product"], most_profitable["Profit"])
+        st.metric("💰 Most Profit per Unit", most_profitable["Product"], f"KES {max(profit_values):.2f}")
     
     # ========== CHARTS ==========
-st.markdown("---")
-st.markdown("### 📊 Visual Analysis")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    # Profit margin bar chart
-    chart_data = []
-    for r in results:
-        margin_str = r["Margin %"]
-        if margin_str != 'N/A' and margin_str.endswith('%'):
-            margin_num = float(margin_str.replace('%', ''))
+    st.markdown("---")
+    st.markdown("### 📊 Visual Analysis")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Profit margin bar chart
+        chart_data = []
+        for r in results:
             chart_data.append({
                 "Product": r["Product"][:20],
-                "Margin %": margin_num
+                "Margin %": r["Margin %"]
             })
-    
-    if chart_data:
+        
         df_chart = pd.DataFrame(chart_data)
         fig = px.bar(df_chart, x='Product', y='Margin %', 
                     title='Profit Margin by Product',
@@ -2934,22 +2915,16 @@ with col1:
         fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
         fig.update_layout(height=500, xaxis_tickangle=-45)
         st.plotly_chart(fig, width='stretch')
-    else:
-        st.info("No margin data available")
-
-with col2:
-    # Profit per unit chart
-    profit_data = []
-    for r in results:
-        profit_str = r["Profit"]
-        if profit_str != 'N/A' and profit_str.startswith('KES '):
-            profit_num = float(profit_str.replace('KES ', '').replace(',', ''))
+    
+    with col2:
+        # Profit per unit chart
+        profit_data = []
+        for r in results:
             profit_data.append({
                 "Product": r["Product"][:20],
-                "Profit (KES)": profit_num
+                "Profit (KES)": r["Profit"]
             })
-    
-    if profit_data:
+        
         df_profit = pd.DataFrame(profit_data)
         fig = px.bar(df_profit, x='Product', y='Profit (KES)', 
                     title='Profit per Unit by Product',
@@ -2958,46 +2933,36 @@ with col2:
         fig.update_traces(texttemplate='KES %{text:.2f}', textposition='outside')
         fig.update_layout(height=500, xaxis_tickangle=-45)
         st.plotly_chart(fig, width='stretch')
-    else:
-        st.info("No profit data available")
     
     # ========== COST BREAKDOWN ==========
-st.markdown("---")
-st.markdown("### 🔍 Cost Breakdown for Selected Product")
-
-selected_product = st.selectbox("Select a product to see detailed cost breakdown", [r["Product"] for r in results])
-product_detail = next((r for r in results if r["Product"] == selected_product), None)
-
-if product_detail:
-    col1, col2 = st.columns(2)
+    st.markdown("---")
+    st.markdown("### 🔍 Cost Breakdown for Selected Product")
     
-    with col1:
-        # Cost breakdown pie chart
-        try:
-            ingredient_cost_val = float(product_detail["Ingredient Cost"].replace('KES ', '').replace(',', ''))
-            packaging_cost_val = float(product_detail["Packaging Cost"].replace('KES ', '').replace(',', ''))
-            
+    selected_product = st.selectbox("Select a product to see detailed cost breakdown", [r["Product"] for r in results])
+    product_detail = next((r for r in results if r["Product"] == selected_product), None)
+    
+    if product_detail:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Cost breakdown pie chart
             cost_data = pd.DataFrame({
                 'Category': ['Ingredient Cost', 'Packaging Cost'],
-                'Amount': [ingredient_cost_val, packaging_cost_val]
+                'Amount': [product_detail["Ingredient Cost"], product_detail["Packaging Cost"]]
             })
             fig = px.pie(cost_data, values='Amount', names='Category', 
                         title=f'Cost Breakdown for {selected_product}',
                         color_discrete_sequence=['#FF9800', '#2196F3'])
             st.plotly_chart(fig, width='stretch')
-        except:
-            st.info("Cost breakdown not available")
-    
-    with col2:
-        st.markdown(f"### 📊 {selected_product}")
-        st.metric("💰 Selling Price", product_detail["Selling Price"])
-        st.metric("🏭 Total Cost", product_detail["Total Cost"])
-        st.metric("📈 Profit", product_detail["Profit"], delta=product_detail["Margin %"])
         
-        # Show profit recommendation
-        margin_str = product_detail["Margin %"]
-        if margin_str != 'N/A' and margin_str.endswith('%'):
-            margin_pct = float(margin_str.replace('%', ''))
+        with col2:
+            st.markdown(f"### 📊 {selected_product}")
+            st.metric("💰 Selling Price", f"KES {product_detail['Selling Price']:.2f}")
+            st.metric("🏭 Total Cost", f"KES {product_detail['Total Cost']:.2f}")
+            st.metric("📈 Profit", f"KES {product_detail['Profit']:.2f}", delta=f"{product_detail['Margin %']:.1f}%")
+            
+            # Show profit recommendation
+            margin_pct = product_detail["Margin %"]
             if margin_pct > 50:
                 st.success(f"✅ Excellent margin! Keep this price point.")
             elif margin_pct > 30:
@@ -3006,8 +2971,6 @@ if product_detail:
                 st.warning(f"⚠️ Low margin. Review costs or increase price.")
             else:
                 st.error(f"❌ Very low margin! Consider discontinuing or raising price significantly.")
-        else:
-            st.info("Margin data not available")
     
     # ========== WHAT-IF ANALYSIS ==========
     st.markdown("---")
@@ -3030,7 +2993,7 @@ if product_detail:
             # Calculate with new values
             weight = product_data["Weight (g)"]
             ingredient_cost_new = weight * test_ingredient_cost
-            packaging_cost_new = test_packaging if test_packaging > 0 else float(product_data["Packaging Cost"].replace('KES ', ''))
+            packaging_cost_new = test_packaging if test_packaging > 0 else product_data["Packaging Cost"]
             total_cost_new = ingredient_cost_new + packaging_cost_new
             profit_new = test_price - total_cost_new
             margin_new = (profit_new / test_price) * 100 if test_price > 0 else 0
@@ -3049,39 +3012,6 @@ if product_detail:
                 st.info("📈 Good margin achievable with these numbers.")
             else:
                 st.warning("⚠️ Margin is low. Consider reducing costs or increasing price.")
-    
-    # ========== ACTUAL VS TARGET ==========
-    st.markdown("---")
-    st.markdown("### 🎯 Actual vs Target Profit Analysis")
-    st.caption("Compare your actual sales data with target profits")
-    
-    if not sales_df.empty:
-        # Get actual sales data
-        actual_sales = sales_df.groupby('Product')['Total'].sum().reset_index()
-        actual_sales.columns = ['Product', 'Actual Revenue']
-        
-        # Merge with target calculations
-        target_data = []
-        for r in results:
-            target_data.append({
-                "Product": r["Product"],
-                "Target Profit per Unit": float(r["Profit"].replace('KES ', ''))
-            })
-        df_target = pd.DataFrame(target_data)
-        
-        # Estimate quantity sold (simplified)
-        # This would need actual quantity data from your sales
-        st.info("To see actual vs target, ensure your sales records include product names matching above.")
-        
-        # Display current profit leaderboard from actual sales
-        st.subheader("🏆 Most Profitable Products (Based on Actual Sales)")
-        
-        # This requires linking actual sales quantities to product profit calculations
-        # For now, show the target profit leaderboard
-        df_target_sorted = df_target.sort_values('Target Profit per Unit', ascending=False)
-        st.dataframe(df_target_sorted, use_container_width=True, hide_index=True)
-    else:
-        st.info("No sales data available yet. Start recording sales to see actual vs target analysis.")
         
 # Footer
 st.markdown("---")
