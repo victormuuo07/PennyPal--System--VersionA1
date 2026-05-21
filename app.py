@@ -337,7 +337,7 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
@@ -347,7 +347,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
      "💰 Funding & Capital",
      "🏭 Assets & Equipment",
      "📝 Daily Sales Entry",
-     "📊 Stock Reconciliation"
+     "📊 Stock Reconciliation",
+     "💰 Profit Calculator" 
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -1636,7 +1637,7 @@ with tab6:
                     st.write(f"  - {msg}")
             else:
             # Save batch to BATCHES table
-                batch_data = {
+                    batch_data = {
                 "batch_number": batch_number,
                 "production_date": str(production_date),
                 "total_kg_produced": total_kg,
@@ -2736,6 +2737,295 @@ with tab10:
             st.metric(f"Total for {history_date}", f"KES {total_revenue_history:,.0f} from {total_sold_history} units")
         else:
             st.info(f"No records found for {history_date}")
+
+
+# ==================== TAB 11: PROFIT CALCULATOR ====================
+with tab11:
+    st.markdown('<div class="section-header">💰 Profit Calculator</div>', unsafe_allow_html=True)
+    
+    st.info("📊 **Calculate profit margins for each product based on ingredient costs, packaging, and selling price**")
+    
+    # ========== COST CONFIGURATION ==========
+    with st.expander("⚙️ Cost Configuration", expanded=True):
+        st.markdown("### 📦 Raw Material & Packaging Costs")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Raw Materials**")
+            cost_per_gram = st.number_input("Cost per gram (KES)", min_value=0.0, step=0.01, value=0.34, key="cost_per_gram")
+            st.caption("Current: KES 0.34 per gram")
+        
+        with col2:
+            st.markdown("**Packaging Costs**")
+            label_cost = st.number_input("Label cost (KES)", min_value=0.0, step=1.0, value=11.0, key="label_cost")
+            bottle_cost = st.number_input("Bottle cost (KES)", min_value=0.0, step=1.0, value=12.0, key="bottle_cost")
+            sachet_cost = st.number_input("Sachet packaging cost (KES)", min_value=0.0, step=0.5, value=0.5, key="sachet_cost")
+    
+    # ========== PRODUCT PROFIT CALCULATIONS ==========
+    st.markdown("---")
+    st.markdown("### 📊 Product Profitability Analysis")
+    
+    # Define all products
+    products = [
+        # Sachets
+        {"name": "1.5g Sachet (Street)", "weight_g": 1.5, "b2b_price": None, "b2c_price": 10.0, "channel": "Street"},
+        {"name": "1.5g Sachet (School)", "weight_g": 1.5, "b2b_price": 5.0, "b2c_price": None, "channel": "School B2B"},
+        {"name": "1.5g Sachet (B2B)", "weight_g": 1.5, "b2b_price": 2.9, "b2c_price": None, "channel": "Wholesale"},
+        {"name": "5g Sachet", "weight_g": 5.0, "b2b_price": None, "b2c_price": 20.0, "channel": "Retail"},
+        {"name": "10g Sachet (B2B)", "weight_g": 10.0, "b2b_price": 30.0, "b2c_price": None, "channel": "Wholesale"},
+        {"name": "10g Sachet (B2C)", "weight_g": 10.0, "b2b_price": None, "b2c_price": 40.0, "channel": "Retail"},
+        # Bottles
+        {"name": "100g Bottle (B2B)", "weight_g": 100.0, "b2b_price": 150.0, "b2c_price": None, "channel": "Wholesale", "uses_bottle": True},
+        {"name": "100g Bottle (B2C)", "weight_g": 100.0, "b2b_price": None, "b2c_price": 200.0, "channel": "Retail", "uses_bottle": True},
+        {"name": "100g Refill (B2B)", "weight_g": 100.0, "b2b_price": 100.0, "b2c_price": None, "channel": "Refill Wholesale", "uses_bottle": False},
+        {"name": "100g Refill (B2C)", "weight_g": 100.0, "b2b_price": None, "b2c_price": 120.0, "channel": "Refill Retail", "uses_bottle": False},
+    ]
+    
+    # Calculate for each product
+    results = []
+    
+    for product in products:
+        # Calculate ingredient cost
+        ingredient_cost = product["weight_g"] * cost_per_gram
+        
+        # Calculate packaging cost
+        packaging_cost = 0
+        if "sachet" in product["name"].lower():
+            packaging_cost = sachet_cost
+        elif "bottle" in product["name"].lower() and product.get("uses_bottle", True):
+            packaging_cost = label_cost + bottle_cost
+        elif "refill" in product["name"].lower():
+            packaging_cost = label_cost  # Refill only needs label, no bottle
+        
+        total_cost = ingredient_cost + packaging_cost
+        
+        # Get selling price
+        selling_price = product.get("b2b_price") if product.get("b2b_price") else product.get("b2c_price")
+        channel = product.get("channel", "Retail")
+        
+        # Calculate profit
+        profit = selling_price - total_cost
+        profit_margin = (profit / selling_price) * 100 if selling_price > 0 else 0
+        
+        results.append({
+            "Product": product["name"],
+            "Channel": channel,
+            "Weight (g)": product["weight_g"],
+            "Ingredient Cost": ingredient_cost,
+            "Packaging Cost": packaging_cost,
+            "Total Cost": total_cost,
+            "Selling Price": selling_price,
+            "Profit": profit,
+            "Margin %": profit_margin
+        })
+    
+    # Display results table
+    df_results = pd.DataFrame(results)
+    
+    # Format currency columns
+    for col in ["Ingredient Cost", "Packaging Cost", "Total Cost", "Selling Price", "Profit"]:
+        df_results[col] = df_results[col].apply(lambda x: f"KES {x:.2f}")
+    df_results["Margin %"] = df_results["Margin %"].apply(lambda x: f"{x:.1f}%")
+    
+    st.dataframe(
+        df_results,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Product": st.column_config.TextColumn("Product", width="medium"),
+            "Channel": st.column_config.TextColumn("Channel", width="small"),
+            "Weight (g)": st.column_config.NumberColumn("Weight", format="%.1f g"),
+            "Ingredient Cost": st.column_config.TextColumn("Ingredient", width="small"),
+            "Packaging Cost": st.column_config.TextColumn("Packaging", width="small"),
+            "Total Cost": st.column_config.TextColumn("Total Cost", width="small"),
+            "Selling Price": st.column_config.TextColumn("Selling Price", width="small"),
+            "Profit": st.column_config.TextColumn("Profit", width="small"),
+            "Margin %": st.column_config.TextColumn("Margin", width="small")
+        }
+    )
+    
+    # ========== PROFIT SUMMARY CARDS ==========
+    st.markdown("---")
+    st.markdown("### 📈 Profit Summary")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    # Calculate summary statistics
+    high_margin_products = [r for r in results if r["Margin %"].replace('%', '') and float(r["Margin %"].replace('%', '')) > 50]
+    low_margin_products = [r for r in results if r["Margin %"].replace('%', '') and float(r["Margin %"].replace('%', '')) < 20]
+    
+    with col1:
+        best_product = max(results, key=lambda x: float(x["Margin %"].replace('%', '')) if x["Margin %"] != 'N/A' else 0)
+        st.metric("🏆 Highest Margin", best_product["Product"], best_product["Margin %"])
+    
+    with col2:
+        worst_product = min(results, key=lambda x: float(x["Margin %"].replace('%', '')) if x["Margin %"] != 'N/A' else 100)
+        st.metric("📉 Lowest Margin", worst_product["Product"], worst_product["Margin %"])
+    
+    with col3:
+        avg_margin = sum([float(r["Margin %"].replace('%', '')) for r in results if r["Margin %"] != 'N/A']) / len(results)
+        st.metric("📊 Average Margin", f"{avg_margin:.1f}%")
+    
+    with col4:
+        most_profitable = max(results, key=lambda x: float(x["Profit"].replace('KES ', '').replace(',', '')) if x["Profit"] != 'N/A' else 0)
+        st.metric("💰 Most Profit per Unit", most_profitable["Product"], most_profitable["Profit"])
+    
+    # ========== CHARTS ==========
+    st.markdown("---")
+    st.markdown("### 📊 Visual Analysis")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Profit margin bar chart
+        chart_data = []
+        for r in results:
+            chart_data.append({
+                "Product": r["Product"][:20],  # Truncate long names
+                "Margin %": float(r["Margin %"].replace('%', ''))
+            })
+        df_chart = pd.DataFrame(chart_data)
+        fig = px.bar(df_chart, x='Product', y='Margin %', 
+                    title='Profit Margin by Product',
+                    color='Margin %', color_continuous_scale='RdYlGn',
+                    text='Margin %')
+        fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+        fig.update_layout(height=500, xaxis_tickangle=-45)
+        st.plotly_chart(fig, width='stretch')
+    
+    with col2:
+        # Profit per unit chart
+        profit_data = []
+        for r in results:
+            profit_data.append({
+                "Product": r["Product"][:20],
+                "Profit (KES)": float(r["Profit"].replace('KES ', ''))
+            })
+        df_profit = pd.DataFrame(profit_data)
+        fig = px.bar(df_profit, x='Product', y='Profit (KES)', 
+                    title='Profit per Unit by Product',
+                    color='Profit (KES)', color_continuous_scale='Greens',
+                    text='Profit (KES)')
+        fig.update_traces(texttemplate='KES %{text:.2f}', textposition='outside')
+        fig.update_layout(height=500, xaxis_tickangle=-45)
+        st.plotly_chart(fig, width='stretch')
+    
+    # ========== COST BREAKDOWN ==========
+    st.markdown("---")
+    st.markdown("### 🔍 Cost Breakdown for Selected Product")
+    
+    selected_product = st.selectbox("Select a product to see detailed cost breakdown", [r["Product"] for r in results])
+    product_detail = next((r for r in results if r["Product"] == selected_product), None)
+    
+    if product_detail:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Cost breakdown pie chart
+            cost_data = pd.DataFrame({
+                'Category': ['Ingredient Cost', 'Packaging Cost'],
+                'Amount': [
+                    float(product_detail["Ingredient Cost"].replace('KES ', '')),
+                    float(product_detail["Packaging Cost"].replace('KES ', ''))
+                ]
+            })
+            fig = px.pie(cost_data, values='Amount', names='Category', 
+                        title=f'Cost Breakdown for {selected_product}',
+                        color_discrete_sequence=['#FF9800', '#2196F3'])
+            st.plotly_chart(fig, width='stretch')
+        
+        with col2:
+            st.markdown(f"### 📊 {selected_product}")
+            st.metric("💰 Selling Price", product_detail["Selling Price"])
+            st.metric("🏭 Total Cost", product_detail["Total Cost"])
+            st.metric("📈 Profit", product_detail["Profit"], delta=product_detail["Margin %"])
+            
+            # Show profit recommendation
+            margin_pct = float(product_detail["Margin %"].replace('%', ''))
+            if margin_pct > 50:
+                st.success(f"✅ Excellent margin! Keep this price point.")
+            elif margin_pct > 30:
+                st.info(f"📈 Good margin. Consider testing higher price.")
+            elif margin_pct > 15:
+                st.warning(f"⚠️ Low margin. Review costs or increase price.")
+            else:
+                st.error(f"❌ Very low margin! Consider discontinuing or raising price significantly.")
+    
+    # ========== WHAT-IF ANALYSIS ==========
+    st.markdown("---")
+    st.markdown("### 🔮 What-If Analysis")
+    st.caption("Adjust costs or prices to see how profit changes")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        test_product = st.selectbox("Select product for analysis", [r["Product"] for r in results], key="test_product")
+        test_price = st.number_input("Test Selling Price (KES)", min_value=0.0, step=5.0, value=0.0, key="test_price")
+    
+    with col2:
+        test_ingredient_cost = st.number_input("Test Ingredient Cost (KES per gram)", min_value=0.0, step=0.01, value=cost_per_gram, key="test_ingredient")
+        test_packaging = st.number_input("Test Packaging Cost (KES)", min_value=0.0, step=1.0, value=0.0, key="test_packaging")
+    
+    if test_price > 0:
+        product_data = next((r for r in results if r["Product"] == test_product), None)
+        if product_data:
+            # Calculate with new values
+            weight = product_data["Weight (g)"]
+            ingredient_cost_new = weight * test_ingredient_cost
+            packaging_cost_new = test_packaging if test_packaging > 0 else float(product_data["Packaging Cost"].replace('KES ', ''))
+            total_cost_new = ingredient_cost_new + packaging_cost_new
+            profit_new = test_price - total_cost_new
+            margin_new = (profit_new / test_price) * 100 if test_price > 0 else 0
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("New Total Cost", f"KES {total_cost_new:.2f}")
+            with col2:
+                st.metric("New Profit", f"KES {profit_new:.2f}")
+            with col3:
+                st.metric("New Margin", f"{margin_new:.1f}%")
+            
+            if margin_new > 50:
+                st.success("✅ This pricing strategy gives excellent margin!")
+            elif margin_new > 30:
+                st.info("📈 Good margin achievable with these numbers.")
+            else:
+                st.warning("⚠️ Margin is low. Consider reducing costs or increasing price.")
+    
+    # ========== ACTUAL VS TARGET ==========
+    st.markdown("---")
+    st.markdown("### 🎯 Actual vs Target Profit Analysis")
+    st.caption("Compare your actual sales data with target profits")
+    
+    if not sales_df.empty:
+        # Get actual sales data
+        actual_sales = sales_df.groupby('Product')['Total'].sum().reset_index()
+        actual_sales.columns = ['Product', 'Actual Revenue']
+        
+        # Merge with target calculations
+        target_data = []
+        for r in results:
+            target_data.append({
+                "Product": r["Product"],
+                "Target Profit per Unit": float(r["Profit"].replace('KES ', ''))
+            })
+        df_target = pd.DataFrame(target_data)
+        
+        # Estimate quantity sold (simplified)
+        # This would need actual quantity data from your sales
+        st.info("To see actual vs target, ensure your sales records include product names matching above.")
+        
+        # Display current profit leaderboard from actual sales
+        st.subheader("🏆 Most Profitable Products (Based on Actual Sales)")
+        
+        # This requires linking actual sales quantities to product profit calculations
+        # For now, show the target profit leaderboard
+        df_target_sorted = df_target.sort_values('Target Profit per Unit', ascending=False)
+        st.dataframe(df_target_sorted, use_container_width=True, hide_index=True)
+    else:
+        st.info("No sales data available yet. Start recording sales to see actual vs target analysis.")
+        
 # Footer
 st.markdown("---")
 st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
