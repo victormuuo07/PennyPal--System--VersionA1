@@ -1217,3 +1217,106 @@ def get_daily_summary(date):
         return None
     except Exception as e:
         return None
+
+# -------------------------------
+# HOTEL TRACKING FUNCTIONS
+# -------------------------------
+
+def save_hotel(hotel_data: dict):
+    """Save a new hotel"""
+    try:
+        hotel_data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTELS").insert(hotel_data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving hotel: {str(e)}")
+        return None
+
+def get_all_hotels():
+    """Get all hotels"""
+    try:
+        response = supabase.table("HOTELS").select("*").order("hotel_name").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def save_hotel_refill(refill_data: dict):
+    """Record a hotel refill"""
+    try:
+        refill_data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTEL_REFILLS").insert(refill_data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving refill: {str(e)}")
+        return None
+
+def get_hotel_refills(hotel_id: str = None):
+    """Get refill history for a hotel or all"""
+    try:
+        query = supabase.table("HOTEL_REFILLS").select("*, HOTELS(*)").order("refill_date", desc=True)
+        if hotel_id:
+            query = query.eq("hotel_id", hotel_id)
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def get_hotel_refill_summary():
+    """Get summary of refills by hotel"""
+    try:
+        response = supabase.table("HOTEL_REFILLS").select("*, HOTELS(*)").execute()
+        if response.data:
+            df = pd.DataFrame(response.data)
+            summary = df.groupby('HOTELS').agg({
+                'quantity': 'sum',
+                'amount_paid': 'sum',
+                'refill_date': 'count'
+            }).reset_index()
+            summary.columns = ['Hotel', 'Total Quantity', 'Total Revenue', 'Number of Refills']
+            return summary
+        return pd.DataFrame()
+    except Exception as e:
+        return pd.DataFrame()
+
+# -------------------------------
+# MAMA MBOGAS TRACKING FUNCTIONS
+# -------------------------------
+
+def save_mama_mboga(mama_data: dict):
+    """Save a new Mama Mboga shop"""
+    try:
+        mama_data["id"] = str(uuid.uuid4())
+        response = supabase.table("MAMA_MBOGAS").insert(mama_data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving Mama Mboga: {str(e)}")
+        return None
+
+def get_all_mama_mbogas():
+    """Get all Mama Mboga shops"""
+    try:
+        response = supabase.table("MAMA_MBOGAS").select("*").order("shop_name").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def save_mama_purchase(purchase_data: dict):
+    """Record a Mama Mboga purchase"""
+    try:
+        purchase_data["id"] = str(uuid.uuid4())
+        response = supabase.table("MAMA_MBOGAS_PURCHASES").insert(purchase_data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving purchase: {str(e)}")
+        return None
+
+def get_mama_purchases(mama_id: str = None):
+    """Get purchase history for a Mama Mboga or all"""
+    try:
+        query = supabase.table("MAMA_MBOGAS_PURCHASES").select("*, MAMA_MBOGAS(*)").order("purchase_date", desc=True)
+        if mama_id:
+            query = query.eq("mama_id", mama_id)
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []

@@ -24,8 +24,16 @@ if time_since_refresh > 30:
 
 # Supabase functions
 from supabase_client import (
+    get_all_hotels,
+    get_all_mama_mbogas,
     get_current_material_balance,
+    get_hotel_refills,
     record_restock_with_balance,
+    save_hotel,
+    save_hotel_refill,
+    save_mama_mboga,
+    save_mama_purchase,
+    save_mama_purchase,
     save_sale,
     save_expense,
     save_distribution,
@@ -1101,60 +1109,218 @@ with tab5:
                     st.plotly_chart(fig, width='stretch')
 
     with analytics_tab3:
-        # Hotel Refill Tracking Dashboard
         st.markdown("### 🏨 Hotel Refill Performance")
+    
+    # ========== HOTEL MANAGEMENT ==========
+        with st.expander("➕ Add New Hotel", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                new_hotel = st.text_input("Hotel Name", key="new_hotel_name")
+                hotel_location = st.text_input("Location", key="hotel_location")
+            with col2:
+                hotel_contact = st.text_input("Contact Phone", key="hotel_contact")
+                hotel_person = st.text_input("Contact Person", key="hotel_person")
         
-        if not sales_df.empty:
-            hotel_sales = sales_df[sales_df['Customer_Type'] == 'Hotel/Restaurant'] if 'Customer_Type' in sales_df.columns else pd.DataFrame()
-            if not hotel_sales.empty:
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Hotels", hotel_sales['Name'].nunique())
-                with col2:
-                    refill_count = len(hotel_sales[hotel_sales['Is_Refill'] == True]) if 'Is_Refill' in hotel_sales.columns else 0
-                    st.metric("Refill Orders", refill_count)
-                with col3:
-                    st.metric("Hotel Revenue", f"KES {hotel_sales['Total'].sum():,.0f}")
-                
-                hotel_summary = hotel_sales.groupby('Name').agg({'Total': 'sum', 'Date': 'count', 'Quantity': 'sum'}).reset_index()
-                hotel_summary.columns = ['Hotel', 'Revenue', 'Orders', 'Quantity']
-                hotel_summary = hotel_summary.sort_values('Orders', ascending=False).head(10)
-                
-                st.dataframe(hotel_summary, use_container_width=True, hide_index=True)
-                
-                fig = px.bar(hotel_summary, x='Hotel', y='Orders', title='Fastest Refilling Hotels', color='Revenue', text='Orders')
-                fig.update_traces(textposition='outside')
+            if st.button("💾 Save Hotel", key="save_hotel"):
+                if new_hotel:
+                    hotel_data = {
+                    "hotel_name": new_hotel,
+                    "location": hotel_location,
+                    "contact_phone": hotel_contact,
+                    "contact_person": hotel_person,
+                    "joined_date": str(date.today()),
+                    "status": "Active"
+                }
+                    save_hotel(hotel_data)
+                    st.success(f"✅ Hotel '{new_hotel}' added!")
+                    st.rerun()
+    
+    # ========== RECORD REFILL ==========
+        with st.expander("🔄 Record Hotel Refill", expanded=True):
+            hotels = get_all_hotels()
+            hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
+        
+            col1, col2 = st.columns(2)
+            with col1:
+                selected_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="refill_hotel")
+                refill_date = st.date_input("Refill Date", value=date.today(), key="refill_date")
+                refill_product = st.selectbox("Product", ["100g Bottle", "100g Refill", "Sachet 5", "Sachet 10", "Sachet 20", "Sachet 30", "Sachet 40"], key="refill_product")
+            with col2:
+                refill_quantity = st.number_input("Quantity", min_value=1, step=1, value=1, key="refill_quantity")
+                refill_amount = st.number_input("Amount Paid (KES)", min_value=0, step=100, value=0, key="refill_amount")
+                refill_notes = st.text_area("Notes", key="refill_notes")
+        
+            if st.button("💾 Record Refill", key="record_refill"):
+                if selected_hotel != "No hotels" and refill_quantity > 0:
+                    hotel_id = hotel_options[selected_hotel]
+                    refill_data = {
+                    "hotel_id": hotel_id,
+                    "refill_date": str(refill_date),
+                    "product_type": refill_product,
+                    "quantity": refill_quantity,
+                    "amount_paid": refill_amount if refill_amount > 0 else refill_quantity * (120 if "Refill" in refill_product else 150),
+                    "payment_status": "Paid",
+                    "notes": refill_notes
+                }
+                    save_hotel_refill(refill_data)
+                    st.success(f"✅ Refill recorded for {selected_hotel}!")
+                    st.rerun()
+    
+    # ========== HOTEL PERFORMANCE DASHBOARD ==========
+        st.markdown("---")
+        st.markdown("### 📊 Hotel Performance Dashboard")
+    
+        hotels = get_all_hotels()
+        if hotels:
+        # Display all hotels with stats
+            hotel_stats = []
+            for hotel in hotels:
+                refills = get_hotel_refills(hotel['id'])
+                total_refills = len(refills)
+                total_quantity = sum(r['quantity'] for r in refills)
+                total_revenue = sum(r['amount_paid'] for r in refills)
+            
+            # Calculate average days between refills
+                if len(refills) >= 2:
+                    dates = sorted([r['refill_date'] for r in refills])
+                    avg_days = sum((dates[i+1] - dates[i]).days for i in range(len(dates)-1)) / (len(dates)-1)
+                    frequency = f"Every {avg_days:.0f} days"
+                elif total_refills == 1:
+                    frequency = "First refill"
+                else:
+                    frequency = "No refills yet"
+            
+                hotel_stats.append({
+                "Hotel": hotel['hotel_name'],
+                "Location": hotel.get('location', 'N/A'),
+                "Refills": total_refills,
+                "Total Quantity": total_quantity,
+                "Total Revenue": total_revenue,
+                "Frequency": frequency
+            })
+        
+            df_hotels = pd.DataFrame(hotel_stats)
+            df_hotels['Total Revenue'] = df_hotels['Total Revenue'].apply(lambda x: f"KES {x:,.0f}")
+        
+            st.dataframe(df_hotels, use_container_width=True, hide_index=True)
+        
+        # Fastest refilling hotels chart
+            refill_counts = [(h['Hotel'], h['Refills']) for h in hotel_stats if h['Refills'] > 0]
+            if refill_counts:
+                df_refills = pd.DataFrame(refill_counts, columns=['Hotel', 'Number of Refills'])
+                df_refills = df_refills.sort_values('Number of Refills', ascending=False).head(10)
+                fig = px.bar(df_refills, x='Hotel', y='Number of Refills', 
+                        title='Hotels with Most Refills',
+                        color='Number of Refills', color_continuous_scale='Viridis',
+                        text='Number of Refills')
                 st.plotly_chart(fig, width='stretch')
-            else:
-                st.info("No hotel sales recorded yet")
-        
+        else:
+            st.info("No hotels added yet. Add your first hotel above!")
+    
+    # ========== MAMA MBOGAS SECTION ==========
         st.markdown("---")
         st.markdown("### 🏪 Mama Mboga Performance")
+    
+    # Add new Mama Mboga
+        with st.expander("➕ Add New Mama Mboga/Shop", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                new_mama = st.text_input("Shop Name", key="new_mama_name")
+                mama_location = st.text_input("Location", key="mama_location")
+            with col2:
+                mama_contact = st.text_input("Contact Phone", key="mama_contact")
+                mama_volume = st.selectbox("Sales Volume", ["Low", "Medium", "High"], key="mama_volume")
         
-        if not sales_df.empty:
-            mama_sales = sales_df[sales_df['Customer_Type'] == 'Shop/Mama Mboga (B2B)'] if 'Customer_Type' in sales_df.columns else pd.DataFrame()
-            if not mama_sales.empty:
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Total Shops", mama_sales['Name'].nunique())
-                with col2:
-                    st.metric("Total Revenue", f"KES {mama_sales['Total'].sum():,.0f}")
-                
-                mama_summary = mama_sales.groupby('Name').agg({'Total': 'sum', 'Quantity': 'sum', 'Date': 'count'}).reset_index()
-                mama_summary.columns = ['Shop', 'Revenue', 'Quantity', 'Orders']
-                mama_summary = mama_summary.sort_values('Revenue', ascending=False).head(10)
-                
-                st.dataframe(mama_summary, use_container_width=True, hide_index=True)
-                
-                # Profit potential
-                mama_summary['Potential Profit'] = mama_summary['Quantity'] * 2.1
-                st.caption("💡 Reseller profit potential: Buy at 2.9, sell at 5 = 2.1 profit per sachet")
-                
-                fig = px.bar(mama_summary, x='Shop', y='Potential Profit', title='Top Shops by Reseller Profit Potential', color='Revenue', text='Potential Profit')
-                fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+            if st.button("💾 Save Mama Mboga", key="save_mama"):
+                if new_mama:
+                    mama_data = {
+                    "shop_name": new_mama,
+                    "location": mama_location,
+                    "contact_phone": mama_contact,
+                    "sales_volume": mama_volume,
+                    "joined_date": str(date.today()),
+                    "status": "Active"
+                }
+                    save_mama_mboga(mama_data)
+                    st.success(f"✅ Shop '{new_mama}' added!")
+                    st.rerun()
+    
+    # Record purchase
+        with st.expander("💰 Record Mama Mboga Purchase", expanded=True):
+            mamas = get_all_mama_mbogas()
+            mama_options = {m['shop_name']: m['id'] for m in mamas} if mamas else {}
+        
+            col1, col2 = st.columns(2)
+            with col1:
+                selected_mama = st.selectbox("Select Shop", list(mama_options.keys()) if mama_options else ["No shops"], key="purchase_mama")
+                purchase_date = st.date_input("Purchase Date", value=date.today(), key="purchase_date")
+                purchase_product = st.selectbox("Product", ["Sachet 5", "Sachet 10", "Sachet 20", "Sachet 30", "Sachet 40", "100g Bottle"], key="purchase_product")
+            with col2:
+                purchase_quantity = st.number_input("Quantity", min_value=1, step=1, value=1, key="purchase_quantity")
+                unit_price = st.number_input("Unit Price (KES)", min_value=0, step=1, value=5, key="unit_price")
+                total_amount = purchase_quantity * unit_price
+                st.info(f"Total: KES {total_amount:,.0f}")
+        
+            if st.button("💾 Record Purchase", key="record_purchase"):
+                if selected_mama != "No shops" and purchase_quantity > 0:
+                    mama_id = mama_options[selected_mama]
+                    purchase_data = {
+                    "mama_id": mama_id,
+                    "purchase_date": str(purchase_date),
+                    "product_type": purchase_product,
+                    "quantity": purchase_quantity,
+                    "unit_price": unit_price,
+                    "total_amount": total_amount,
+                    "payment_status": "Paid"
+                }
+                save_mama_purchase(purchase_data)
+                st.success(f"✅ Purchase recorded for {selected_mama}!")
+                st.rerun()
+    
+    # Mama Mboga Performance Dashboard
+        st.markdown("---")
+        st.markdown("### 📊 Mama Mboga Performance Dashboard")
+    
+        mamas = get_all_mama_mbogas()
+        if mamas:
+            mama_stats = []
+            for mama in mamas:
+                purchases = get_mama_purchases(mama['id'])
+                total_purchases = len(purchases)
+                total_quantity = sum(p['quantity'] for p in purchases)
+                total_revenue = sum(p['total_amount'] for p in purchases)
+            
+            # Calculate profit for mama (they sell at higher price)
+                estimated_profit = total_quantity * 2.1 if "Sachet" in str(purchases) else 0
+            
+                mama_stats.append({
+                "Shop": mama['shop_name'],
+                "Location": mama.get('location', 'N/A'),
+                "Purchases": total_purchases,
+                "Total Quantity": total_quantity,
+                "Total Revenue": total_revenue,
+                "Est. Profit": estimated_profit,
+                "Volume": mama.get('sales_volume', 'N/A')
+            })
+        
+            df_mamas = pd.DataFrame(mama_stats)
+            df_mamas['Total Revenue'] = df_mamas['Total Revenue'].apply(lambda x: f"KES {x:,.0f}")
+            df_mamas['Est. Profit'] = df_mamas['Est. Profit'].apply(lambda x: f"KES {x:,.0f}")
+        
+            st.dataframe(df_mamas, use_container_width=True, hide_index=True)
+        
+        # Top performing shops chart
+            top_mamas = [(m['Shop'], m['Total Quantity']) for m in mama_stats if m['Total Quantity'] > 0]
+            if top_mamas:
+                df_top = pd.DataFrame(top_mamas, columns=['Shop', 'Quantity Purchased'])
+                df_top = df_top.sort_values('Quantity Purchased', ascending=False).head(10)
+                fig = px.bar(df_top, x='Shop', y='Quantity Purchased', 
+                        title='Top Performing Mama Mbogas',
+                        color='Quantity Purchased', color_continuous_scale='Plasma',
+                        text='Quantity Purchased')
                 st.plotly_chart(fig, width='stretch')
-            else:
-                st.info("No Mama Mboga sales recorded yet")
+        else:
+            st.info("No Mama Mboga shops added yet. Add your first shop above!")
         
         # Product Mix Analysis
         st.markdown("---")
