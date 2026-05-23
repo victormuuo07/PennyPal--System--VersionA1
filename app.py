@@ -1697,7 +1697,7 @@ with tab6:
         with col1:
             batch_number = st.text_input("Batch Number", placeholder="e.g., BATCH-001", key="batch_num")
             production_date = st.date_input("Production Date", value=date.today(), key="prod_date")
-            total_kg = st.number_input("Total KG Produced", min_value=0.5, step=0.5, value=2.0, key="total_kg")
+            total_kg = st.number_input("Total KG Produced", min_value=0.1, step=0.1, value=2.0, key="total_kg")
         
         with col2:
             st.markdown("### 📊 Recipe Formula")
