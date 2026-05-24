@@ -1929,7 +1929,7 @@ with tab6:
             with col1:
                 restock_material = st.selectbox("Material", material_list, key="restock_material")
             with col2:
-                restock_qty = st.number_input("Quantity (KG)", min_value=0.5, step=0.5, value=5.0, key="restock_qty")
+                restock_qty = st.number_input("Quantity (KG)", min_value=0.1, step=0.1, value=5.0, key="restock_qty")
             with col3:
                 restock_cost = st.number_input("Cost per KG (KES)", min_value=0, step=10, value=100, key="restock_cost")
     
