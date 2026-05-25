@@ -1021,55 +1021,25 @@ def record_material_usage_with_balance(batch_id: str, material_name: str, quanti
         else:
             usage_date_str = str(usage_date)
         
-        # First, check if the material exists in RAW_MATERIALS_INVENTORY
-        inv_check = supabase.table("RAW_MATERIALS_INVENTORY").select("*").eq("material_name", material_name).execute()
-        
-        if not inv_check.data:
-            # Material doesn't exist, create it with default values
-            st.warning(f"⚠️ {material_name} not found in inventory. Creating entry...")
-            supabase.table("RAW_MATERIALS_INVENTORY").insert({
-                "material_name": material_name,
-                "current_stock_kg": 0,
-                "total_purchased_kg": 0,
-                "total_used_kg": 0,
-                "unit_cost": 100,
-                "reorder_level": 10
-            }).execute()
-            
-            # Also create a dummy restock
-            supabase.table("STOCK_RESTOCK").insert({
-                "id": str(uuid.uuid4()),
-                "material_name": material_name,
-                "quantity_kg": 0,
-                "remaining_kg": 0,
-                "cost_per_kg": 100,
-                "total_cost": 0,
-                "supplier": "Initial Stock",
-                "restock_date": "2024-01-01",
-                "notes": "Auto-created for usage tracking"
-            }).execute()
-        
-        # Get current stock
+        # Check if enough stock is available
         current_stock = get_current_material_balance(material_name)
         st.write(f"DEBUG: Current stock for {material_name}: {current_stock}kg")
         
         if current_stock < quantity_used_kg:
             st.error(f"Insufficient {material_name}! Need {quantity_used_kg:.2f}kg, have {current_stock:.2f}kg")
-            st.info(f"💡 Please restock {material_name} first before creating this batch.")
             return False
         
         # Get restocks with remaining stock (oldest first for FIFO)
+        # FIXED: Use .order() with column name, then .asc() for ascending order
         response = supabase.table("STOCK_RESTOCK")\
             .select("*")\
             .eq("material_name", material_name)\
             .gt("remaining_kg", 0)\
-            .order("restock_date", asc=True)\
+            .order("restock_date")\
             .execute()
         
-        st.write(f"DEBUG: Found {len(response.data) if response.data else 0} restocks for {material_name}")
-        
         if not response.data:
-            st.error(f"No stock available for {material_name}! Please record a restock first.")
+            st.error(f"No stock available for {material_name}!")
             return False
         
         remaining_to_use = quantity_used_kg
@@ -1085,6 +1055,7 @@ def record_material_usage_with_balance(batch_id: str, material_name: str, quanti
             
             st.write(f"DEBUG: Using {use_from_this}kg from restock dated {restock['restock_date']}")
             
+            # Update remaining in this restock
             supabase.table("STOCK_RESTOCK")\
                 .update({"remaining_kg": new_remaining})\
                 .eq("id", restock['id'])\
