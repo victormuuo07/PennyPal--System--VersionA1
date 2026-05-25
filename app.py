@@ -1826,6 +1826,7 @@ with tab6:
                 usage_success = True
                 for mat_name, needed in materials_needed.items():
                     st.write(f"Recording usage: {mat_name} - {needed}kg")
+                    cost_per_kg = 100
                     success = record_material_usage_with_balance(batch_id, mat_name, needed, production_date)
                     if not success:
                         usage_success = False
