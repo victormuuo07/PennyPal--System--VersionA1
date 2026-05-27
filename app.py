@@ -1182,7 +1182,9 @@ with tab5:
             
             # Calculate average days between refills
                 if len(refills) >= 2:
-                    dates = sorted([r['refill_date'] for r in refills])
+    # Convert string dates to datetime objects
+                    from datetime import datetime
+                    dates = sorted([datetime.strptime(r['refill_date'], '%Y-%m-%d') if isinstance(r['refill_date'], str) else r['refill_date'] for r in refills])
                     avg_days = sum((dates[i+1] - dates[i]).days for i in range(len(dates)-1)) / (len(dates)-1)
                     frequency = f"Every {avg_days:.0f} days"
                 elif total_refills == 1:
