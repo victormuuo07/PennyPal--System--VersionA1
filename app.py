@@ -797,8 +797,6 @@ with tab5:
     st.markdown("### 📊 Sales Performance Dashboard")
 
     if not sales_df.empty:
-    
-    # Period selector with better options
         col1, col2 = st.columns([2, 1])
         with col1:
             period = st.radio(
