@@ -1425,6 +1425,300 @@ with tab5:
         st.info("No expense data available. Start recording expenses to see burn rate analysis!")
 
         
+            # ========== PROFIT TREND ANALYSIS ==========
+    st.markdown("---")
+    st.markdown("### 📈 Profit Trend Analysis")
+    
+    if not sales_df.empty and not expenses_df.empty:
+        
+        # Prepare daily data
+        sales_df['Date'] = pd.to_datetime(sales_df['Date'])
+        expenses_df['date'] = pd.to_datetime(expenses_df['date'])
+        
+        # Get date range
+        all_dates = pd.date_range(
+            start=min(sales_df['Date'].min(), expenses_df['date'].min()),
+            end=max(sales_df['Date'].max(), expenses_df['date'].max()),
+            freq='D'
+        )
+        
+        # Daily sales
+        daily_sales = sales_df.groupby('Date')['Total'].sum().reset_index()
+        daily_sales.columns = ['Date', 'Sales']
+        
+        # Daily expenses
+        daily_expenses = expenses_df.groupby('date')['amount'].sum().reset_index()
+        daily_expenses.columns = ['Date', 'Expenses']
+        
+        # Merge and fill missing days with 0
+        profit_df = pd.merge(daily_sales, daily_expenses, on='Date', how='outer').fillna(0)
+        profit_df = profit_df.sort_values('Date')
+        
+        # Calculate daily profit
+        profit_df['Daily Profit'] = profit_df['Sales'] - profit_df['Expenses']
+        
+        # Calculate cumulative profit
+        profit_df['Cumulative Sales'] = profit_df['Sales'].cumsum()
+        profit_df['Cumulative Expenses'] = profit_df['Expenses'].cumsum()
+        profit_df['Cumulative Profit'] = profit_df['Cumulative Sales'] - profit_df['Cumulative Expenses']
+        
+        # Calculate 7-day moving average of profit
+        profit_df['Profit_MA7'] = profit_df['Daily Profit'].rolling(window=7, min_periods=1).mean()
+        
+        # ========== PROFIT METRICS ==========
+        st.markdown("#### 💰 Profit Metrics")
+        
+        total_profit = profit_df['Daily Profit'].sum()
+        avg_daily_profit = profit_df['Daily Profit'].mean()
+        best_profit_day = profit_df.loc[profit_df['Daily Profit'].idxmax()]
+        worst_profit_day = profit_df.loc[profit_df['Daily Profit'].idxmin()]
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("💰 Total Profit", f"KES {total_profit:,.0f}")
+        with col2:
+            st.metric("📊 Avg Daily Profit", f"KES {avg_daily_profit:,.0f}")
+        with col3:
+            st.metric("🏆 Best Day", f"KES {best_profit_day['Daily Profit']:,.0f}")
+            st.caption(f"{best_profit_day['Date'].strftime('%b %d')}")
+        with col4:
+            st.metric("📉 Worst Day", f"KES {worst_profit_day['Daily Profit']:,.0f}")
+            st.caption(f"{worst_profit_day['Date'].strftime('%b %d')}")
+        
+        # ========== DAILY PROFIT CHART ==========
+        st.markdown("#### 📊 Daily Profit Trend")
+        
+        fig = go.Figure()
+        
+        # Add bars for profit (green for positive, red for negative)
+        colors = ['#4CAF50' if x >= 0 else '#FF4B4B' for x in profit_df['Daily Profit']]
+        
+        fig.add_trace(go.Bar(
+            x=profit_df['Date'], 
+            y=profit_df['Daily Profit'],
+            name='Daily Profit',
+            marker_color=colors,
+            text=profit_df['Daily Profit'].apply(lambda x: f'KES {x:,.0f}'),
+            textposition='outside',
+            hovertemplate='Date: %{x}<br>Profit: KES %{y:,.0f}<extra></extra>'
+        ))
+        
+        # Add moving average line
+        fig.add_trace(go.Scatter(
+            x=profit_df['Date'],
+            y=profit_df['Profit_MA7'],
+            name='7-Day Avg Profit',
+            line=dict(color='#FF9800', width=3),
+            mode='lines'
+        ))
+        
+        # Add zero line
+        fig.add_hline(y=0, line_dash="dash", line_color="gray", annotation_text="Break-even")
+        
+        fig.update_layout(
+            title='Daily Profit with 7-Day Moving Average',
+            xaxis_title='Date',
+            yaxis_title='Profit (KES)',
+            height=450,
+            hovermode='x unified'
+        )
+        st.plotly_chart(fig, width='stretch')
+        
+        # ========== CUMULATIVE PROFIT CHART ==========
+        st.markdown("#### 📈 Cumulative Profit Over Time")
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=profit_df['Date'],
+            y=profit_df['Cumulative Sales'],
+            name='Cumulative Sales',
+            mode='lines',
+            line=dict(color='#36B37E', width=3),
+            fill=None,
+            hovertemplate='Date: %{x}<br>Sales: KES %{y:,.0f}<extra></extra>'
+        ))
+        
+        fig.add_trace(go.Scatter(
+            x=profit_df['Date'],
+            y=profit_df['Cumulative Expenses'],
+            name='Cumulative Expenses',
+            mode='lines',
+            line=dict(color='#FF4B4B', width=3),
+            fill=None,
+            hovertemplate='Date: %{x}<br>Expenses: KES %{y:,.0f}<extra></extra>'
+        ))
+        
+        fig.add_trace(go.Scatter(
+            x=profit_df['Date'],
+            y=profit_df['Cumulative Profit'],
+            name='Cumulative Profit',
+            mode='lines',
+            line=dict(color='#4CAF50', width=4, dash='dash'),
+            fill='tozeroy',
+            hovertemplate='Date: %{x}<br>Profit: KES %{y:,.0f}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            title='Cumulative Sales, Expenses, and Profit',
+            xaxis_title='Date',
+            yaxis_title='Amount (KES)',
+            height=500,
+            hovermode='x unified',
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+        )
+        st.plotly_chart(fig, width='stretch')
+        
+        # ========== PROFIT MARGIN ==========
+        st.markdown("#### 📊 Profit Margin Analysis")
+        
+        # Calculate profit margin by day
+        profit_df['Profit Margin %'] = (profit_df['Daily Profit'] / profit_df['Sales'] * 100).fillna(0)
+        profit_df['Profit Margin %'] = profit_df['Profit Margin %'].clip(lower=-100, upper=100)
+        
+        # Remove infinite values
+        profit_df['Profit Margin %'] = profit_df['Profit Margin %'].replace([np.inf, -np.inf], 0)
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Bar(
+            x=profit_df['Date'],
+            y=profit_df['Profit Margin %'],
+            name='Profit Margin',
+            marker_color=profit_df['Profit Margin %'],
+            marker_colorscale='RdYlGn',
+            text=profit_df['Profit Margin %'].apply(lambda x: f'{x:.1f}%'),
+            textposition='outside',
+            hovertemplate='Date: %{x}<br>Margin: %{y:.1f}%<extra></extra>'
+        ))
+        
+        fig.add_hline(y=0, line_dash="dash", line_color="gray")
+        fig.add_hline(y=20, line_dash="dash", line_color="green", annotation_text="Target 20%", annotation_position="bottom right")
+        
+        fig.update_layout(
+            title='Daily Profit Margin %',
+            xaxis_title='Date',
+            yaxis_title='Profit Margin (%)',
+            height=400,
+            yaxis_range=[-100, 100]
+        )
+        st.plotly_chart(fig, width='stretch')
+        
+        # ========== SALES vs EXPENSES GROWTH ==========
+        st.markdown("#### 📈 Sales vs Expenses Growth Rate")
+        
+        # Calculate weekly totals
+        profit_df['Week'] = profit_df['Date'].dt.isocalendar().week
+        profit_df['Year'] = profit_df['Date'].dt.year
+        
+        weekly_summary = profit_df.groupby(['Year', 'Week']).agg({
+            'Sales': 'sum',
+            'Expenses': 'sum',
+            'Daily Profit': 'sum'
+        }).reset_index()
+        
+        weekly_summary['WeekLabel'] = weekly_summary.apply(lambda x: f"W{x['Week']}", axis=1)
+        
+        if len(weekly_summary) >= 2:
+            # Calculate week-over-week growth
+            weekly_summary['Sales Growth %'] = weekly_summary['Sales'].pct_change() * 100
+            weekly_summary['Expense Growth %'] = weekly_summary['Expenses'].pct_change() * 100
+            weekly_summary['Profit Growth %'] = weekly_summary['Daily Profit'].pct_change() * 100
+            
+            growth_df = weekly_summary.tail(8)[['WeekLabel', 'Sales Growth %', 'Expense Growth %', 'Profit Growth %']].dropna()
+            
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=growth_df['WeekLabel'], y=growth_df['Sales Growth %'], name='Sales Growth', marker_color='#36B37E'))
+            fig.add_trace(go.Bar(x=growth_df['WeekLabel'], y=growth_df['Expense Growth %'], name='Expense Growth', marker_color='#FF4B4B'))
+            fig.add_trace(go.Scatter(x=growth_df['WeekLabel'], y=growth_df['Profit Growth %'], name='Profit Growth', 
+                                    mode='lines+markers', line=dict(color='#FF9800', width=3)))
+            fig.add_hline(y=0, line_dash="dash", line_color="gray")
+            fig.update_layout(
+                title='Week-over-Week Growth Rates',
+                xaxis_title='Week',
+                yaxis_title='Growth %',
+                height=450,
+                barmode='group'
+            )
+            st.plotly_chart(fig, width='stretch')
+            
+            # Summary insight
+            latest_sales_growth = growth_df['Sales Growth %'].iloc[-1] if not growth_df.empty else 0
+            latest_expense_growth = growth_df['Expense Growth %'].iloc[-1] if not growth_df.empty else 0
+            
+            if latest_sales_growth > latest_expense_growth:
+                st.success(f"✅ **Great!** Sales are growing faster ({latest_sales_growth:.1f}%) than expenses ({latest_expense_growth:.1f}%)")
+            elif latest_sales_growth < latest_expense_growth:
+                st.warning(f"⚠️ **Warning:** Expenses are growing faster ({latest_expense_growth:.1f}%) than sales ({latest_sales_growth:.1f}%)")
+            else:
+                st.info(f"📊 Sales and expenses are growing at similar rates")
+        
+        # ========== PROFIT INSIGHTS ==========
+        st.markdown("#### 💡 Profit Insights")
+        
+        insights = []
+        
+        # Overall profit health
+        if total_profit > 0:
+            insights.append(f"✅ **Overall Profitability:** Your business has generated KES {total_profit:,.0f} in total profit")
+        else:
+            insights.append(f"⚠️ **Overall Profitability:** Your business has a total loss of KES {abs(total_profit):,.0f}")
+        
+        # Profit margin average
+        avg_margin = profit_df['Profit Margin %'].mean()
+        if avg_margin > 20:
+            insights.append(f"✅ **Average Profit Margin:** {avg_margin:.1f}% - Excellent!")
+        elif avg_margin > 10:
+            insights.append(f"📈 **Average Profit Margin:** {avg_margin:.1f}% - Good, room for improvement")
+        elif avg_margin > 0:
+            insights.append(f"⚠️ **Average Profit Margin:** {avg_margin:.1f}% - Low, consider cost reduction")
+        else:
+            insights.append(f"🔴 **Average Profit Margin:** {avg_margin:.1f}% - Negative, need urgent action")
+        
+        # Best performing period
+        if len(weekly_summary) >= 2:
+            best_week = weekly_summary.loc[weekly_summary['Daily Profit'].idxmax()]
+            insights.append(f"🏆 **Best Week:** {best_week['WeekLabel']} with KES {best_week['Daily Profit']:,.0f} profit")
+        
+        # Sales vs expenses ratio
+        total_sales_all = profit_df['Sales'].sum()
+        total_expenses_all = profit_df['Expenses'].sum()
+        if total_expenses_all > 0:
+            expense_ratio = (total_expenses_all / total_sales_all) * 100
+            insights.append(f"📊 **Expense Ratio:** {expense_ratio:.1f}% of revenue goes to expenses")
+        
+        for insight in insights:
+            st.info(insight)
+        
+        # ========== BREAK-EVEN ANALYSIS ==========
+        st.markdown("#### 🎯 Break-even Analysis")
+        
+        # Calculate average daily fixed costs (from fixed categories)
+        fixed_categories_list = ['Salaries', 'Office Rent', 'Insurance', 'Software', 'Utilities']
+        fixed_expenses = expenses_df[expenses_df['category'].isin(fixed_categories_list)]['amount'].sum()
+        avg_daily_fixed = fixed_expenses / len(profit_df) if len(profit_df) > 0 else 0
+        
+        # Average variable cost per unit (estimate)
+        avg_variable_cost = 0.34 * 10  # Approximate for 10g product
+        
+        # Average selling price
+        avg_selling_price = profit_df['Sales'].sum() / profit_df['Sales'].count() if profit_df['Sales'].sum() > 0 else 0
+        
+        if avg_selling_price > avg_variable_cost:
+            contribution_margin = avg_selling_price - avg_variable_cost
+            break_even_units = avg_daily_fixed / contribution_margin if contribution_margin > 0 else 0
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("📊 Daily Fixed Costs", f"KES {avg_daily_fixed:,.0f}")
+                st.metric("💵 Contribution Margin", f"KES {contribution_margin:.0f} per unit")
+            with col2:
+                st.metric("🎯 Break-even Units", f"{break_even_units:.0f} units/day")
+                st.caption("Units needed to cover daily costs")
+        
+    else:
+        st.info("Need both sales and expense data to show profit analysis")
+        
         # Key Metrics Cards
         st.markdown("### 📈 Key Performance Indicators")
         
