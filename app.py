@@ -1642,31 +1642,51 @@ with tab5:
                     best_product = product_margin.loc[product_margin['Total'].idxmax(), 'Product_Type']
                     st.write(f"• **Best Performing Product:** {best_product}")
         
+            # Replace the insights section with this corrected version
+
             with col2:
                 st.markdown("### 💎 Key Insights")
-            
-            # Generate insights
+    
+                # Generate insights based on actual revenue contribution
                 insights = []
+    
+    # Calculate revenue by segment (not customer count)
+                if len(customer_ltv) > 0:
+                    segment_revenue = customer_ltv.groupby('Segment')['total_spent'].sum().reset_index()
+                    if not segment_revenue.empty:
+            # Find segment with highest total revenue
+                        top_segment = segment_revenue.loc[segment_revenue['total_spent'].idxmax()]
+                        insights.append(f"💰 **Highest revenue segment:** {top_segment['Segment']} customers contributing KES {top_segment['total_spent']:,.0f}")
+                    else:
+                        insights.append("💰 **Highest revenue segment:** Not enough data")
+    
+    # Other insights
                 if kpis['cash_percentage'] < 50:
                     insights.append("🔴 Too much credit - tighten payment terms")
-                if len(customer_ltv[customer_ltv['order_count'] == 1]) / len(customer_ltv) > 0.6 if len(customer_ltv) > 0 else False:
+    
+                repeat_rate = len(customer_ltv[customer_ltv['order_count'] > 1]) / len(customer_ltv) * 100 if len(customer_ltv) > 0 else 0
+                if repeat_rate < 20:
                     insights.append("🟡 Low customer retention - implement loyalty program")
+                elif repeat_rate > 50:
+                    insights.append(f"🟢 Great retention! {repeat_rate:.0f}% of customers return")
+    
                 if 'Margin_Percentage' in locals() and not product_margin.empty and product_margin['Margin_Percentage'].min() < 20:
                     insights.append("🟠 Low margin on some products - review pricing")
-            
-                if len(customer_ltv) > 0:
-                    best_segment = customer_ltv['Segment'].mode().iloc[0] if not customer_ltv.empty else 'N/A'
-                    insights.append(f"🟢 Most valuable segment: {best_segment} customers")
-            
+    
                 if kpis['total_sales'] > 0:
                     insights.append(f"💰 Total revenue: KES {kpis['total_sales']:,.0f}")
-                    insights.append(f"📈 Net profit margin: {(kpis['net_profit']/kpis['total_sales']*100):.1f}%" if kpis['total_sales'] > 0 else "📈 Net profit margin: N/A")
-            
-                for insight in insights[:4]:
+                    profit_margin = (kpis['net_profit']/kpis['total_sales']*100) if kpis['total_sales'] > 0 else 0
+                    insights.append(f"📈 Net profit margin: {profit_margin:.1f}%")
+    
+    # Top customer insight
+                if len(customer_ltv) > 0:
+                    top_customer = customer_ltv.loc[customer_ltv['total_spent'].idxmax()]
+                    insights.append(f"🏆 Best customer: {top_customer['Name']} spent KES {top_customer['total_spent']:,.0f}")
+    
+                for insight in insights[:5]:
                     st.write(f"• {insight}")
     
-        else:
-            st.info("Not enough sales data for advanced analytics. Add some sales to see insights!")
+       
 
 # ==================== TAB 6: PRODUCTION & INVENTORY ====================
 with tab6:
