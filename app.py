@@ -1131,7 +1131,7 @@ with tab5:
     else:
         st.info("No sales data available. Start recording sales to see trends!")
 
-            # ========== EXPENSE ANALYSIS & BURN RATE DASHBOARD ==========
+                # ========== EXPENSE ANALYSIS & BURN RATE DASHBOARD ==========
     st.markdown("---")
     st.markdown("### 💸 Expense Analysis & Burn Rate")
     
@@ -1151,51 +1151,55 @@ with tab5:
         # ========== BURN RATE CALCULATION ==========
         st.markdown("#### 🔥 Burn Rate Analysis")
         
-        # Calculate burn rate based on selected period
         current_date = datetime.now()
         
+        # Initialize burn variables
+        daily_burn = 0
+        weekly_burn = 0
+        monthly_burn = 0
+        quarterly_burn = 0
+        burn_rate = 0
+        period_name = ""
+        runway_days = 0
+        
+        # Calculate burn rate based on selected period
         if expense_period == "Daily":
             # Last 30 days average daily burn
             last_30_days = expenses_df[expenses_df['date'] >= current_date - timedelta(days=30)]
             daily_burn = last_30_days['amount'].sum() / 30 if len(last_30_days) > 0 else 0
             period_name = "Daily"
-            period_days = 1
+            burn_rate = daily_burn
+            runway_days = current_cash / burn_rate if burn_rate > 0 else 0
             
         elif expense_period == "Weekly":
             # Last 4 weeks average weekly burn
             last_4_weeks = expenses_df[expenses_df['date'] >= current_date - timedelta(days=28)]
             weekly_burn = last_4_weeks['amount'].sum() / 4 if len(last_4_weeks) > 0 else 0
             period_name = "Weekly"
-            period_days = 7
+            burn_rate = weekly_burn
+            runway_days = (current_cash / burn_rate) * 7 if burn_rate > 0 else 0
             
         elif expense_period == "Monthly":
             # Last 3 months average monthly burn
             last_3_months = expenses_df[expenses_df['date'] >= current_date - timedelta(days=90)]
             monthly_burn = last_3_months['amount'].sum() / 3 if len(last_3_months) > 0 else 0
             period_name = "Monthly"
-            period_days = 30
+            burn_rate = monthly_burn
+            runway_days = (current_cash / burn_rate) * 30 if burn_rate > 0 else 0
             
         else:  # Quarterly
             # Last 2 quarters average quarterly burn
             last_2_quarters = expenses_df[expenses_df['date'] >= current_date - timedelta(days=180)]
             quarterly_burn = last_2_quarters['amount'].sum() / 2 if len(last_2_quarters) > 0 else 0
             period_name = "Quarterly"
-            period_days = 90
-        
-        # Calculate runway based on cash balance
-        current_cash = kpis['running_balance']
-        if period_name == "Daily":
-            burn_rate = daily_burn
-            runway_days = current_cash / burn_rate if burn_rate > 0 else 0
-        elif period_name == "Weekly":
-            burn_rate = weekly_burn
-            runway_days = (current_cash / burn_rate) * 7 if burn_rate > 0 else 0
-        elif period_name == "Monthly":
-            burn_rate = monthly_burn
-            runway_days = (current_cash / burn_rate) * 30 if burn_rate > 0 else 0
-        else:
             burn_rate = quarterly_burn
             runway_days = (current_cash / burn_rate) * 90 if burn_rate > 0 else 0
+        
+        current_cash = kpis['running_balance']
+        
+        # Calculate monthly revenue for burn ratio
+        monthly_revenue = sales_df[sales_df['Date'] >= current_date - timedelta(days=30)]['Total'].sum() if not sales_df.empty else 0
+        burn_to_revenue = (monthly_burn / monthly_revenue * 100) if monthly_burn > 0 and monthly_revenue > 0 else 0
         
         # Display burn rate metrics
         col1, col2, col3, col4 = st.columns(4)
@@ -1207,15 +1211,12 @@ with tab5:
             st.metric("📊 Runway", f"{runway_days:.0f} days" if runway_days > 0 else "N/A")
             st.caption(f"At current burn rate")
         with col4:
-            # Monthly burn vs revenue ratio
-            monthly_revenue = sales_df[sales_df['Date'] >= current_date - timedelta(days=30)]['Total'].sum() if not sales_df.empty else 0
-            burn_to_revenue = (monthly_burn / monthly_revenue * 100) if monthly_revenue > 0 else 0
-            st.metric("📉 Burn/Revenue Ratio", f"{burn_to_revenue:.1f}%")
+            st.metric("📉 Burn/Revenue Ratio", f"{burn_to_revenue:.1f}%" if burn_to_revenue > 0 else "N/A")
             if burn_to_revenue > 100:
                 st.caption("⚠️ Spending more than earning!")
             elif burn_to_revenue > 70:
                 st.caption("⚠️ High expense ratio")
-            else:
+            elif burn_to_revenue > 0:
                 st.caption("✅ Healthy ratio")
         
         # ========== EXPENSE TRENDS ==========
@@ -1257,11 +1258,11 @@ with tab5:
                         title='Quarterly Expense Trend',
                         color='amount', color_continuous_scale='Reds')
         
-        fig.update_layout(height=400)
-        st.plotly_chart(fig, width='stretch')
+        if 'fig' in locals():
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, width='stretch')
         
         # ========== EXPENSE CATEGORY BREAKDOWN ==========
-                # ========== EXPENSE CATEGORY BREAKDOWN ==========
         st.markdown("#### 📂 Expense Categories")
         
         col1, col2 = st.columns(2)
@@ -1306,64 +1307,63 @@ with tab5:
         
         classification_summary = expenses_df.groupby('Classification')['amount'].sum().reset_index()
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            fig = px.pie(classification_summary, values='amount', names='Classification',
-                        title='Fixed vs Variable Expenses',
-                        color='Classification',
-                        color_discrete_map={'Fixed': '#2196F3', 'Variable': '#FF9800', 'Other': '#9E9E9E'})
-            st.plotly_chart(fig, width='stretch')
+        if not classification_summary.empty:
+            col1, col2 = st.columns(2)
             
-            # Show classification insights
-            fixed_total = classification_summary[classification_summary['Classification'] == 'Fixed']['amount'].sum() if len(classification_summary) > 0 else 0
-            variable_total = classification_summary[classification_summary['Classification'] == 'Variable']['amount'].sum() if len(classification_summary) > 0 else 0
+            with col1:
+                fig = px.pie(classification_summary, values='amount', names='Classification',
+                            title='Fixed vs Variable Expenses',
+                            color='Classification',
+                            color_discrete_map={'Fixed': '#2196F3', 'Variable': '#FF9800', 'Other': '#9E9E9E'})
+                st.plotly_chart(fig, width='stretch')
+                
+                # Show classification insights
+                fixed_total = classification_summary[classification_summary['Classification'] == 'Fixed']['amount'].sum() if len(classification_summary) > 0 else 0
+                variable_total = classification_summary[classification_summary['Classification'] == 'Variable']['amount'].sum() if len(classification_summary) > 0 else 0
+                
+                if fixed_total > variable_total:
+                    st.info("💡 **Insight:** Most expenses are fixed. Consider negotiating fixed costs to improve profitability.")
+                else:
+                    st.info("💡 **Insight:** Most expenses are variable. Focus on volume-based cost reduction.")
             
-            if fixed_total > variable_total:
-                st.info("💡 **Insight:** Most expenses are fixed. Consider negotiating fixed costs to improve profitability.")
-            else:
-                st.info("💡 **Insight:** Most expenses are variable. Focus on volume-based cost reduction.")
+            with col2:
+                # Monthly fixed vs variable trend
+                expenses_df['Month'] = expenses_df['date'].dt.strftime('%Y-%m')
+                monthly_class = expenses_df.groupby(['Month', 'Classification'])['amount'].sum().reset_index()
+                
+                if not monthly_class.empty:
+                    fig = px.line(monthly_class, x='Month', y='amount', color='Classification',
+                                 title='Monthly Fixed vs Variable Trend',
+                                 markers=True)
+                    fig.update_layout(height=350)
+                    st.plotly_chart(fig, width='stretch')
         
-        with col2:
-            # Monthly fixed vs variable trend
-            expenses_df['Month'] = expenses_df['date'].dt.strftime('%Y-%m')
-            monthly_class = expenses_df.groupby(['Month', 'Classification'])['amount'].sum().reset_index()
-            
-            fig = px.line(monthly_class, x='Month', y='amount', color='Classification',
-                         title='Monthly Fixed vs Variable Trend',
-                         markers=True)
-            fig.update_layout(height=350)
-            st.plotly_chart(fig, width='stretch')
-        
-        
-                # ========== EXPENSE ALERTS & INSIGHTS ==========
+        # ========== EXPENSE ALERTS & INSIGHTS ==========
         st.markdown("#### ⚠️ Expense Alerts & Insights")
         
-        # Get total expenses from kpis dictionary
         total_expenses_value = kpis['total_expenses']
         
         alerts = []
         
         # Check for unusually high expense days/weeks/months
-        if expense_period == "Monthly" and len(expense_trend) >= 3:
+        if expense_period == "Monthly" and 'expense_trend' in locals() and len(expense_trend) >= 3:
             avg_expense = expense_trend['amount'].mean()
             current_expense = expense_trend['amount'].iloc[-1] if len(expense_trend) > 0 else 0
             if current_expense > avg_expense * 1.3:
                 alerts.append(f"📈 **High expense alert:** Current {expense_period.lower()} expenses are {((current_expense/avg_expense)-1)*100:.0f}% above average")
         
         # Check burn rate against revenue
-        monthly_revenue = sales_df[sales_df['Date'] >= datetime.now() - timedelta(days=30)]['Total'].sum() if not sales_df.empty else 0
-        if 'monthly_burn' in locals() and monthly_burn > monthly_revenue and monthly_revenue > 0:
+        if monthly_burn > monthly_revenue and monthly_revenue > 0:
             alerts.append(f"⚠️ **Burn rate warning:** You're spending KES {monthly_burn - monthly_revenue:,.0f} more than you earn each month")
         
         # Check cash runway
-        if 'runway_days' in locals() and runway_days < 30 and runway_days > 0:
+        if runway_days < 30 and runway_days > 0:
             alerts.append(f"🚨 **Critical runway:** Only {runway_days:.0f} days of cash left at current burn rate")
-        elif 'runway_days' in locals() and runway_days < 90 and runway_days > 0:
+        elif runway_days < 90 and runway_days > 0:
             alerts.append(f"⚠️ **Low runway:** {runway_days:.0f} days of cash remaining")
         
         # Category spikes
-        if 'category_summary' in locals():
+        if 'category_summary' in locals() and not category_summary.empty:
             for cat in category_summary.head(3)['category'].values:
                 cat_total = category_summary[category_summary['category'] == cat]['amount'].values[0]
                 if cat_total > total_expenses_value * 0.4:
