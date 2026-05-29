@@ -793,69 +793,342 @@ with tab4:
 # ==================== TAB 5: ADVANCED ANALYTICS ====================
 with tab5:
     st.markdown('<div class="section-header">📈 Advanced Analytics</div>', unsafe_allow_html=True)
-
     
-    # ========== NEW: SALES TREND DASHBOARD ==========
+    # ========== ENHANCED SALES TREND DASHBOARD ==========
     st.markdown("### 📊 Sales Performance Dashboard")
     
     if not sales_df.empty:
         
-        # Period selector
-        period = st.radio(
-            "Select Time Period",
-            ["Daily", "Weekly", "Monthly", "Quarterly"],
-            horizontal=True
-        )
+        # Period selector with better options
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            period = st.radio(
+                "Select Time Period",
+                ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"],
+                horizontal=True
+            )
+        with col2:
+            show_numbers = st.checkbox("Show exact numbers on charts", value=True)
         
-        # Create time-based aggregations
+        # Calculate metrics based on selected period
         if period == "Daily":
+            # Group by date
             sales_trend = sales_df.groupby('Date')['Total'].sum().reset_index()
-            sales_trend.columns = ['Period', 'Sales']
-            x_title = "Date"
+            sales_trend.columns = ['Date', 'Sales']
+            sales_trend['Day'] = sales_trend['Date'].dt.day_name()
+            sales_trend['DayOfMonth'] = sales_trend['Date'].dt.day
             
-            # Add moving average for daily
-            sales_trend['7_Day_Avg'] = sales_trend['Sales'].rolling(window=7, min_periods=1).mean()
+            # Calculate daily average
+            avg_daily = sales_trend['Sales'].mean()
+            total_period = sales_trend['Sales'].sum()
+            best_day = sales_trend.loc[sales_trend['Sales'].idxmax()]
+            worst_day = sales_trend.loc[sales_trend['Sales'].idxmin()]
             
+            # Create daily chart with numbers
             fig = go.Figure()
-            fig.add_trace(go.Bar(x=sales_trend['Period'], y=sales_trend['Sales'], name='Daily Sales', marker_color='#36B37E'))
-            fig.add_trace(go.Scatter(x=sales_trend['Period'], y=sales_trend['7_Day_Avg'], name='7-Day Average', line=dict(color='#FF9800', width=3)))
-            fig.update_layout(title='Daily Sales Trend with Moving Average', xaxis_title='Date', yaxis_title='Sales (KES)', hovermode='x unified')
+            fig.add_trace(go.Bar(
+                x=sales_trend['Date'], 
+                y=sales_trend['Sales'], 
+                name='Daily Sales', 
+                marker_color='#36B37E',
+                text=sales_trend['Sales'].apply(lambda x: f'KES {x:,.0f}') if show_numbers else None,
+                textposition='outside'
+            ))
+            # Add average line
+            fig.add_hline(y=avg_daily, line_dash="dash", line_color="red", 
+                         annotation_text=f"Avg: KES {avg_daily:,.0f}")
+            fig.update_layout(
+                title='Daily Sales Performance',
+                xaxis_title='Date',
+                yaxis_title='Sales (KES)',
+                hovermode='x unified',
+                height=450
+            )
+            st.plotly_chart(fig, width='stretch')
+            
+            # Show daily metrics
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("📊 Avg Daily Sales", f"KES {avg_daily:,.0f}")
+            with col2:
+                st.metric("🏆 Best Day", f"KES {best_day['Sales']:,.0f}")
+                st.caption(f"{best_day['Date'].strftime('%A, %b %d')}")
+            with col3:
+                st.metric("📉 Worst Day", f"KES {worst_day['Sales']:,.0f}")
+                st.caption(f"{worst_day['Date'].strftime('%A, %b %d')}")
+            with col4:
+                st.metric("💰 Total Period", f"KES {total_period:,.0f}")
+            
+            # Best day of week analysis
+            st.markdown("#### 📅 Best Performing Days")
+            day_avg = sales_df.groupby(sales_df['Date'].dt.day_name())['Total'].mean().reindex(
+                ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            ).reset_index()
+            day_avg.columns = ['Day', 'Average Sales']
+            fig = px.bar(day_avg, x='Day', y='Average Sales', 
+                        title='Average Sales by Day of Week',
+                        color='Average Sales', color_continuous_scale='Viridis',
+                        text='Average Sales')
+            fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
             st.plotly_chart(fig, width='stretch')
             
         elif period == "Weekly":
             # Group by week
             sales_df['Week'] = sales_df['Date'].dt.isocalendar().week
             sales_df['Year'] = sales_df['Date'].dt.year
-            sales_trend = sales_df.groupby(['Year', 'Week'])['Total'].sum().reset_index()
-            sales_trend['Period'] = sales_trend.apply(lambda x: f"W{x['Week']} ({x['Year']})", axis=1)
-            x_title = "Week"
+            sales_df['WeekLabel'] = sales_df.apply(lambda x: f"W{x['Week']} ({x['Year']})", axis=1)
             
-            fig = px.bar(sales_trend, x='Period', y='Total', title='Weekly Sales Trend',
-                        color='Total', color_continuous_scale='Viridis', text='Total')
-            fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+            weekly_sales = sales_df.groupby(['Year', 'Week', 'WeekLabel'])['Total'].sum().reset_index()
+            weekly_sales = weekly_sales.sort_values(['Year', 'Week'])
+            
+            # Calculate weekly average
+            avg_weekly = weekly_sales['Total'].mean()
+            total_period = weekly_sales['Total'].sum()
+            best_week = weekly_sales.loc[weekly_sales['Total'].idxmax()]
+            
+            # Weekly trend chart
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=weekly_sales['WeekLabel'], 
+                y=weekly_sales['Total'], 
+                name='Weekly Sales',
+                marker_color='#2196F3',
+                text=weekly_sales['Total'].apply(lambda x: f'KES {x:,.0f}') if show_numbers else None,
+                textposition='outside'
+            ))
+            fig.add_hline(y=avg_weekly, line_dash="dash", line_color="red",
+                         annotation_text=f"Avg: KES {avg_weekly:,.0f}")
+            fig.update_layout(
+                title='Weekly Sales Performance',
+                xaxis_title='Week',
+                yaxis_title='Sales (KES)',
+                height=450,
+                xaxis_tickangle=-45
+            )
             st.plotly_chart(fig, width='stretch')
+            
+            # Weekly metrics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📊 Avg Weekly Sales", f"KES {avg_weekly:,.0f}")
+            with col2:
+                st.metric("🏆 Best Week", f"KES {best_week['Total']:,.0f}")
+                st.caption(f"{best_week['WeekLabel']}")
+            with col3:
+                st.metric("💰 Total Period", f"KES {total_period:,.0f}")
+            
+            # Week-over-week growth
+            if len(weekly_sales) >= 2:
+                weekly_sales['Growth'] = weekly_sales['Total'].pct_change() * 100
+                growth_df = weekly_sales.tail(8)[['WeekLabel', 'Growth']].dropna()
+                fig = px.bar(growth_df, x='WeekLabel', y='Growth',
+                            title='Week-over-Week Growth %',
+                            color='Growth', color_continuous_scale='RdYlGn',
+                            text='Growth')
+                fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+                st.plotly_chart(fig, width='stretch')
             
         elif period == "Monthly":
             # Group by month
             sales_df['Month'] = sales_df['Date'].dt.strftime('%Y-%m')
-            sales_trend = sales_df.groupby('Month')['Total'].sum().reset_index()
-            sales_trend.columns = ['Period', 'Sales']
+            sales_df['MonthName'] = sales_df['Date'].dt.strftime('%B %Y')
             
-            fig = px.line(sales_trend, x='Period', y='Sales', title='Monthly Sales Trend',
-                         markers=True, line_shape='spline')
-            fig.update_traces(line=dict(color='#4CAF50', width=3), marker=dict(size=10))
+            monthly_sales = sales_df.groupby(['Month', 'MonthName'])['Total'].sum().reset_index()
+            monthly_sales = monthly_sales.sort_values('Month')
+            
+            # Calculate monthly average
+            avg_monthly = monthly_sales['Total'].mean()
+            total_period = monthly_sales['Total'].sum()
+            best_month = monthly_sales.loc[monthly_sales['Total'].idxmax()]
+            
+            # Monthly chart
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=monthly_sales['MonthName'], 
+                y=monthly_sales['Total'], 
+                name='Monthly Sales',
+                marker_color='#4CAF50',
+                text=monthly_sales['Total'].apply(lambda x: f'KES {x:,.0f}') if show_numbers else None,
+                textposition='outside'
+            ))
+            fig.add_hline(y=avg_monthly, line_dash="dash", line_color="red",
+                         annotation_text=f"Avg: KES {avg_monthly:,.0f}")
+            fig.update_layout(
+                title='Monthly Sales Performance',
+                xaxis_title='Month',
+                yaxis_title='Sales (KES)',
+                height=450,
+                xaxis_tickangle=-45
+            )
             st.plotly_chart(fig, width='stretch')
             
-        else:  # Quarterly
+            # Monthly metrics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📊 Avg Monthly Sales", f"KES {avg_monthly:,.0f}")
+            with col2:
+                st.metric("🏆 Best Month", f"KES {best_month['Total']:,.0f}")
+                st.caption(f"{best_month['MonthName']}")
+            with col3:
+                st.metric("💰 Total Period", f"KES {total_period:,.0f}")
+            
+            # Month-over-month growth
+            if len(monthly_sales) >= 2:
+                monthly_sales['Growth'] = monthly_sales['Total'].pct_change() * 100
+                fig = px.line(monthly_sales, x='MonthName', y='Growth',
+                             title='Month-over-Month Growth Trend',
+                             markers=True, line_shape='spline')
+                fig.add_hline(y=0, line_dash="dash", line_color="gray")
+                fig.update_traces(line=dict(color='#FF9800', width=3))
+                st.plotly_chart(fig, width='stretch')
+            
+        elif period == "Quarterly":
+            # Group by quarter
             sales_df['Quarter'] = sales_df['Date'].dt.quarter
             sales_df['Year'] = sales_df['Date'].dt.year
-            sales_trend = sales_df.groupby(['Year', 'Quarter'])['Total'].sum().reset_index()
-            sales_trend['Period'] = sales_trend.apply(lambda x: f"Q{x['Quarter']} {x['Year']}", axis=1)
+            sales_df['QuarterLabel'] = sales_df.apply(lambda x: f"Q{x['Quarter']} {x['Year']}", axis=1)
             
-            fig = px.bar(sales_trend, x='Period', y='Total', title='Quarterly Sales Trend',
-                        color='Total', color_continuous_scale='Blues', text='Total')
+            quarterly_sales = sales_df.groupby(['Year', 'Quarter', 'QuarterLabel'])['Total'].sum().reset_index()
+            quarterly_sales = quarterly_sales.sort_values(['Year', 'Quarter'])
+            
+            avg_quarterly = quarterly_sales['Total'].mean()
+            total_period = quarterly_sales['Total'].sum()
+            
+            fig = px.bar(quarterly_sales, x='QuarterLabel', y='Total',
+                        title='Quarterly Sales Performance',
+                        color='Total', color_continuous_scale='Purples',
+                        text='Total')
+            fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+            fig.add_hline(y=avg_quarterly, line_dash="dash", line_color="red",
+                         annotation_text=f"Avg: KES {avg_quarterly:,.0f}")
+            st.plotly_chart(fig, width='stretch')
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("📊 Avg Quarterly Sales", f"KES {avg_quarterly:,.0f}")
+            with col2:
+                st.metric("💰 Total Period", f"KES {total_period:,.0f}")
+        
+        else:  # Yearly
+            # Group by year
+            sales_df['Year'] = sales_df['Date'].dt.year
+            yearly_sales = sales_df.groupby('Year')['Total'].sum().reset_index()
+            
+            fig = px.bar(yearly_sales, x='Year', y='Total',
+                        title='Yearly Sales Performance',
+                        color='Total', color_continuous_scale='Reds',
+                        text='Total')
             fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
             st.plotly_chart(fig, width='stretch')
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("💰 Total Sales", f"KES {yearly_sales['Total'].sum():,.0f}")
+            with col2:
+                if len(yearly_sales) >= 2:
+                    growth = ((yearly_sales['Total'].iloc[-1] - yearly_sales['Total'].iloc[-2]) / yearly_sales['Total'].iloc[-2]) * 100
+                    st.metric("📈 Year-over-Year Growth", f"{growth:.1f}%")
+        
+        # ========== CUMULATIVE SALES TRACKER ==========
+        st.markdown("---")
+        st.markdown("### 📈 Cumulative Sales Tracker")
+        
+        cumulative_sales = sales_df.sort_values('Date')
+        cumulative_sales['Cumulative'] = cumulative_sales['Total'].cumsum()
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=cumulative_sales['Date'], 
+            y=cumulative_sales['Cumulative'],
+            mode='lines+fill',
+            name='Total Sales',
+            fill='tozeroy',
+            line=dict(color='#4CAF50', width=3),
+            text=cumulative_sales['Cumulative'].apply(lambda x: f'KES {x:,.0f}'),
+            hovertemplate='Date: %{x}<br>Total: KES %{y:,.0f}<extra></extra>'
+        ))
+        fig.update_layout(
+            title='Cumulative Sales Over Time',
+            xaxis_title='Date',
+            yaxis_title='Cumulative Sales (KES)',
+            height=400
+        )
+        st.plotly_chart(fig, width='stretch')
+        
+        # ========== SALES SPEEDOMETER (Daily Target) ==========
+        st.markdown("---")
+        st.markdown("### 🎯 Daily Sales Target Tracker")
+        
+        daily_target = st.number_input("Set Daily Sales Target (KES)", min_value=0, step=5000, value=10000, key="daily_target")
+        
+        # Get today's sales
+        today = date.today()
+        today_sales = sales_df[sales_df['Date'] == pd.Timestamp(today)]['Total'].sum() if not sales_df.empty else 0
+        
+        # Calculate progress
+        progress = min((today_sales / daily_target) * 100, 100)
+        
+        st.progress(progress / 100)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Today's Sales", f"KES {today_sales:,.0f}")
+        with col2:
+            st.metric("Daily Target", f"KES {daily_target:,.0f}")
+            st.caption(f"Progress: {progress:.1f}%")
+        
+        if today_sales >= daily_target:
+            st.success("🎉 Congratulations! You've reached your daily sales goal! 🎉")
+        elif progress >= 75:
+            st.info("📈 Almost there! Keep going!")
+        elif progress <= 25 and datetime.now().hour > 15:
+            st.warning("⚠️ Sales are behind target. Consider promotions or follow-ups.")
+        
+        # ========== SALES INSIGHTS SUMMARY ==========
+        st.markdown("---")
+        st.markdown("### 💡 Sales Insights & Recommendations")
+        
+        insights = []
+        
+        # Best selling day of week
+        day_sales = sales_df.groupby(sales_df['Date'].dt.day_name())['Total'].sum().reindex(
+            ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        )
+        best_day = day_sales.idxmax()
+        best_day_value = day_sales.max()
+        insights.append(f"📌 **Best selling day:** {best_day} with KES {best_day_value:,.0f} in sales")
+        
+        # Worst selling day
+        worst_day = day_sales.idxmin()
+        worst_day_value = day_sales.min()
+        insights.append(f"📌 **Slowest day:** {worst_day} with KES {worst_day_value:,.0f}")
+        
+        # Trend analysis
+        if len(sales_df) >= 7:
+            last_week = sales_df.tail(7)['Total'].sum()
+            previous_week = sales_df.head(7)['Total'].sum() if len(sales_df) > 14 else 0
+            if previous_week > 0:
+                weekly_growth = ((last_week - previous_week) / previous_week) * 100
+                if weekly_growth > 10:
+                    insights.append(f"📈 **Sales are growing!** +{weekly_growth:.1f}% compared to previous week")
+                elif weekly_growth < -10:
+                    insights.append(f"📉 **Sales are declining.** {weekly_growth:.1f}% drop from previous week")
+        
+        # Average order value
+        avg_order = sales_df['Total'].mean()
+        insights.append(f"💰 **Average order value:** KES {avg_order:,.0f}")
+        
+        # Top product (if available)
+        if 'Product' in sales_df.columns:
+            top_product = sales_df.groupby('Product')['Total'].sum().idxmax()
+            top_product_value = sales_df.groupby('Product')['Total'].sum().max()
+            insights.append(f"🏆 **Best selling product:** {top_product} with KES {top_product_value:,.0f}")
+        
+        for insight in insights:
+            st.info(insight)
+            
+    else:
+        st.info("No sales data available. Start recording sales to see trends!")
+
         
         # Key Metrics Cards
         st.markdown("### 📈 Key Performance Indicators")
@@ -1018,8 +1291,8 @@ with tab5:
         elif progress <= 25 and (date.today().day > 15):
             st.warning("⚠️ **Sales are behind target.** Consider running a promotion or reaching out to customers.")
             
-    else:
-        st.info("No sales data available. Start recording sales to see trends!")
+        else:
+            st.info("No sales data available. Start recording sales to see trends!")
     
     analytics_tab1, analytics_tab2, analytics_tab3, analytics_tab4, analytics_tab5 = st.tabs([
         "🏆 Performance Leaderboards", 
