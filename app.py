@@ -1030,30 +1030,33 @@ with tab5:
                     st.metric("📈 Year-over-Year Growth", f"{growth:.1f}%")
         
         # ========== CUMULATIVE SALES TRACKER ==========
-        st.markdown("---")
-        st.markdown("### 📈 Cumulative Sales Tracker")
-        
-        cumulative_sales = sales_df.sort_values('Date')
-        cumulative_sales['Cumulative'] = cumulative_sales['Total'].cumsum()
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=cumulative_sales['Date'], 
-            y=cumulative_sales['Cumulative'],
-            mode='lines+fill',
-            name='Total Sales',
-            fill='tozeroy',
-            line=dict(color='#4CAF50', width=3),
-            text=cumulative_sales['Cumulative'].apply(lambda x: f'KES {x:,.0f}'),
-            hovertemplate='Date: %{x}<br>Total: KES %{y:,.0f}<extra></extra>'
-        ))
-        fig.update_layout(
-            title='Cumulative Sales Over Time',
-            xaxis_title='Date',
-            yaxis_title='Cumulative Sales (KES)',
-            height=400
-        )
-        st.plotly_chart(fig, width='stretch')
+            st.markdown("---")
+            st.markdown("### 📈 Cumulative Sales Tracker")
+
+            if not sales_df.empty:
+                cumulative_sales = sales_df.sort_values('Date')
+                cumulative_sales['Cumulative'] = cumulative_sales['Total'].cumsum()
+    
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=cumulative_sales['Date'], 
+        y=cumulative_sales['Cumulative'],
+        mode='lines',
+        name='Total Sales',
+        fill='tozeroy',
+        line=dict(color='#4CAF50', width=3),
+        hovertemplate='Date: %{x|%Y-%m-%d}<br>Total: KES %{y:,.0f}<extra></extra>'
+    ))
+                fig.update_layout(
+        title='Cumulative Sales Over Time',
+        xaxis_title='Date',
+        yaxis_title='Cumulative Sales (KES)',
+        height=400,
+        hovermode='x unified'
+    )
+                st.plotly_chart(fig, width='stretch')
+            else:
+                st.info("No sales data available to show cumulative totals")
         
         # ========== SALES SPEEDOMETER (Daily Target) ==========
         st.markdown("---")
