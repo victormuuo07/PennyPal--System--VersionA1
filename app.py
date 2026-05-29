@@ -1152,6 +1152,7 @@ with tab5:
         st.markdown("#### 🔥 Burn Rate Analysis")
         
         current_date = datetime.now()
+        current_cash = kpis['running_balance']  # <-- MOVED THIS HERE FIRST
         
         # Initialize burn variables
         daily_burn = 0
@@ -1195,9 +1196,7 @@ with tab5:
             burn_rate = quarterly_burn
             runway_days = (current_cash / burn_rate) * 90 if burn_rate > 0 else 0
         
-        current_cash = kpis['running_balance']
-        
-        # Calculate monthly revenue for burn ratio
+        # Calculate monthly revenue for burn ratio (using the monthly_burn we calculated)
         monthly_revenue = sales_df[sales_df['Date'] >= current_date - timedelta(days=30)]['Total'].sum() if not sales_df.empty else 0
         burn_to_revenue = (monthly_burn / monthly_revenue * 100) if monthly_burn > 0 and monthly_revenue > 0 else 0
         
