@@ -345,7 +345,7 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12  = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
@@ -356,7 +356,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
      "🏭 Assets & Equipment",
      "📝 Daily Sales Entry",
      "📊 Stock Reconciliation",
-     "💰 Profit Calculator" 
+     "💰 Profit Calculator",
+     "🏥 Business Health" 
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -1718,7 +1719,7 @@ with tab5:
         
     else:
         st.info("Need both sales and expense data to show profit analysis")
-        
+
         # Key Metrics Cards
         st.markdown("### 📈 Key Performance Indicators")
         
@@ -4063,6 +4064,424 @@ with tab11:
                 st.info("📈 Good margin achievable with these numbers.")
             else:
                 st.warning("⚠️ Margin is low. Consider reducing costs or increasing price.")
+
+# ==================== TAB 12: BUSINESS HEALTH ====================
+with tab12:
+    st.markdown('<div class="section-header">🏥 Business Health Dashboard</div>', unsafe_allow_html=True)
+    
+    st.info("📊 **一键分析 - One-Click Business Health Analysis** - Get instant insights about your business temperature and valuation")
+    
+    # ========== ANALYZE BUTTON ==========
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        analyze_clicked = st.button("🔍 ANALYZE MY BUSINESS", type="primary", use_container_width=True)
+    
+    if analyze_clicked or 'last_analysis' in st.session_state:
+        
+        # Store analysis timestamp
+        st.session_state.last_analysis = datetime.now()
+        
+        # ========== BUSINESS TEMPERATURE ==========
+        st.markdown("---")
+        st.markdown("### 🌡️ Business Temperature")
+        
+        # Calculate key metrics
+        total_sales = kpis['total_sales']
+        total_expenses = kpis['total_expenses']
+        net_profit = kpis['net_profit']
+        cash_balance = kpis['running_balance']
+        total_funding = get_total_funding()
+        
+        # Calculate growth metrics
+        if not sales_df.empty and len(sales_df) >= 7:
+            last_7_days = sales_df.tail(7)['Total'].sum()
+            previous_7_days = sales_df.head(7)['Total'].sum() if len(sales_df) > 14 else last_7_days
+            sales_growth = ((last_7_days - previous_7_days) / previous_7_days * 100) if previous_7_days > 0 else 0
+        else:
+            sales_growth = 0
+        
+        # Calculate profit margin
+        profit_margin = (net_profit / total_sales * 100) if total_sales > 0 else 0
+        
+        # Calculate burn rate
+        if not expenses_df.empty:
+            last_30_days = expenses_df[expenses_df['date'] >= datetime.now() - timedelta(days=30)]
+            monthly_burn = last_30_days['amount'].sum() if len(last_30_days) > 0 else 0
+        else:
+            monthly_burn = 0
+        
+        # Calculate runway
+        runway_months = cash_balance / monthly_burn if monthly_burn > 0 else 0
+        
+        # Determine business temperature
+        temperature_score = 0
+        temperature_status = ""
+        temperature_color = ""
+        
+        # Score calculation (0-100)
+        if profit_margin > 20:
+            temperature_score += 30
+        elif profit_margin > 10:
+            temperature_score += 20
+        elif profit_margin > 0:
+            temperature_score += 10
+        
+        if sales_growth > 20:
+            temperature_score += 30
+        elif sales_growth > 10:
+            temperature_score += 20
+        elif sales_growth > 0:
+            temperature_score += 10
+        
+        if runway_months > 12:
+            temperature_score += 25
+        elif runway_months > 6:
+            temperature_score += 15
+        elif runway_months > 3:
+            temperature_score += 10
+        
+        if cash_balance > 100000:
+            temperature_score += 15
+        elif cash_balance > 50000:
+            temperature_score += 10
+        elif cash_balance > 10000:
+            temperature_score += 5
+        
+        # Determine status
+        if temperature_score >= 70:
+            temperature_status = "🔥 HOT - Business is on fire!"
+            temperature_color = "🟢"
+            temperature_advice = "Excellent! Keep doing what you're doing. Consider expanding."
+        elif temperature_score >= 50:
+            temperature_status = "🌡️ WARM - Good, but room for improvement"
+            temperature_color = "🟡"
+            temperature_advice = "You're on the right track. Focus on increasing sales and managing costs."
+        elif temperature_score >= 30:
+            temperature_status = "❄️ COOL - Needs attention"
+            temperature_color = "🟠"
+            temperature_advice = "Review your expenses and look for ways to increase revenue."
+        else:
+            temperature_status = "🧊 COLD - Critical attention needed"
+            temperature_color = "🔴"
+            temperature_advice = "Urgent action required. Focus on cash flow and cost reduction."
+        
+        # Display temperature gauge
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            # Create gauge chart
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number+delta",
+                value=temperature_score,
+                domain={'x': [0, 1], 'y': [0, 1]},
+                title={'text': f"{temperature_color} Business Health Score"},
+                gauge={
+                    'axis': {'range': [0, 100], 'tickwidth': 1},
+                    'bar': {'color': "darkgreen" if temperature_score >= 70 else "orange" if temperature_score >= 40 else "red"},
+                    'steps': [
+                        {'range': [0, 30], 'color': 'lightcoral'},
+                        {'range': [30, 50], 'color': 'lightsalmon'},
+                        {'range': [50, 70], 'color': 'lightyellow'},
+                        {'range': [70, 100], 'color': 'lightgreen'}
+                    ],
+                    'threshold': {
+                        'line': {'color': "red", 'width': 4},
+                        'thickness': 0.75,
+                        'value': temperature_score
+                    }
+                }
+            ))
+            fig.update_layout(height=300)
+            st.plotly_chart(fig, width='stretch')
+        
+        with col2:
+            st.markdown(f"## {temperature_color}")
+            st.markdown(f"### {temperature_status}")
+            st.metric("Health Score", f"{temperature_score:.0f}/100")
+            st.caption(temperature_advice)
+        
+        # ========== KEY METRICS SUMMARY ==========
+        st.markdown("---")
+        st.markdown("### 📊 Key Business Metrics")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("💰 Total Sales", f"KES {total_sales:,.0f}")
+        with col2:
+            st.metric("📈 Profit Margin", f"{profit_margin:.1f}%")
+        with col3:
+            st.metric("📊 Sales Growth", f"{sales_growth:.1f}%" if sales_growth != 0 else "N/A")
+        with col4:
+            st.metric("🏃 Runway", f"{runway_months:.1f} months")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("💵 Cash Balance", f"KES {cash_balance:,.0f}")
+        with col2:
+            st.metric("🔥 Monthly Burn", f"KES {monthly_burn:,.0f}")
+        with col3:
+            st.metric("📦 Total Customers", sales_df['Name'].nunique() if not sales_df.empty else 0)
+        with col4:
+            avg_order = sales_df['Total'].mean() if not sales_df.empty else 0
+            st.metric("💰 Avg Order Value", f"KES {avg_order:,.0f}")
+        
+        # ========== BUSINESS VALUATION ==========
+        st.markdown("---")
+        st.markdown("### 💰 Business Valuation")
+        
+        # Valuation methods
+        # Method 1: Revenue Multiple (2x - 5x depending on growth)
+        revenue_multiple = 2.0
+        if sales_growth > 30:
+            revenue_multiple = 5.0
+        elif sales_growth > 20:
+            revenue_multiple = 4.0
+        elif sales_growth > 10:
+            revenue_multiple = 3.0
+        elif sales_growth > 0:
+            revenue_multiple = 2.5
+        
+        annual_revenue = total_sales * 12 if total_sales > 0 else 0  # Assuming monthly average
+        valuation_revenue = annual_revenue * revenue_multiple
+        
+        # Method 2: Profit Multiple (5x - 15x depending on margin)
+        profit_multiple = 5.0
+        if profit_margin > 30:
+            profit_multiple = 15.0
+        elif profit_margin > 20:
+            profit_multiple = 12.0
+        elif profit_margin > 10:
+            profit_multiple = 8.0
+        elif profit_margin > 0:
+            profit_multiple = 5.0
+        
+        annual_profit = net_profit * 12 if net_profit > 0 else 0
+        valuation_profit = annual_profit * profit_multiple
+        
+        # Method 3: Asset-based valuation
+        total_assets = get_total_funding() + total_sales - total_expenses
+        valuation_assets = total_assets
+        
+        # Method 4: Customer-based valuation (value per customer)
+        customer_count = sales_df['Name'].nunique() if not sales_df.empty else 0
+        customer_value = 5000  # Estimated value per customer
+        valuation_customers = customer_count * customer_value
+        
+        # Weighted average valuation
+        valuation_final = (valuation_revenue * 0.4 + valuation_profit * 0.4 + valuation_assets * 0.1 + valuation_customers * 0.1)
+        
+        # Display valuation
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### Valuation Methods")
+            st.write(f"**Revenue Multiple ({revenue_multiple}x):** KES {valuation_revenue:,.0f}")
+            st.write(f"**Profit Multiple ({profit_multiple}x):** KES {valuation_profit:,.0f}")
+            st.write(f"**Asset-based:** KES {valuation_assets:,.0f}")
+            st.write(f"**Customer-based:** KES {valuation_customers:,.0f}")
+        
+        with col2:
+            st.markdown("#### 📈 Estimated Valuation")
+            st.markdown(f"## 🏆 KES {valuation_final:,.0f}")
+            st.caption(f"Based on {customer_count} customers and {sales_growth:.1f}% growth rate")
+            
+            # Valuation range
+            valuation_low = valuation_final * 0.7
+            valuation_high = valuation_final * 1.3
+            st.caption(f"Valuation Range: KES {valuation_low:,.0f} - KES {valuation_high:,.0f}")
+        
+        # Valuation growth simulation
+        st.markdown("#### 📈 Valuation Growth Simulator")
+        st.caption("See how your valuation increases as sales grow")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            projected_growth = st.slider("Projected Monthly Sales Growth (%)", 0, 50, 10, key="growth_slider")
+        with col2:
+            months_ahead = st.slider("Months Ahead", 1, 24, 12, key="months_slider")
+        
+        # Calculate projected valuation
+        projected_sales = total_sales
+        projected_valuations = []
+        months = []
+        
+        for i in range(months_ahead + 1):
+            if i > 0:
+                projected_sales = projected_sales * (1 + projected_growth / 100)
+            projected_annual = projected_sales * 12
+            projected_val = projected_annual * revenue_multiple
+            projected_valuations.append(projected_val)
+            months.append(f"Month {i}")
+        
+        # Create projection chart
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=months,
+            y=projected_valuations,
+            mode='lines+markers',
+            name='Projected Valuation',
+            line=dict(color='#4CAF50', width=3),
+            fill='tozeroy'
+        ))
+        fig.update_layout(
+            title=f'Valuation Projection - {projected_growth}% Monthly Growth',
+            xaxis_title='Time',
+            yaxis_title='Valuation (KES)',
+            height=400
+        )
+        st.plotly_chart(fig, width='stretch')
+        
+        final_valuation = projected_valuations[-1]
+        valuation_increase = ((final_valuation - valuation_final) / valuation_final * 100) if valuation_final > 0 else 0
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Current Valuation", f"KES {valuation_final:,.0f}")
+        with col2:
+            st.metric(f"After {months_ahead} Months", f"KES {final_valuation:,.0f}")
+        with col3:
+            st.metric("Potential Growth", f"+{valuation_increase:.0f}%", delta=f"{valuation_increase:.0f}%")
+        
+        # ========== SWOT ANALYSIS ==========
+        st.markdown("---")
+        st.markdown("### 📋 SWOT Analysis")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 💪 Strengths")
+            strengths = []
+            if profit_margin > 20:
+                strengths.append("✅ High profit margin")
+            if sales_growth > 10:
+                strengths.append("✅ Strong sales growth")
+            if cash_balance > 50000:
+                strengths.append("✅ Healthy cash position")
+            if customer_count > 10:
+                strengths.append(f"✅ Growing customer base ({customer_count} customers)")
+            if len(strengths) == 0:
+                strengths.append("📌 Build more customer relationships")
+            
+            for s in strengths:
+                st.write(s)
+            
+            st.markdown("#### 📈 Opportunities")
+            opportunities = []
+            if profit_margin < 30:
+                opportunities.append("🎯 Increase prices to improve margins")
+            if customer_count < 20:
+                opportunities.append("🎯 Expand customer acquisition")
+            if sales_growth < 20:
+                opportunities.append("🎯 Implement referral program")
+            opportunities.append("🎯 Launch new product variants")
+            
+            for o in opportunities[:3]:
+                st.write(o)
+        
+        with col2:
+            st.markdown("#### ⚠️ Weaknesses")
+            weaknesses = []
+            if profit_margin < 10:
+                weaknesses.append("❌ Low profit margin")
+            if runway_months < 6:
+                weaknesses.append("❌ Short cash runway")
+            if monthly_burn > total_sales / 30:
+                weaknesses.append("❌ High burn rate")
+            if len(weaknesses) == 0:
+                weaknesses.append("📌 Monitor expenses closely")
+            
+            for w in weaknesses:
+                st.write(w)
+            
+            st.markdown("#### 🚨 Threats")
+            threats = []
+            if monthly_burn > cash_balance / 3:
+                threats.append("⚠️ Cash depletion risk")
+            if profit_margin < 5:
+                threats.append("⚠️ Price competition")
+            threats.append("⚠️ Supply chain costs")
+            
+            for t in threats[:3]:
+                st.write(t)
+        
+        # ========== ACTIONABLE RECOMMENDATIONS ==========
+        st.markdown("---")
+        st.markdown("### 🎯 Actionable Recommendations")
+        
+        recommendations = []
+        
+        # Sales recommendations
+        if sales_growth < 10:
+            recommendations.append("📈 **Increase Sales:** Run a promotion or offer bundle deals to boost revenue")
+        else:
+            recommendations.append("✅ **Keep Growing:** Your sales momentum is strong - maintain current strategies")
+        
+        # Expense recommendations
+        if profit_margin < 15:
+            recommendations.append("💰 **Reduce Costs:** Review your top expense categories for potential savings")
+        
+        # Cash recommendations
+        if runway_months < 6:
+            recommendations.append("💵 **Improve Cash Flow:** Consider extending payment terms with suppliers")
+        
+        # Customer recommendations
+        if customer_count < 20:
+            recommendations.append("👥 **Grow Customer Base:** Implement a referral program to acquire new customers")
+        
+        # General recommendations
+        recommendations.append("📊 **Track Weekly:** Review this dashboard weekly to stay on top of your business health")
+        
+        for i, rec in enumerate(recommendations[:5], 1):
+            st.write(f"{i}. {rec}")
+        
+        # ========== EXECUTIVE SUMMARY ==========
+        st.markdown("---")
+        st.markdown("### 📝 Executive Summary")
+        
+        # Generate summary
+        summary = f"""
+        **Business Health Score: {temperature_score:.0f}/100 - {temperature_status}**
+        
+        Your business has generated **KES {total_sales:,.0f}** in sales with a **{profit_margin:.1f}%** profit margin. 
+        You have **KES {cash_balance:,.0f}** in cash, which gives you approximately **{runway_months:.1f} months** of runway at current burn rate.
+        
+        **Valuation:** Based on your current performance, your business is valued at approximately **KES {valuation_final:,.0f}**.
+        
+        **Priority Actions:**
+        1. {'Maintain sales momentum' if sales_growth > 10 else 'Focus on increasing sales'}
+        2. {'Continue cost control' if profit_margin > 15 else 'Review and reduce expenses'}
+        3. {'Build customer loyalty programs' if customer_count < 20 else 'Expand customer base'}
+        
+        **Next Review:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
+        """
+        
+        st.info(summary)
+        
+    else:
+        # Show preview before analysis
+        st.markdown("### 📋 What You'll Get")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("#### 🌡️ Business Temperature")
+            st.write("• Health score (0-100)")
+            st.write("• Hot/Warm/Cool/Cold status")
+            st.write("• Immediate advice")
+        
+        with col2:
+            st.markdown("#### 💰 Valuation")
+            st.write("• Current business value")
+            st.write("• Multiple valuation methods")
+            st.write("• Growth projection")
+        
+        with col3:
+            st.markdown("#### 🎯 Insights")
+            st.write("• SWOT analysis")
+            st.write("• Actionable recommendations")
+            st.write("• Executive summary")
+        
+        st.info("👆 Click **'ANALYZE MY BUSINESS'** above to get your complete business health report!")
         
 # Footer
 st.markdown("---")
