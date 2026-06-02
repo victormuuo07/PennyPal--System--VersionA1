@@ -2575,57 +2575,65 @@ with analytics_tab6:  # Add as a new tab or section
     
     if not sales_df.empty:
         
+        # Get metrics from kpis dictionary
+        total_sales_value = kpis['total_sales']
+        total_expenses_value = kpis['total_expenses']
+        net_profit_value = kpis['net_profit']
+        
         # ========== EXECUTIVE SUMMARY ==========
         st.markdown("## 📈 Executive Summary")
         
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("💰 Total Revenue", f"KES {total_sales:,.0f}")
+            st.metric("💰 Total Revenue", f"KES {total_sales_value:,.0f}")
         with col2:
-            st.metric("📦 Total Units Sold", f"{int(sales_df['Quantity'].sum()):,}")
+            total_units = int(sales_df['Quantity'].sum()) if 'Quantity' in sales_df.columns else 0
+            st.metric("📦 Total Units Sold", f"{total_units:,}")
         with col3:
             st.metric("📝 Total Transactions", len(sales_df))
         with col4:
-            avg_transaction = total_sales / len(sales_df) if len(sales_df) > 0 else 0
+            avg_transaction = total_sales_value / len(sales_df) if len(sales_df) > 0 else 0
             st.metric("💵 Avg Transaction", f"KES {avg_transaction:,.0f}")
         
         # ========== PRODUCT PERFORMANCE ==========
         st.markdown("---")
         st.markdown("## 📦 Product Performance")
         
-        product_performance = sales_df.groupby('Product').agg({
-            'Total': 'sum',
-            'Quantity': 'sum',
-            'Product': 'count'
-        }).rename(columns={'Product': 'Transactions'}).reset_index()
-        product_performance = product_performance.sort_values('Total', ascending=False)
-        
-        st.dataframe(
-            product_performance.head(10),
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Product": "Product",
-                "Total": st.column_config.NumberColumn("Revenue", format="KES %d"),
-                "Quantity": "Units Sold",
-                "Transactions": "Transactions"
-            }
-        )
-        
-        # Top product insight
-        top_product = product_performance.iloc[0]['Product']
-        top_revenue = product_performance.iloc[0]['Total']
-        st.success(f"💡 **Key Insight:** Your **{top_product}** is your strongest revenue generator at KES {top_revenue:,.0f}")
-        
-        # Sachet vs Bottle analysis
-        sachet_revenue = product_performance[product_performance['Product'].str.contains('Sachet', case=False)]['Total'].sum()
-        bottle_revenue = product_performance[product_performance['Product'].str.contains('Bottle', case=False)]['Total'].sum()
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("📦 Sachet Revenue", f"KES {sachet_revenue:,.0f}")
-        with col2:
-            st.metric("🍾 Bottle Revenue", f"KES {bottle_revenue:,.0f}")
+        if 'Product' in sales_df.columns:
+            product_performance = sales_df.groupby('Product').agg({
+                'Total': 'sum',
+                'Quantity': 'sum' if 'Quantity' in sales_df.columns else 'count',
+                'Product': 'count'
+            }).rename(columns={'Product': 'Transactions'}).reset_index()
+            product_performance = product_performance.sort_values('Total', ascending=False)
+            
+            st.dataframe(
+                product_performance.head(10),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Product": "Product",
+                    "Total": st.column_config.NumberColumn("Revenue", format="KES %d"),
+                    "Quantity": "Units Sold",
+                    "Transactions": "Transactions"
+                }
+            )
+            
+            # Top product insight
+            if not product_performance.empty:
+                top_product = product_performance.iloc[0]['Product']
+                top_revenue = product_performance.iloc[0]['Total']
+                st.success(f"💡 **Key Insight:** Your **{top_product}** is your strongest revenue generator at KES {top_revenue:,.0f}")
+            
+            # Sachet vs Bottle analysis
+            sachet_revenue = product_performance[product_performance['Product'].str.contains('Sachet', case=False)]['Total'].sum() if not product_performance.empty else 0
+            bottle_revenue = product_performance[product_performance['Product'].str.contains('Bottle', case=False)]['Total'].sum() if not product_performance.empty else 0
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("📦 Sachet Revenue", f"KES {sachet_revenue:,.0f}")
+            with col2:
+                st.metric("🍾 Bottle Revenue", f"KES {bottle_revenue:,.0f}")
         
         # ========== MONTHLY PERFORMANCE ==========
         st.markdown("---")
@@ -2642,35 +2650,39 @@ with analytics_tab6:  # Add as a new tab or section
         st.plotly_chart(fig, width='stretch')
         
         # Best month insight
-        best_month = monthly_performance.iloc[monthly_performance['Total'].idxmax()]
-        best_month_pct = (best_month['Total'] / total_sales * 100)
-        st.success(f"💡 **Insight:** {best_month['Month']} accounted for {best_month_pct:.1f}% of all revenue. Investigate what worked and replicate it!")
+        if not monthly_performance.empty:
+            best_month = monthly_performance.iloc[monthly_performance['Total'].idxmax()]
+            best_month_pct = (best_month['Total'] / total_sales_value * 100) if total_sales_value > 0 else 0
+            st.success(f"💡 **Insight:** {best_month['Month']} accounted for {best_month_pct:.1f}% of all revenue. Investigate what worked and replicate it!")
         
         # ========== LOCATION PERFORMANCE ==========
         st.markdown("---")
         st.markdown("## 📍 Best Performing Locations")
         
-        # Clean location data
-        sales_df['CleanLocation'] = sales_df['Location'].str.split(',').str[0].str.strip()
-        location_performance = sales_df.groupby('CleanLocation')['Total'].sum().reset_index()
-        location_performance = location_performance.sort_values('Total', ascending=False).head(10)
-        
-        fig = px.bar(location_performance, x='CleanLocation', y='Total',
-                    title='Revenue by Location',
-                    color='Total', color_continuous_scale='Blues',
-                    text='Total')
-        fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
-        st.plotly_chart(fig, width='stretch')
+        if 'Location' in sales_df.columns:
+            # Clean location data
+            sales_df['CleanLocation'] = sales_df['Location'].str.split(',').str[0].str.strip()
+            location_performance = sales_df.groupby('CleanLocation')['Total'].sum().reset_index()
+            location_performance = location_performance.sort_values('Total', ascending=False).head(10)
+            
+            if not location_performance.empty:
+                fig = px.bar(location_performance, x='CleanLocation', y='Total',
+                            title='Revenue by Location',
+                            color='Total', color_continuous_scale='Blues',
+                            text='Total')
+                fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+                st.plotly_chart(fig, width='stretch')
         
         # ========== TOP CUSTOMERS ==========
         st.markdown("---")
         st.markdown("## 🏆 Top Customers")
         
-        top_customers = sales_df.groupby('Name')['Total'].sum().reset_index()
-        top_customers = top_customers.sort_values('Total', ascending=False).head(10)
-        
-        st.dataframe(top_customers, use_container_width=True, hide_index=True,
-                    column_config={"Name": "Customer", "Total": st.column_config.NumberColumn("Revenue", format="KES %d")})
+        if 'Name' in sales_df.columns:
+            top_customers = sales_df.groupby('Name')['Total'].sum().reset_index()
+            top_customers = top_customers.sort_values('Total', ascending=False).head(10)
+            
+            st.dataframe(top_customers, use_container_width=True, hide_index=True,
+                        column_config={"Name": "Customer", "Total": st.column_config.NumberColumn("Revenue", format="KES %d")})
         
         # ========== SWOT ANALYSIS ==========
         st.markdown("---")
@@ -2685,8 +2697,10 @@ with analytics_tab6:  # Add as a new tab or section
                 strengths.append("✅ Premium product (bottles) driving revenue")
             if len(sales_df) > 100:
                 strengths.append("✅ Strong sales volume (100+ transactions)")
-            if monthly_performance['Total'].pct_change().iloc[-1] > 0:
-                strengths.append("✅ Month-over-month growth")
+            if len(monthly_performance) >= 2:
+                growth = (monthly_performance['Total'].iloc[-1] - monthly_performance['Total'].iloc[-2]) / monthly_performance['Total'].iloc[-2] * 100 if monthly_performance['Total'].iloc[-2] > 0 else 0
+                if growth > 0:
+                    strengths.append(f"✅ Month-over-month growth ({growth:.0f}%)")
             if len(strengths) == 0:
                 strengths.append("📌 Building customer base")
             
@@ -2708,7 +2722,8 @@ with analytics_tab6:  # Add as a new tab or section
             feedback_count = sales_df['Feedback'].notna().sum() if 'Feedback' in sales_df.columns else 0
             if feedback_count < len(sales_df) * 0.3:
                 weaknesses.append("❌ Low feedback collection (<30%)")
-            if sales_df['Name'].nunique() / len(sales_df) < 0.3:
+            repeat_rate = sales_df['Name'].duplicated().sum() / len(sales_df) if 'Name' in sales_df.columns and len(sales_df) > 0 else 0
+            if repeat_rate < 0.3:
                 weaknesses.append("❌ Low repeat purchase rate")
             if len(weaknesses) == 0:
                 weaknesses.append("📌 Track repeat purchases better")
@@ -2728,13 +2743,18 @@ with analytics_tab6:  # Add as a new tab or section
         st.markdown("---")
         st.markdown("## 🚀 Growth Recommendations")
         
-        recommendations = [
-            f"1. **Push the {top_product.split('-')[0] if '-' in top_product else top_product} aggressively** - It's your highest revenue product",
+        recommendations = []
+        
+        if not product_performance.empty:
+            top_product_name = product_performance.iloc[0]['Product'].split('-')[0] if '-' in product_performance.iloc[0]['Product'] else product_performance.iloc[0]['Product']
+            recommendations.append(f"1. **Push the {top_product_name} aggressively** - It's your highest revenue product")
+        
+        recommendations.extend([
             "2. **Use sachets as sampling tools** - Always upsell: 'The bottle gives much better value'",
             "3. **Build a hotel channel** - Create hotel starter packs and refill programs",
             "4. **Track repeat customers** - Add 'First Purchase' and 'Repeat Purchase' flags",
             "5. **Standardize location names** - Use dropdown instead of free text"
-        ]
+        ])
         
         for rec in recommendations:
             st.info(rec)
@@ -2756,22 +2776,24 @@ with analytics_tab6:  # Add as a new tab or section
             else:
                 return 'Other'
         
-        sales_df['Category'] = sales_df['Product'].apply(categorize_product)
-        category_mix = sales_df.groupby('Category')['Total'].sum().reset_index()
+        if 'Product' in sales_df.columns:
+            sales_df['Category'] = sales_df['Product'].apply(categorize_product)
+            category_mix = sales_df.groupby('Category')['Total'].sum().reset_index()
+            
+            if not category_mix.empty:
+                fig = px.pie(category_mix, values='Total', names='Category',
+                            title='Revenue by Product Category',
+                            color_discrete_sequence=px.colors.qualitative.Set2,
+                            hole=0.3)
+                st.plotly_chart(fig, width='stretch')
         
-        fig = px.pie(category_mix, values='Total', names='Category',
-                    title='Revenue by Product Category',
-                    color_discrete_sequence=px.colors.qualitative.Set2,
-                    hole=0.3)
-        st.plotly_chart(fig, width='stretch')
-        
-        # Business health verdict
+        # ========== BUSINESS HEALTH VERDICT ==========
         st.markdown("---")
         st.markdown("## 🩺 Founder's Verdict")
         
-        if total_sales > 10000:
+        if total_sales_value > 10000:
             verdict = "✅ **HEALTHY** - Your business is generating meaningful revenue. Focus on repeat customers and upselling."
-        elif total_sales > 5000:
+        elif total_sales_value > 5000:
             verdict = "📈 **GROWING** - You're building momentum. Double down on what worked in your best month."
         else:
             verdict = "🌱 **EARLY STAGE** - Focus on customer acquisition and product awareness."
@@ -2779,7 +2801,7 @@ with analytics_tab6:  # Add as a new tab or section
         st.info(verdict)
         
     else:
-        st.info("No sales data available. Add sales to generate business intelligence report.")   
+        st.info("No sales data available. Add sales to generate business intelligence report.")
 
 # ==================== TAB 6: PRODUCTION & INVENTORY ====================
 with tab6:
