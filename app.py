@@ -1902,12 +1902,13 @@ with tab5:
         else:
             st.info("No sales data available. Start recording sales to see trends!")
     
-    analytics_tab1, analytics_tab2, analytics_tab3, analytics_tab4, analytics_tab5 = st.tabs([
+    analytics_tab1, analytics_tab2, analytics_tab3, analytics_tab4, analytics_tab5, analytics_tab6 = st.tabs([
         "🏆 Performance Leaderboards", 
         "📊 Distribution Insights", 
         "🏨 Hotel & Mama Mboga", 
         "📁 Data Management",
-        "🦈 Shark Tank Analytics"
+        "🦈 Shark Tank Analytics",
+        "BUSINESS INTELLIGENCE REPORT"
     ])
     
     with analytics_tab1:
@@ -2567,7 +2568,218 @@ with tab5:
                 for insight in insights[:5]:
                     st.write(f"• {insight}")
     
-       
+    # ========== BUSINESS INTELLIGENCE REPORT ==========
+with analytics_tab6:  # Add as a new tab or section
+    st.markdown("### 📊 Executive Business Intelligence Report")
+    st.info("AI-Powered Analysis of Your Business Performance")
+    
+    if not sales_df.empty:
+        
+        # ========== EXECUTIVE SUMMARY ==========
+        st.markdown("## 📈 Executive Summary")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("💰 Total Revenue", f"KES {total_sales:,.0f}")
+        with col2:
+            st.metric("📦 Total Units Sold", f"{int(sales_df['Quantity'].sum()):,}")
+        with col3:
+            st.metric("📝 Total Transactions", len(sales_df))
+        with col4:
+            avg_transaction = total_sales / len(sales_df) if len(sales_df) > 0 else 0
+            st.metric("💵 Avg Transaction", f"KES {avg_transaction:,.0f}")
+        
+        # ========== PRODUCT PERFORMANCE ==========
+        st.markdown("---")
+        st.markdown("## 📦 Product Performance")
+        
+        product_performance = sales_df.groupby('Product').agg({
+            'Total': 'sum',
+            'Quantity': 'sum',
+            'Product': 'count'
+        }).rename(columns={'Product': 'Transactions'}).reset_index()
+        product_performance = product_performance.sort_values('Total', ascending=False)
+        
+        st.dataframe(
+            product_performance.head(10),
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Product": "Product",
+                "Total": st.column_config.NumberColumn("Revenue", format="KES %d"),
+                "Quantity": "Units Sold",
+                "Transactions": "Transactions"
+            }
+        )
+        
+        # Top product insight
+        top_product = product_performance.iloc[0]['Product']
+        top_revenue = product_performance.iloc[0]['Total']
+        st.success(f"💡 **Key Insight:** Your **{top_product}** is your strongest revenue generator at KES {top_revenue:,.0f}")
+        
+        # Sachet vs Bottle analysis
+        sachet_revenue = product_performance[product_performance['Product'].str.contains('Sachet', case=False)]['Total'].sum()
+        bottle_revenue = product_performance[product_performance['Product'].str.contains('Bottle', case=False)]['Total'].sum()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("📦 Sachet Revenue", f"KES {sachet_revenue:,.0f}")
+        with col2:
+            st.metric("🍾 Bottle Revenue", f"KES {bottle_revenue:,.0f}")
+        
+        # ========== MONTHLY PERFORMANCE ==========
+        st.markdown("---")
+        st.markdown("## 📅 Monthly Performance")
+        
+        sales_df['Month'] = sales_df['Date'].dt.strftime('%B %Y')
+        monthly_performance = sales_df.groupby('Month')['Total'].sum().reset_index()
+        
+        fig = px.bar(monthly_performance, x='Month', y='Total', 
+                    title='Monthly Revenue Trend',
+                    color='Total', color_continuous_scale='Viridis',
+                    text='Total')
+        fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+        st.plotly_chart(fig, width='stretch')
+        
+        # Best month insight
+        best_month = monthly_performance.iloc[monthly_performance['Total'].idxmax()]
+        best_month_pct = (best_month['Total'] / total_sales * 100)
+        st.success(f"💡 **Insight:** {best_month['Month']} accounted for {best_month_pct:.1f}% of all revenue. Investigate what worked and replicate it!")
+        
+        # ========== LOCATION PERFORMANCE ==========
+        st.markdown("---")
+        st.markdown("## 📍 Best Performing Locations")
+        
+        # Clean location data
+        sales_df['CleanLocation'] = sales_df['Location'].str.split(',').str[0].str.strip()
+        location_performance = sales_df.groupby('CleanLocation')['Total'].sum().reset_index()
+        location_performance = location_performance.sort_values('Total', ascending=False).head(10)
+        
+        fig = px.bar(location_performance, x='CleanLocation', y='Total',
+                    title='Revenue by Location',
+                    color='Total', color_continuous_scale='Blues',
+                    text='Total')
+        fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+        st.plotly_chart(fig, width='stretch')
+        
+        # ========== TOP CUSTOMERS ==========
+        st.markdown("---")
+        st.markdown("## 🏆 Top Customers")
+        
+        top_customers = sales_df.groupby('Name')['Total'].sum().reset_index()
+        top_customers = top_customers.sort_values('Total', ascending=False).head(10)
+        
+        st.dataframe(top_customers, use_container_width=True, hide_index=True,
+                    column_config={"Name": "Customer", "Total": st.column_config.NumberColumn("Revenue", format="KES %d")})
+        
+        # ========== SWOT ANALYSIS ==========
+        st.markdown("---")
+        st.markdown("## 🎯 Strategic Analysis")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 💪 Strengths")
+            strengths = []
+            if bottle_revenue > sachet_revenue:
+                strengths.append("✅ Premium product (bottles) driving revenue")
+            if len(sales_df) > 100:
+                strengths.append("✅ Strong sales volume (100+ transactions)")
+            if monthly_performance['Total'].pct_change().iloc[-1] > 0:
+                strengths.append("✅ Month-over-month growth")
+            if len(strengths) == 0:
+                strengths.append("📌 Building customer base")
+            
+            for s in strengths:
+                st.write(s)
+            
+            st.markdown("#### 📈 Opportunities")
+            opportunities = [
+                "🎯 Upsell sachet customers to bottles",
+                "🎯 Develop hotel refill program",
+                "🎯 Standardize location data for better tracking"
+            ]
+            for o in opportunities:
+                st.write(o)
+        
+        with col2:
+            st.markdown("#### ⚠️ Weaknesses")
+            weaknesses = []
+            feedback_count = sales_df['Feedback'].notna().sum() if 'Feedback' in sales_df.columns else 0
+            if feedback_count < len(sales_df) * 0.3:
+                weaknesses.append("❌ Low feedback collection (<30%)")
+            if sales_df['Name'].nunique() / len(sales_df) < 0.3:
+                weaknesses.append("❌ Low repeat purchase rate")
+            if len(weaknesses) == 0:
+                weaknesses.append("📌 Track repeat purchases better")
+            
+            for w in weaknesses:
+                st.write(w)
+            
+            st.markdown("#### 🚨 Threats")
+            threats = [
+                "⚠️ Competition in spice market",
+                "⚠️ Raw material price volatility"
+            ]
+            for t in threats:
+                st.write(t)
+        
+        # ========== RECOMMENDATIONS ==========
+        st.markdown("---")
+        st.markdown("## 🚀 Growth Recommendations")
+        
+        recommendations = [
+            f"1. **Push the {top_product.split('-')[0] if '-' in top_product else top_product} aggressively** - It's your highest revenue product",
+            "2. **Use sachets as sampling tools** - Always upsell: 'The bottle gives much better value'",
+            "3. **Build a hotel channel** - Create hotel starter packs and refill programs",
+            "4. **Track repeat customers** - Add 'First Purchase' and 'Repeat Purchase' flags",
+            "5. **Standardize location names** - Use dropdown instead of free text"
+        ]
+        
+        for rec in recommendations:
+            st.info(rec)
+        
+        # ========== REVENUE MIX ==========
+        st.markdown("---")
+        st.markdown("## 📊 Revenue Mix")
+        
+        # Categorize products
+        def categorize_product(product):
+            if 'Bottle' in str(product):
+                return 'Bottles'
+            elif 'Sachet' in str(product):
+                return 'Sachets'
+            elif 'Refill' in str(product):
+                return 'Refills'
+            elif 'Hot Sauce' in str(product):
+                return 'Hot Sauce'
+            else:
+                return 'Other'
+        
+        sales_df['Category'] = sales_df['Product'].apply(categorize_product)
+        category_mix = sales_df.groupby('Category')['Total'].sum().reset_index()
+        
+        fig = px.pie(category_mix, values='Total', names='Category',
+                    title='Revenue by Product Category',
+                    color_discrete_sequence=px.colors.qualitative.Set2,
+                    hole=0.3)
+        st.plotly_chart(fig, width='stretch')
+        
+        # Business health verdict
+        st.markdown("---")
+        st.markdown("## 🩺 Founder's Verdict")
+        
+        if total_sales > 10000:
+            verdict = "✅ **HEALTHY** - Your business is generating meaningful revenue. Focus on repeat customers and upselling."
+        elif total_sales > 5000:
+            verdict = "📈 **GROWING** - You're building momentum. Double down on what worked in your best month."
+        else:
+            verdict = "🌱 **EARLY STAGE** - Focus on customer acquisition and product awareness."
+        
+        st.info(verdict)
+        
+    else:
+        st.info("No sales data available. Add sales to generate business intelligence report.")   
 
 # ==================== TAB 6: PRODUCTION & INVENTORY ====================
 with tab6:
