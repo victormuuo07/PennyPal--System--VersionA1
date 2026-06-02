@@ -4339,6 +4339,186 @@ with tab12:
         st.write(f"• New Expenses: KES {new_expenses:,.0f}")
         st.write(f"• New Profit: KES {new_profit2:,.0f}")
         st.write(f"• New Margin: {new_margin2:.1f}%")
+
+    # ========== TRUE BUSINESS PERFORMANCE (From April 1st) ==========
+st.markdown("---")
+st.markdown("### 📅 Business Performance Since April 1st")
+st.info("🔍 **This analysis excludes all pre-launch/startup costs and only shows your actual business operations since April 1, 2026**")
+
+# Filter data from April 1st
+start_date_filter = date(2026, 4, 1)
+current_date_filter = datetime.now().date()
+
+# Filter sales from April 1st
+sales_from_april = sales_df[sales_df['Date'] >= pd.Timestamp(start_date_filter)] if not sales_df.empty else pd.DataFrame()
+expenses_from_april = expenses_df[expenses_df['date'] >= pd.Timestamp(start_date_filter)] if not expenses_df.empty else pd.DataFrame()
+
+# Calculate metrics from April 1st
+total_sales_april = sales_from_april['Total'].sum() if not sales_from_april.empty else 0
+total_expenses_april = expenses_from_april['amount'].sum() if not expenses_from_april.empty else 0
+
+# Separate operational vs capital from April
+capital_keywords = [
+    'kebs', 'standardization', 'trademark', 'permit', 'registration', 
+    'grinder', 'mixer', 'machine', 'equipment', 'design', 'posters', 'envelope',
+    'application', 'certificate', 'deposit', 'rent', 'permit'
+]
+
+operational_keywords = [
+    'salaries', 'supplies', 'transport', 'delivery', 'utilities', 'credit', 
+    'water', 'food', 'ingredients', 'salt', 'pepper', 'cayenne', 'paprika',
+    'onion', 'garlic', 'bottle', 'label', 'packaging', 'labelling', 'salary'
+]
+
+if not expenses_from_april.empty:
+    expenses_from_april['is_capital'] = expenses_from_april['category'].str.lower().str.contains('|'.join(capital_keywords), na=False)
+    expenses_from_april['is_capital'] = expenses_from_april['is_capital'] | expenses_from_april['description'].str.lower().str.contains('|'.join(capital_keywords), na=False)
+    
+    capital_from_april = expenses_from_april[expenses_from_april['is_capital']]['amount'].sum()
+    operational_from_april = expenses_from_april[~expenses_from_april['is_capital']]['amount'].sum()
+else:
+    capital_from_april = 0
+    operational_from_april = 0
+
+# Calculate operational profit
+operational_profit_april = total_sales_april - operational_from_april
+operational_margin_april = (operational_profit_april / total_sales_april * 100) if total_sales_april > 0 else 0
+
+# Display metrics
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("📅 Period", "Apr 1 - Present")
+    st.caption(f"{start_date_filter.strftime('%b %d')} to {current_date_filter.strftime('%b %d')}")
+with col2:
+    st.metric("💰 Total Sales", f"KES {total_sales_april:,.0f}")
+with col3:
+    st.metric("💵 Operational Expenses", f"KES {operational_from_april:,.0f}")
+with col4:
+    profit_color = "normal" if operational_profit_april > 0 else "inverse"
+    st.metric("✅ Operational Profit", f"KES {operational_profit_april:,.0f}", delta_color=profit_color)
+
+# Key metrics row
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("📈 Operational Margin", f"{operational_margin_april:.1f}%")
+with col2:
+    # Average daily sales
+    days_active = (datetime.now() - datetime(2026, 4, 1)).days
+    avg_daily_sales = total_sales_april / days_active if days_active > 0 else 0
+    st.metric("📊 Avg Daily Sales", f"KES {avg_daily_sales:,.0f}")
+with col3:
+    # Customer count since April
+    customer_count_april = sales_from_april['Name'].nunique() if not sales_from_april.empty else 0
+    st.metric("👥 Total Customers", customer_count_april)
+with col4:
+    # Average order value
+    avg_order_april = total_sales_april / len(sales_from_april) if not sales_from_april.empty else 0
+    st.metric("💰 Avg Order Value", f"KES {avg_order_april:,.0f}")
+
+# Business Health Status
+st.markdown("---")
+st.markdown("### 🩺 Business Health Status (Since April 1st)")
+
+if operational_profit_april > 0:
+    st.success(f"✅ **HEALTHY!** Your business is operationally profitable, making KES {operational_margin_april:.0f} profit on every KES 100 sold.")
+    
+    # Projection
+    monthly_profit = operational_profit_april / (days_active / 30)
+    st.info(f"📈 **Projection:** At current rate, you're making ~KES {monthly_profit:,.0f} profit per month")
+    
+elif operational_profit_april < 0:
+    st.warning(f"⚠️ **NEEDS IMPROVEMENT:** Your operations are losing KES {abs(operational_profit_april):,.0f}. Need to increase sales or reduce costs.")
+    
+    # Break-even analysis
+    needed_sales = abs(operational_profit_april) + total_sales_april
+    st.info(f"🎯 **Break-even target:** Need KES {needed_sales:,.0f} in sales to break even")
+else:
+    st.info("📊 **BREAKING EVEN:** Your sales exactly cover operational costs.")
+
+# One-time costs (pre-April)
+st.markdown("---")
+st.markdown("### 🏭 One-Time Startup Costs (Before April 1st)")
+
+# Filter expenses before April
+expenses_before_april = expenses_df[expenses_df['date'] < pd.Timestamp(start_date_filter)] if not expenses_df.empty else pd.DataFrame()
+capital_before = expenses_before_april['amount'].sum() if not expenses_before_april.empty else 0
+
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("💰 Total Investment to Date", f"KES {total_funding:,.0f}")
+    st.caption("From Grandma + other sources")
+with col2:
+    st.metric("🏭 Startup Costs (Pre-April)", f"KES {abs(capital_before):,.0f}")
+    st.caption("KEBS, Permits, Equipment, Trademark")
+
+# Show breakdown of pre-April costs
+if not expenses_before_april.empty:
+    with st.expander("View One-Time Startup Costs"):
+        for _, row in expenses_before_april.iterrows():
+            st.write(f"• {row['date']}: {row['description'][:60]} - KES {row['amount']:,.0f}")
+
+# Remaining capital
+remaining_capital = total_funding - abs(capital_before) - operational_from_april
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("💵 Remaining Capital", f"KES {remaining_capital:,.0f}")
+    if remaining_capital > 0:
+        st.caption(f"~{remaining_capital / avg_daily_sales:.0f} days of runway at current sales")
+with col2:
+    # ROI calculation based on operational profit only
+    if total_funding > 0:
+        roi_operational = (operational_profit_april / total_funding) * 100
+        st.metric("📈 ROI (Operational)", f"{roi_operational:.1f}%")
+        st.caption("Based on operational profit vs total investment")
+
+# Actionable insights
+st.markdown("---")
+st.markdown("### 🎯 Actionable Insights")
+
+insights = []
+
+if operational_profit_april < 0:
+    insights.append(f"🚨 **Reduce operational costs by KES {abs(operational_profit_april):,.0f}** to break even")
+    
+if avg_order_april < 500:
+    insights.append("💰 **Increase average order value** - Offer bundle deals (e.g., 3 bottles for KES 400)")
+
+if customer_count_april > 0:
+    avg_customer_value = total_sales_april / customer_count_april
+    insights.append(f"👥 **Customer lifetime value: KES {avg_customer_value:,.0f}** - Focus on repeat purchases")
+
+# Sales per day analysis
+if len(sales_from_april) > 0:
+    busiest_days = sales_from_april.groupby(sales_from_april['Date'].dt.day_name())['Total'].sum()
+    if not busiest_days.empty:
+        best_day = busiest_days.idxmax()
+        insights.append(f"📅 **Best sales day: {best_day}** - Run promotions on slow days")
+
+for i, insight in enumerate(insights[:4], 1):
+    st.write(f"{i}. {insight}")
+
+# Summary
+st.markdown("---")
+st.markdown("### 📋 Executive Summary")
+
+summary = f"""
+**Since April 1st ({days_active} days):**
+
+• **Total Sales:** KES {total_sales_april:,.0f}
+• **Operational Expenses:** KES {operational_from_april:,.0f}
+• **Operational Profit:** KES {operational_profit_april:,.0f} ({operational_margin_april:.1f}% margin)
+• **Customers Acquired:** {customer_count_april}
+• **Average Daily Sales:** KES {avg_daily_sales:,.0f}
+
+**Startup Investment:** KES {total_funding:,.0f} (Grandma)
+**One-time Setup Costs:** KES {abs(capital_before):,.0f}
+**Remaining Capital:** KES {remaining_capital:,.0f}
+
+**Verdict:** {'Your business is OPERATIONALLY PROFITABLE! The negative numbers come from one-time startup costs.' if operational_profit_april > 0 else 'Your business is still in investment phase. Focus on increasing sales.'}
+"""
+
+st.info(summary)
+
 # Footer
 st.markdown("---")
 st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
