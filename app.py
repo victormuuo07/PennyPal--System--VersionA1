@@ -4519,6 +4519,210 @@ summary = f"""
 
 st.info(summary)
 
+# ========== DETAILED EXPENSE ANALYSIS & OPTIMIZATION ==========
+st.markdown("---")
+st.markdown("### 💰 Where Your Money Is Going")
+st.info("🔍 **Deep dive into your spending patterns - see exactly what you can change**")
+
+if not expenses_df.empty:
+    
+    # Create proper categories
+    def categorize_expense(row):
+        desc = str(row['description']).lower()
+        cat = str(row['category']).lower() if pd.notna(row['category']) else ""
+        
+        # Salary & Personal
+        if 'salary' in cat or 'salaries' in cat or 'food' in desc or 'personal' in desc or 'shopping' in desc:
+            return '💰 Salaries & Personal'
+        # Ingredients & Supplies
+        elif 'supplies' in cat or 'ingredient' in desc or 'salt' in desc or 'pepper' in desc or 'paprika' in desc:
+            return '📦 Ingredients & Supplies'
+        # Transport
+        elif 'transport' in cat or 'delivery' in desc or 'transport' in desc:
+            return '🚚 Transport & Delivery'
+        # Equipment (One-time)
+        elif 'equipment' in cat or 'grinder' in desc or 'mixer' in desc or 'machine' in desc or 'cooker' in desc:
+            return '🔧 Equipment (One-time)'
+        # KEBS & Permits (One-time)
+        elif 'kebs' in desc or 'permit' in cat or 'standardization' in desc or 'trademark' in desc or 'registration' in desc:
+            return '📋 Permits & Licenses (One-time)'
+        # Rent & Utilities
+        elif 'rent' in cat or 'utilities' in cat or 'water' in desc or 'credit' in desc:
+            return '🏠 Rent & Utilities'
+        # Packaging
+        elif 'bottle' in desc or 'label' in desc or 'packaging' in desc:
+            return '📦 Packaging'
+        # Marketing
+        elif 'marketing' in cat or 'posters' in desc:
+            return '📢 Marketing'
+        # Refunds
+        elif 'refund' in cat:
+            return '💰 Refunds (Money Back)'
+        else:
+            return '📌 Other'
+    
+    expenses_df['analysis_category'] = expenses_df.apply(categorize_expense, axis=1)
+    
+    # Group by category
+    category_totals = expenses_df.groupby('analysis_category')['amount'].sum().reset_index()
+    category_totals = category_totals.sort_values('amount', ascending=False)
+    
+    # Display pie chart
+    fig = px.pie(category_totals, values='amount', names='analysis_category', 
+                title='Where Every Shilling Goes',
+                color_discrete_sequence=px.colors.qualitative.Set3,
+                hole=0.3)
+    fig.update_traces(textposition='inside', textinfo='percent+label')
+    st.plotly_chart(fig, width='stretch')
+    
+    # Display table with details
+    st.markdown("### 📋 Detailed Spending Breakdown")
+    
+    for _, row in category_totals.iterrows():
+        amount = row['amount']
+        category = row['analysis_category']
+        percentage = (amount / total_expenses * 100) if total_expenses > 0 else 0
+        
+        # Color code based on category type
+        if 'One-time' in category:
+            color = "🟣"
+        elif 'Salaries' in category:
+            color = "🔴"
+        elif 'Ingredients' in category:
+            color = "🟢"
+        elif 'Transport' in category:
+            color = "🟠"
+        else:
+            color = "🔵"
+        
+        st.write(f"{color} **{category}:** KES {amount:,.0f} ({percentage:.1f}%)")
+        
+        # Show top expenses in this category
+        category_expenses = expenses_df[expenses_df['analysis_category'] == category].nlargest(3, 'amount')
+        for _, exp in category_expenses.iterrows():
+            st.write(f"   └─ {exp['date']}: {exp['description'][:50]} - KES {exp['amount']:,.0f}")
+        st.write("")
+    
+    # ========== SALARY SPECIFIC ANALYSIS ==========
+    st.markdown("---")
+    st.markdown("### 💼 Salary & Personal Spending Analysis")
+    st.info("🔍 **This is where you can optimize your spending**")
+    
+    # Filter salary/personal expenses
+    salary_expenses = expenses_df[expenses_df['analysis_category'] == '💰 Salaries & Personal']
+    
+    if not salary_expenses.empty:
+        total_salary = salary_expenses['amount'].sum()
+        salary_percentage = (total_salary / total_expenses * 100) if total_expenses > 0 else 0
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("💰 Total Salary/Personal", f"KES {total_salary:,.0f}")
+        with col2:
+            st.metric("📊 % of Total Expenses", f"{salary_percentage:.1f}%")
+        with col3:
+            # Average monthly salary
+            months_active = (datetime.now() - sales_df['Date'].min()).days / 30 if not sales_df.empty else 1
+            monthly_salary = total_salary / max(months_active, 1)
+            st.metric("📅 Avg Monthly Salary", f"KES {monthly_salary:,.0f}")
+        
+        # Show salary breakdown
+        st.write("**Salary & Personal Expenses Breakdown:**")
+        salary_by_date = salary_expenses.groupby('date')['amount'].sum().reset_index()
+        salary_by_date = salary_by_date.sort_values('date')
+        
+        fig = px.bar(salary_by_date, x='date', y='amount', 
+                    title='Salary & Personal Spending Over Time',
+                    color='amount', color_continuous_scale='Reds',
+                    text='amount')
+        fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+        st.plotly_chart(fig, width='stretch')
+        
+        # List all salary expenses
+        with st.expander("View All Salary/Personal Expenses"):
+            for _, row in salary_expenses.sort_values('date', ascending=False).iterrows():
+                st.write(f"• {row['date']}: {row['description'][:60]} - KES {row['amount']:,.0f}")
+    
+    # ========== OPTIMIZATION RECOMMENDATIONS ==========
+    st.markdown("---")
+    st.markdown("### 🎯 Optimization Recommendations")
+    
+    recommendations = []
+    
+    # Analyze salary vs revenue
+    if not salary_expenses.empty and total_sales > 0:
+        salary_to_revenue = (total_salary / total_sales * 100) if total_sales > 0 else 0
+        if salary_to_revenue > 30:
+            recommendations.append(f"⚠️ **Salary/Revenue ratio is {salary_to_revenue:.0f}%** - Consider performance-based pay or reducing personal drawings")
+        elif salary_to_revenue > 20:
+            recommendations.append(f"📊 **Salary/Revenue ratio is {salary_to_revenue:.0f}%** - Monitor this as you grow")
+        else:
+            recommendations.append(f"✅ **Salary/Revenue ratio is {salary_to_revenue:.0f}%** - Good efficiency!")
+    
+    # Analyze transport costs
+    transport_expenses = expenses_df[expenses_df['analysis_category'] == '🚚 Transport & Delivery']['amount'].sum()
+    if transport_expenses > 0:
+        transport_percentage = (transport_expenses / total_expenses * 100) if total_expenses > 0 else 0
+        if transport_percentage > 15:
+            recommendations.append(f"🚚 **Transport costs are {transport_percentage:.0f}% of expenses** - Consider batching deliveries or negotiating better rates")
+    
+    # Analyze ingredient costs
+    ingredient_expenses = expenses_df[expenses_df['analysis_category'] == '📦 Ingredients & Supplies']['amount'].sum()
+    if ingredient_expenses > 0 and total_sales > 0:
+        ingredient_percentage = (ingredient_expenses / total_sales * 100) if total_sales > 0 else 0
+        if ingredient_percentage > 40:
+            recommendations.append(f"📦 **Ingredients cost {ingredient_percentage:.0f}% of sales** - Consider bulk purchasing or finding cheaper suppliers")
+        elif ingredient_percentage > 30:
+            recommendations.append(f"📦 **Ingredients cost {ingredient_percentage:.0f}% of sales** - Room for improvement")
+    
+    # General recommendations
+    if total_expenses > total_sales and total_sales > 0:
+        loss = total_expenses - total_sales
+        recommendations.append(f"🚨 **You're spending KES {loss:,.0f} more than you earn** - Focus on increasing sales or reducing non-essential expenses")
+    
+    # One-time vs operational ratio
+    one_time = expenses_df[expenses_df['analysis_category'].str.contains('One-time', na=False)]['amount'].sum()
+    operational = total_expenses - one_time
+    if one_time > operational:
+        recommendations.append(f"🏭 **Most expenses are one-time startup costs ({one_time/total_expenses*100:.0f}%)** - Your actual monthly operational costs are lower")
+    
+    if not recommendations:
+        recommendations.append("✅ Your spending patterns look healthy! Focus on increasing sales to improve profitability.")
+    
+    for i, rec in enumerate(recommendations, 1):
+        if "⚠️" in rec or "🚨" in rec:
+            st.warning(rec)
+        elif "✅" in rec:
+            st.success(rec)
+        else:
+            st.info(rec)
+    
+    # ========== MONTHLY TREND ==========
+    st.markdown("---")
+    st.markdown("### 📈 Monthly Spending Trend")
+    
+    expenses_df['month'] = expenses_df['date'].dt.strftime('%Y-%m')
+    monthly_trend = expenses_df.groupby('month')['amount'].sum().reset_index()
+    monthly_trend = monthly_trend.sort_values('month')
+    
+    fig = px.line(monthly_trend, x='month', y='amount', 
+                 title='Monthly Spending Trend',
+                 markers=True, line_shape='spline')
+    fig.update_traces(line=dict(color='#FF4B4B', width=3))
+    fig.update_layout(xaxis_title='Month', yaxis_title='Total Expenses (KES)')
+    st.plotly_chart(fig, width='stretch')
+    
+    # Identify months with unusual spending
+    if len(monthly_trend) > 1:
+        avg_spending = monthly_trend['amount'].mean()
+        high_spending_months = monthly_trend[monthly_trend['amount'] > avg_spending * 1.3]
+        if not high_spending_months.empty:
+            st.warning(f"⚠️ **High spending detected in:** {', '.join(high_spending_months['month'].tolist())}")
+            st.caption("Review these months for one-time purchases or unusual expenses")
+    
+else:
+    st.info("Add expense data to see detailed analysis")
+
 # Footer
 st.markdown("---")
 st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
