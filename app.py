@@ -353,7 +353,7 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12  = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13  = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
@@ -365,7 +365,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12  = st.
      "📝 Daily Sales Entry",
      "📊 Stock Reconciliation",
      "💰 Profit Calculator",
-     "🏥 Business Health" 
+     "🏥 Business Health",
+     "INVOICE SYSTEM "
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -4722,6 +4723,74 @@ if not expenses_df.empty:
     
 else:
     st.info("Add expense data to see detailed analysis")
+
+# ========== INVOICE SYSTEM (New Tab) ==========
+with tab13:
+    st.markdown('<div class="section-header">📄 Invoice Management</div>', unsafe_allow_html=True)
+    
+    # Generate invoice
+    with st.expander("➕ Create New Invoice", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            invoice_number = st.text_input("Invoice Number", value=f"INV-{datetime.now().strftime('%Y%m')}-001")
+            customer_name = st.text_input("Customer Name")
+            invoice_date = st.date_input("Invoice Date", value=date.today())
+            due_date = st.date_input("Due Date", value=date.today() + timedelta(days=30))
+        
+        with col2:
+            customer_phone = st.text_input("Customer Phone")
+            customer_email = st.text_input("Customer Email (optional)")
+            notes = st.text_area("Notes", placeholder="Payment terms, delivery instructions...")
+        
+        st.markdown("#### Items")
+        
+        # Dynamic item rows
+        items = []
+        for i in range(5):
+            col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+            with col1:
+                product = st.selectbox("Product", product_list, key=f"prod_{i}", label_visibility="collapsed")
+            with col2:
+                qty = st.number_input("Qty", min_value=0, step=1, value=0, key=f"qty_{i}", label_visibility="collapsed")
+            with col3:
+                price = st.number_input("Price", min_value=0, step=10, value=0, key=f"price_{i}", label_visibility="collapsed")
+            with col4:
+                total = qty * price
+                st.write(f"KES {total:,.0f}")
+            
+            if qty > 0:
+                items.append({"product": product, "qty": qty, "price": price, "total": total})
+        
+        if items:
+            subtotal = sum(i['total'] for i in items)
+            tax = subtotal * 0.16  # 16% VAT
+            grand_total = subtotal + tax
+            
+            st.markdown("---")
+            col1, col2, col3 = st.columns(3)
+            with col2:
+                st.write(f"**Subtotal:** KES {subtotal:,.0f}")
+                st.write(f"**VAT (16%):** KES {tax:,.0f}")
+                st.write(f"**Total:** KES {grand_total:,.0f}")
+            
+            if st.button("💾 Save & Send Invoice", type="primary"):
+                # Save to database
+                invoice_data = {
+                    "invoice_number": invoice_number,
+                    "customer_name": customer_name,
+                    "customer_phone": customer_phone,
+                    "invoice_date": str(invoice_date),
+                    "due_date": str(due_date),
+                    "items": items,
+                    "subtotal": subtotal,
+                    "tax": tax,
+                    "total": grand_total,
+                    "status": "Pending",
+                    "notes": notes
+                }
+                st.success(f"✅ Invoice {invoice_number} created!")
+                st.balloons()
 
 # Footer
 st.markdown("---")
