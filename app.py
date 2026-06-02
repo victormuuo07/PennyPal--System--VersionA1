@@ -104,6 +104,15 @@ def test_distribution_connection():
     except Exception as e:
         return False
 
+PRODUCT_LIST = [
+    "SpiseUp Spicy Salt Sachet (5 KES) - Consumer",
+    "SpiseUp Spicy Salt Sachet (2.9 KES) - Wholesale",
+    "SpiseUp Spicy Salt Sachet (30 KES)",
+    "SpiseUp Spicy Salt Bottle (100g New)",
+    "SpiseUp Spicy Salt Bottle (100g Refill)",
+    "SpiseUp Hot Sauce"
+]
+
 st.set_page_config(
     page_title="🌶️ SpiseUp Finance Tracker",
     layout="wide",
@@ -4750,7 +4759,7 @@ with tab13:
         for i in range(5):
             col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
             with col1:
-                product = st.selectbox("Product", product_list, key=f"prod_{i}", label_visibility="collapsed")
+                product = st.selectbox("Product", PRODUCT_LIST, key=f"prod_{i}", label_visibility="collapsed")
             with col2:
                 qty = st.number_input("Qty", min_value=0, step=1, value=0, key=f"qty_{i}", label_visibility="collapsed")
             with col3:
