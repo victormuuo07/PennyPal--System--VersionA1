@@ -4791,6 +4791,249 @@ with tab13:
                 }
                 st.success(f"✅ Invoice {invoice_number} created!")
                 st.balloons()
+     # ========== TAX SETTINGS ==========
+    with st.expander("⚙️ Tax Settings", expanded=True):
+        st.markdown("Set your tax rates (based on Kenyan tax laws)")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            vat_rate = st.number_input("VAT Rate (%)", min_value=0, max_value=25, value=16, step=1, help="Standard VAT rate in Kenya is 16%")
+            income_tax_rate = st.number_input("Income Tax Rate (%)", min_value=0, max_value=35, value=30, step=1, help="Corporate tax rate for small businesses")
+        
+        with col2:
+            withholding_rate = st.number_input("Withholding Tax Rate (%)", min_value=0, max_value=15, value=5, step=1)
+            turnover_threshold = st.number_input("Turnover Tax Threshold (KES)", min_value=0, step=100000, value=5000000, help="Businesses below this can opt for Turnover Tax")
+        
+        with col3:
+            is_vat_registered = st.checkbox("I am VAT registered", help="If you earn over KES 5M annually, you must register for VAT")
+            is_turnover_tax = st.checkbox("Opt for Turnover Tax", help="3% tax on gross sales (for businesses under KES 5M turnover)")
+    
+    # ========== TAX CALCULATIONS ==========
+    st.markdown("---")
+    st.markdown("### 📊 Your Tax Obligations")
+    
+    # Calculate based on your data
+    total_sales_tax = total_sales
+    total_expenses_tax = total_expenses
+    
+    # VAT Calculation (Input vs Output)
+    vat_output = total_sales_tax * (vat_rate / 100)  # VAT collected from customers
+    vat_input = 0  # VAT paid on purchases (need to mark which expenses include VAT)
+    
+    # For now, estimate VAT on operational expenses
+    if not expenses_df.empty:
+        # Estimate that 50% of operational expenses include VAT
+        operational_expenses_tax = expenses_df[~expenses_df['category'].str.contains('Salaries|Rent', case=False, na=False)]['amount'].sum()
+        vat_input = operational_expenses_tax * (vat_rate / 100) * 0.5  # Rough estimate
+    
+    vat_payable = max(0, vat_output - vat_input)
+    
+    # Income Tax Calculation
+    net_profit_tax = kpis['net_profit']
+    if net_profit_tax < 0:
+        net_profit_tax = 0
+    
+    # Turnover Tax (3% on gross sales)
+    turnover_tax = total_sales_tax * 0.03 if is_turnover_tax else 0
+    
+    # Normal Income Tax
+    income_tax = net_profit_tax * (income_tax_rate / 100) if not is_turnover_tax else 0
+    
+    # Withholding Tax (on specific payments like rent, dividends)
+    # Estimate from expenses
+    rent_expenses = expenses_df[expenses_df['category'].str.contains('Rent', case=False, na=False)]['amount'].sum() if not expenses_df.empty else 0
+    withholding_tax = rent_expenses * (withholding_rate / 100)
+    
+    # Display tax summary
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("#### 📈 VAT Summary")
+        st.metric("VAT Collected (Output)", f"KES {vat_output:,.0f}")
+        st.metric("VAT Paid (Input)", f"KES {vat_input:,.0f}")
+        st.metric("💰 VAT Payable", f"KES {vat_payable:,.0f}", delta=f"{vat_payable/total_sales*100:.1f}% of sales" if total_sales > 0 else None)
+    
+    with col2:
+        st.markdown("#### 💰 Income Tax Summary")
+        st.metric("Net Profit (Taxable)", f"KES {net_profit_tax:,.0f}")
+        if is_turnover_tax:
+            st.metric("Turnover Tax (3%)", f"KES {turnover_tax:,.0f}")
+            st.caption("Alternative to income tax for small businesses")
+        else:
+            st.metric("Income Tax", f"KES {income_tax:,.0f}", delta=f"{income_tax_rate}% rate")
+    
+    with col3:
+        st.markdown("#### 🏢 Other Taxes")
+        st.metric("Withholding Tax (Rent)", f"KES {withholding_tax:,.0f}")
+        st.metric("Total Estimated Tax", f"KES {vat_payable + income_tax + turnover_tax + withholding_tax:,.0f}")
+    
+    # ========== TAX DUE DATES ==========
+    st.markdown("---")
+    st.markdown("### 📅 Upcoming Tax Deadlines")
+    
+    # Calculate based on current month
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+    
+    tax_deadlines = []
+    
+    # VAT returns (monthly by 20th)
+    vat_due_date = datetime(current_year, current_month, 20)
+    if vat_due_date > datetime.now():
+        tax_deadlines.append({
+            "tax": "VAT Return",
+            "due_date": vat_due_date,
+            "estimated": vat_payable,
+            "status": "Upcoming"
+        })
+    
+    # Income tax (by June 30th following year)
+    income_tax_due = datetime(current_year, 6, 30)
+    if income_tax_due > datetime.now():
+        tax_deadlines.append({
+            "tax": "Income Tax Return",
+            "due_date": income_tax_due,
+            "estimated": income_tax,
+            "status": "Upcoming"
+        })
+    
+    # Turnover tax (monthly by 20th)
+    if is_turnover_tax:
+        turnover_due = datetime(current_year, current_month, 20)
+        if turnover_due > datetime.now():
+            tax_deadlines.append({
+                "tax": "Turnover Tax",
+                "due_date": turnover_due,
+                "estimated": turnover_tax,
+                "status": "Upcoming"
+            })
+    
+    # Display deadlines
+    if tax_deadlines:
+        df_deadlines = pd.DataFrame(tax_deadlines)
+        df_deadlines['due_date'] = pd.to_datetime(df_deadlines['due_date']).dt.strftime('%b %d, %Y')
+        df_deadlines['estimated'] = df_deadlines['estimated'].apply(lambda x: f"KES {x:,.0f}")
+        
+        st.dataframe(df_deadlines, use_container_width=True, hide_index=True)
+        
+        # Next deadline alert
+        next_deadline = min([d['due_date'] for d in tax_deadlines])
+        days_until = (next_deadline - datetime.now()).days
+        
+        if days_until <= 7:
+            st.warning(f"⚠️ **URGENT:** Tax deadline in {days_until} days! Prepare your payment.")
+        elif days_until <= 30:
+            st.info(f"📌 **Reminder:** Tax deadline in {days_until} days")
+    else:
+        st.success("✅ No upcoming tax deadlines in the next month")
+    
+    # ========== DEDUCTIBLE EXPENSES ==========
+    st.markdown("---")
+    st.markdown("### 📋 Tax-Deductible Expenses")
+    st.info("These expenses can be deducted from your taxable income")
+    
+    deductible_categories = {
+        "Operating Expenses": ["Supplies", "Transport", "Utilities", "Marketing", "Advertising"],
+        "Professional Services": ["Legal", "Accounting", "Consulting"],
+        "Office Expenses": ["Office Rent", "Equipment (depreciated)", "Furniture"],
+        "Staff Costs": ["Salaries", "Training", "Benefits"],
+        "Other": ["Insurance", "Interest on loans", "Repairs"]
+    }
+    
+    total_deductible = 0
+    for category_group, categories in deductible_categories.items():
+        group_total = 0
+        for cat in categories:
+            cat_total = expenses_df[expenses_df['category'].str.contains(cat, case=False, na=False)]['amount'].sum() if not expenses_df.empty else 0
+            if cat_total > 0:
+                group_total += cat_total
+                total_deductible += cat_total
+        
+        if group_total > 0:
+            st.write(f"**{category_group}:** KES {group_total:,.0f}")
+    
+    st.metric("💰 Total Deductible Expenses", f"KES {total_deductible:,.0f}")
+    st.caption("These reduce your taxable income")
+    
+    # ========== TAX SAVINGS TIPS ==========
+    st.markdown("---")
+    st.markdown("### 💡 Tax Saving Tips")
+    
+    tips = [
+        "📌 **Keep all receipts** - You need proof for every deduction",
+        "📌 **Separate business and personal** expenses - Use different bank accounts",
+        "📌 **Track mileage** - Business travel is deductible",
+        "📌 **Home office deduction** - If you work from home, claim a portion of utilities",
+        "📌 **Equipment purchases** - Can be depreciated or expensed under certain limits",
+        "📌 **Health insurance** premiums are tax-deductible",
+        f"📌 **VAT input** - You can claim VAT on {vat_input:,.0f} of purchases"
+    ]
+    
+    for tip in tips:
+        st.write(tip)
+    
+    # ========== TAX PROJECTION ==========
+    st.markdown("---")
+    st.markdown("### 🔮 Tax Projection (Next Quarter)")
+    
+    # Calculate average monthly sales
+    if not sales_df.empty:
+        months_active = max(1, (datetime.now() - sales_df['Date'].min()).days / 30)
+        avg_monthly_sales = total_sales / months_active
+        projected_sales_quarter = avg_monthly_sales * 3
+        
+        projected_vat = projected_sales_quarter * (vat_rate / 100)
+        projected_tax = projected_sales_quarter * 0.03 if is_turnover_tax else (projected_sales_quarter - avg_monthly_sales * 0.5) * (income_tax_rate / 100)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("📊 Projected Sales (Next Quarter)", f"KES {projected_sales_quarter:,.0f}")
+            st.metric("💰 Projected VAT", f"KES {projected_vat:,.0f}")
+        with col2:
+            st.metric("📈 Projected Income Tax", f"KES {projected_tax:,.0f}")
+            st.metric("💵 Total Tax to Save", f"KES {projected_vat + projected_tax:,.0f}")
+        
+        # Savings suggestion
+        monthly_save = (projected_vat + projected_tax) / 3
+        st.info(f"💡 **Recommendation:** Set aside ~KES {monthly_save:,.0f} per month for taxes")
+    
+    # ========== EXPORT TAX REPORT ==========
+    st.markdown("---")
+    if st.button("📥 Download Tax Report (Excel)", use_container_width=True):
+        # Generate tax report
+        tax_report = f"""
+        SPI SE UP TAX REPORT
+        Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+        
+        TAX SUMMARY
+        ===========
+        Total Sales: KES {total_sales:,.0f}
+        Total Expenses: KES {total_expenses:,.0f}
+        Net Profit: KES {max(0, net_profit_tax):,.0f}
+        
+        VAT CALCULATION
+        ===============
+        VAT Rate: {vat_rate}%
+        VAT Collected (Output): KES {vat_output:,.0f}
+        VAT Paid (Input): KES {vat_input:,.0f}
+        VAT Payable: KES {vat_payable:,.0f}
+        
+        INCOME TAX
+        ==========
+        Taxable Income: KES {max(0, net_profit_tax):,.0f}
+        Tax Rate: {income_tax_rate}%
+        Income Tax Due: KES {income_tax:,.0f}
+        
+        DEDUCTIBLE EXPENSES
+        ==================
+        Total Deductions: KES {total_deductible:,.0f}
+        
+        NEXT QUARTER PROJECTION
+        =======================
+        Projected Sales: KES {projected_sales_quarter:,.0f}
+        Projected Tax: KES {projected_vat + projected_tax:,.0f}
+        """
+        
+        st.download_button("Download Tax Report", tax_report, f"tax_report_{date.today()}.txt", "text/plain")            
 
 # Footer
 st.markdown("---")
