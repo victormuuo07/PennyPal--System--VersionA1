@@ -71,7 +71,15 @@ from supabase_client import (
     update_asset,
      save_daily_stock_reconciliation,
     get_daily_stock_reconciliation,
-    get_daily_summary
+    get_daily_summary,
+    save_hotel,
+    get_all_hotels,
+    save_hotel_refill,
+    get_hotel_refills,
+    save_mama_mboga,
+    get_all_mama_mbogas,
+    save_mama_purchase,
+    get_mama_purchases
 )
 
 DEBUG_MODE = False  # Set to True only when debugging

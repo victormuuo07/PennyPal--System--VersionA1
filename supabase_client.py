@@ -1328,3 +1328,55 @@ def get_mama_purchases(mama_id: str = None):
         return response.data if response.data else []
     except Exception as e:
         return []
+
+
+# -------------------------------
+# MAMA MBOGAS TRACKING FUNCTIONS
+# -------------------------------
+
+def save_mama_mboga(mama_data: dict):
+    """Save a new Mama Mboga shop"""
+    try:
+        mama_data["id"] = str(uuid.uuid4())
+        response = supabase.table("MAMA_MBOGAS").insert(mama_data).execute()
+        if hasattr(response, 'error') and response.error:
+            st.error(f"Error saving Mama Mboga: {response.error.message}")
+            return None
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving Mama Mboga: {str(e)}")
+        return None
+
+def get_all_mama_mbogas():
+    """Get all Mama Mboga shops"""
+    try:
+        response = supabase.table("MAMA_MBOGAS").select("*").order("shop_name").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Error fetching Mama Mbogas: {str(e)}")
+        return []
+
+def save_mama_purchase(purchase_data: dict):
+    """Record a Mama Mboga purchase"""
+    try:
+        purchase_data["id"] = str(uuid.uuid4())
+        response = supabase.table("MAMA_MBOGAS_PURCHASES").insert(purchase_data).execute()
+        if hasattr(response, 'error') and response.error:
+            st.error(f"Error saving purchase: {response.error.message}")
+            return None
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving purchase: {str(e)}")
+        return None
+
+def get_mama_purchases(mama_id: str = None):
+    """Get purchase history for a Mama Mboga or all"""
+    try:
+        query = supabase.table("MAMA_MBOGAS_PURCHASES").select("*, MAMA_MBOGAS(*)").order("purchase_date", desc=True)
+        if mama_id:
+            query = query.eq("mama_id", mama_id)
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Error fetching purchases: {str(e)}")
+        return []
