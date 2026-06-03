@@ -4968,174 +4968,212 @@ if not expenses_df.empty:
 else:
     st.info("Add expense data to see detailed analysis")
 
-# ========== INVOICE SYSTEM (New Tab) ==========
-with tab13:
+# ==================== INVOICE SYSTEM TAB ====================
+with tab13:  
     st.markdown('<div class="section-header">📄 Invoice Management</div>', unsafe_allow_html=True)
     
-    # Generate invoice
+    st.info("💡 **Create professional invoices for bulk orders, hotels, and credit customers**")
+    
+    # ========== INVOICE SETTINGS ==========
+    # Define product list
+    product_list = [
+        "SpiseUp Spicy Salt Sachet (5 KES)",
+        "SpiseUp Spicy Salt Sachet (10 KES)",
+        "SpiseUp Spicy Salt Sachet (20 KES)",
+        "SpiseUp Spicy Salt Sachet (30 KES)",
+        "SpiseUp Spicy Salt Sachet (40 KES)",
+        "SpiseUp Spicy Salt Bottle (100g) - 150 KES",
+        "SpiseUp Spicy Salt Refill (100g) - 120 KES",
+        "SpiseUp Hot Sauce - 200 KES"
+    ]
+    
+    # ========== CREATE NEW INVOICE ==========
     with st.expander("➕ Create New Invoice", expanded=True):
+        
         col1, col2 = st.columns(2)
         
         with col1:
-            invoice_number = st.text_input("Invoice Number", value=f"INV-{datetime.now().strftime('%Y%m')}-001")
-            customer_name = st.text_input("Customer Name")
-            invoice_date = st.date_input("Invoice Date", value=date.today())
-            due_date = st.date_input("Due Date", value=date.today() + timedelta(days=30))
+            invoice_number = st.text_input("Invoice Number", value=f"INV-{datetime.now().strftime('%Y%m')}-{len(st.session_state.get('invoices', [])) + 1:03d}")
+            customer_name = st.text_input("Customer Name *", placeholder="e.g., Hotel Sakina")
+            customer_phone = st.text_input("Customer Phone", placeholder="e.g., 0712345678")
         
         with col2:
-            customer_phone = st.text_input("Customer Phone")
-            customer_email = st.text_input("Customer Email (optional)")
-            notes = st.text_area("Notes", placeholder="Payment terms, delivery instructions...")
+            invoice_date = st.date_input("Invoice Date", value=date.today())
+            due_date = st.date_input("Due Date", value=date.today() + timedelta(days=30))
+            payment_terms = st.selectbox("Payment Terms", ["Due on Receipt", "Net 15", "Net 30", "Net 60"])
         
-        st.markdown("#### Items")
+        st.markdown("#### 📦 Items")
         
         # Dynamic item rows
         items = []
+        cols = st.columns([3, 1, 1, 1, 1])
+        cols[0].write("**Product**")
+        cols[1].write("**Qty**")
+        cols[2].write("**Price**")
+        cols[3].write("**Total**")
+        cols[4].write("")
+        
         for i in range(5):
-            col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+            col1, col2, col3, col4, col5 = st.columns([3, 1, 1, 1, 1])
             with col1:
-                product = st.selectbox("Product", PRODUCT_LIST, key=f"prod_{i}", label_visibility="collapsed")
+                product = st.selectbox("Product", product_list, key=f"inv_prod_{i}", label_visibility="collapsed")
             with col2:
-                qty = st.number_input("Qty", min_value=0, step=1, value=0, key=f"qty_{i}", label_visibility="collapsed")
+                qty = st.number_input("Qty", min_value=0, step=1, value=0, key=f"inv_qty_{i}", label_visibility="collapsed")
             with col3:
-                price = st.number_input("Price", min_value=0, step=10, value=0, key=f"price_{i}", label_visibility="collapsed")
+                # Extract price from product name or allow manual entry
+                if "5 KES" in product:
+                    default_price = 5
+                elif "10 KES" in product:
+                    default_price = 10
+                elif "20 KES" in product:
+                    default_price = 20
+                elif "30 KES" in product:
+                    default_price = 30
+                elif "40 KES" in product:
+                    default_price = 40
+                elif "150 KES" in product:
+                    default_price = 150
+                elif "120 KES" in product:
+                    default_price = 120
+                elif "200 KES" in product:
+                    default_price = 200
+                else:
+                    default_price = 0
+                price = st.number_input("Price", min_value=0, step=10, value=default_price, key=f"inv_price_{i}", label_visibility="collapsed")
             with col4:
                 total = qty * price
                 st.write(f"KES {total:,.0f}")
+            with col5:
+                if qty > 0:
+                    st.write("📦")
             
             if qty > 0:
                 items.append({"product": product, "qty": qty, "price": price, "total": total})
         
         if items:
             subtotal = sum(i['total'] for i in items)
-            tax = subtotal * 0.16  # 16% VAT
-            grand_total = subtotal + tax
+            vat = subtotal * 0.16  # 16% VAT
+            grand_total = subtotal + vat
             
             st.markdown("---")
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3 = st.columns([2, 1, 1])
             with col2:
                 st.write(f"**Subtotal:** KES {subtotal:,.0f}")
-                st.write(f"**VAT (16%):** KES {tax:,.0f}")
-                st.write(f"**Total:** KES {grand_total:,.0f}")
+                st.write(f"**VAT (16%):** KES {vat:,.0f}")
+                st.write(f"**Total Due:** KES {grand_total:,.0f}")
             
-            if st.button("💾 Save & Send Invoice", type="primary"):
-                # Save to database
-                invoice_data = {
-                    "invoice_number": invoice_number,
-                    "customer_name": customer_name,
-                    "customer_phone": customer_phone,
-                    "invoice_date": str(invoice_date),
-                    "due_date": str(due_date),
-                    "items": items,
-                    "subtotal": subtotal,
-                    "tax": tax,
-                    "total": grand_total,
-                    "status": "Pending",
-                    "notes": notes
-                }
-                st.success(f"✅ Invoice {invoice_number} created!")
-                st.balloons()
-     # ========== TAX SETTINGS ==========
-    with st.expander("⚙️ Tax Settings", expanded=True):
-        st.markdown("Set your tax rates (based on Kenyan tax laws)")
+            notes = st.text_area("Invoice Notes", placeholder="Payment instructions, delivery details, thank you message...")
+            
+            if st.button("💾 Create Invoice", type="primary", use_container_width=True):
+                if not customer_name:
+                    st.error("Please enter customer name!")
+                else:
+                    # Save to session state (or database)
+                    if 'invoices' not in st.session_state:
+                        st.session_state.invoices = []
+                    
+                    new_invoice = {
+                        "invoice_number": invoice_number,
+                        "customer_name": customer_name,
+                        "customer_phone": customer_phone,
+                        "invoice_date": str(invoice_date),
+                        "due_date": str(due_date),
+                        "payment_terms": payment_terms,
+                        "items": items,
+                        "subtotal": subtotal,
+                        "vat": vat,
+                        "total": grand_total,
+                        "notes": notes,
+                        "status": "Pending",
+                        "created_at": str(datetime.now())
+                    }
+                    
+                    st.session_state.invoices.append(new_invoice)
+                    st.success(f"✅ Invoice {invoice_number} created for {customer_name}!")
+                    st.info(f"💰 Total Amount Due: KES {grand_total:,.0f}")
+                    st.balloons()
+    
+    # ========== VIEW INVOICES ==========
+    st.markdown("---")
+    st.markdown("### 📋 Invoice History")
+    
+    if 'invoices' in st.session_state and st.session_state.invoices:
+        # Summary metrics
+        total_outstanding = sum(inv['total'] for inv in st.session_state.invoices if inv['status'] == 'Pending')
+        total_paid = sum(inv['total'] for inv in st.session_state.invoices if inv['status'] == 'Paid')
         
         col1, col2, col3 = st.columns(3)
         with col1:
-            vat_rate = st.number_input("VAT Rate (%)", min_value=0, max_value=25, value=16, step=1, help="Standard VAT rate in Kenya is 16%")
-            income_tax_rate = st.number_input("Income Tax Rate (%)", min_value=0, max_value=35, value=30, step=1, help="Corporate tax rate for small businesses")
-        
+            st.metric("📊 Total Invoices", len(st.session_state.invoices))
         with col2:
-            withholding_rate = st.number_input("Withholding Tax Rate (%)", min_value=0, max_value=15, value=5, step=1)
-            turnover_threshold = st.number_input("Turnover Tax Threshold (KES)", min_value=0, step=100000, value=5000000, help="Businesses below this can opt for Turnover Tax")
-        
+            st.metric("💰 Outstanding", f"KES {total_outstanding:,.0f}")
         with col3:
-            is_vat_registered = st.checkbox("I am VAT registered", help="If you earn over KES 5M annually, you must register for VAT")
-            is_turnover_tax = st.checkbox("Opt for Turnover Tax", help="3% tax on gross sales (for businesses under KES 5M turnover)")
-    
-    # ========== SIMPLIFIED TAX CALCULATIONS ==========
-st.markdown("---")
-st.markdown("### 📊 Your Tax Obligations")
-
-# Get user's tax regime choice
-tax_regime = st.radio(
-    "Select Your Tax Regime (Choose ONE)",
-    [
-        "✅ Turnover Tax (3% of Sales) - Best for small businesses",
-        "📈 Income Tax (30% of Profits)",
-        "🏢 VAT Registered (16% VAT + Income Tax)"
-    ],
-    help="Turnover Tax is usually best for businesses under KES 5M annual turnover"
-)
-
-# Calculate based on your data
-total_sales_tax = total_sales
-net_profit_tax = max(0, kpis['net_profit'])  # Only positive profits are taxed
-
-if "Turnover Tax" in tax_regime:
-    # Turnover Tax (3% on gross sales)
-    tax_due = total_sales_tax * 0.03
-    vat_due = 0
-    
-    st.info(f"**You are using Turnover Tax (3%)** - This is the simplest option")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("📊 Total Sales", f"KES {total_sales_tax:,.0f}")
-    with col2:
-        st.metric("💰 Turnover Tax Due (3%)", f"KES {tax_due:,.0f}", delta=f"{tax_due/total_sales_tax*100:.1f}% of sales")
-    
-    st.success(f"✅ Based on your sales of KES {total_sales_tax:,.0f}, you owe KES {tax_due:,.0f} in Turnover Tax")
-
-elif "Income Tax" in tax_regime:
-    # Income Tax (30% on profits)
-    tax_due = net_profit_tax * 0.30
-    vat_due = 0
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("📊 Net Profit (Taxable)", f"KES {net_profit_tax:,.0f}")
-    with col2:
-        st.metric("💰 Income Tax Due (30%)", f"KES {tax_due:,.0f}")
-    
-    if net_profit_tax <= 0:
-        st.info("ℹ️ Your business has no taxable profit. No income tax due.")
+            st.metric("✅ Paid", f"KES {total_paid:,.0f}")
+        
+        # Display invoices
+        for idx, inv in enumerate(st.session_state.invoices):
+            with st.expander(f"{inv['invoice_number']} - {inv['customer_name']} - {inv['status']} - KES {inv['total']:,.0f}"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**Date:** {inv['invoice_date']}")
+                    st.write(f"**Due Date:** {inv['due_date']}")
+                    st.write(f"**Payment Terms:** {inv['payment_terms']}")
+                with col2:
+                    st.write(f"**Status:** {inv['status']}")
+                    if inv['status'] == 'Pending':
+                        days_overdue = (datetime.now() - datetime.strptime(inv['due_date'], '%Y-%m-%d')).days
+                        if days_overdue > 0:
+                            st.warning(f"⚠️ {days_overdue} days overdue")
+                
+                st.write("**Items:**")
+                for item in inv['items']:
+                    st.write(f"• {item['product']}: {item['qty']} x KES {item['price']} = KES {item['total']:,.0f}")
+                
+                st.write(f"**Total:** KES {inv['total']:,.0f}")
+                
+                if inv['status'] == 'Pending':
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button(f"Mark as Paid", key=f"pay_{idx}"):
+                            st.session_state.invoices[idx]['status'] = 'Paid'
+                            st.success(f"✅ Invoice {inv['invoice_number']} marked as paid!")
+                            st.rerun()
+                    with col2:
+                        if st.button(f"Delete", key=f"del_{idx}"):
+                            st.session_state.invoices.pop(idx)
+                            st.rerun()
+                
+                if inv['notes']:
+                    st.write(f"**Notes:** {inv['notes']}")
     else:
-        st.info(f"✅ Based on KES {net_profit_tax:,.0f} profit, you owe KES {tax_due:,.0f} in Income Tax")
-
-else:  # VAT Registered
-    # VAT on sales
-    vat_output = total_sales_tax * 0.16
-    # Estimate VAT on purchases (50% of operational expenses)
-    operational_for_vat = expenses_df[~expenses_df['category'].str.contains('Salaries|Rent', case=False, na=False)]['amount'].sum() if not expenses_df.empty else 0
-    vat_input = operational_for_vat * 0.16 * 0.5
-    vat_due = max(0, vat_output - vat_input)
+        st.info("No invoices created yet. Create your first invoice above!")
     
-    # Income Tax on profits
-    income_tax_due = net_profit_tax * 0.30
-    
-    tax_due = vat_due + income_tax_due
+    # ========== QUICK INVOICE TEMPLATES ==========
+    st.markdown("---")
+    st.markdown("### 📝 Quick Invoice Templates")
     
     col1, col2 = st.columns(2)
-    with col1:
-        st.metric("💰 VAT Due", f"KES {vat_due:,.0f}")
-        st.caption(f"Output: {vat_output:.0f} - Input: {vat_input:.0f}")
-    with col2:
-        st.metric("💰 Income Tax Due", f"KES {income_tax_due:,.0f}")
     
-    st.info(f"📊 Total Tax Due: KES {tax_due:,.0f}")
-
-# Payment Recommendation
-st.markdown("---")
-st.markdown("### 💡 Tax Payment Recommendation")
-
-monthly_tax = tax_due / max(1, (datetime.now() - sales_df['Date'].min()).days / 30) if not sales_df.empty else tax_due
-
-col1, col2 = st.columns(2)
-with col1:
-    st.metric("📅 Estimated Monthly Tax", f"KES {monthly_tax:,.0f}")
-with col2:
-    st.metric("💵 Set Aside Per Sale", f"KES {monthly_tax / max(1, total_sales/100):.0f} per KES 100")
-
-st.info(f"💡 **Recommendation:** Set aside ~KES {monthly_tax:,.0f} per month in a separate account for taxes")            
+    with col1:
+        if st.button("🏨 Hotel Starter Pack (5 Bottles)", use_container_width=True):
+            # Pre-fill form with hotel pack
+            st.session_state.quick_invoice = {
+                "items": [{"product": "SpiseUp Spicy Salt Bottle (100g) - 150 KES", "qty": 5, "price": 150, "total": 750}],
+                "subtotal": 750,
+                "vat": 120,
+                "total": 870
+            }
+            st.success("Hotel Starter Pack loaded! Fill in customer details above.")
+    
+    with col2:
+        if st.button("🏪 Mama Mboga Starter Pack (50 Sachets)", use_container_width=True):
+            st.session_state.quick_invoice = {
+                "items": [{"product": "SpiseUp Spicy Salt Sachet (5 KES)", "qty": 50, "price": 5, "total": 250}],
+                "subtotal": 250,
+                "vat": 40,
+                "total": 290
+            }
+            st.success("Mama Mboga Pack loaded! Fill in customer details above.")          
 
 # ==================== FREE ITEMS / GIVEAWAYS TAB ====================
 with tab14:  # Add to your tabs list
