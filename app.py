@@ -362,7 +362,7 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13  = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14  = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
@@ -375,7 +375,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13
      "📊 Stock Reconciliation",
      "💰 Profit Calculator",
      "🏥 Business Health",
-     "INVOICE SYSTEM "
+     "INVOICE SYSTEM ",
+     "🎁 Free Items & Giveaways"
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -5135,6 +5136,140 @@ with col2:
     st.metric("💵 Set Aside Per Sale", f"KES {monthly_tax / max(1, total_sales/100):.0f} per KES 100")
 
 st.info(f"💡 **Recommendation:** Set aside ~KES {monthly_tax:,.0f} per month in a separate account for taxes")            
+
+# ==================== FREE ITEMS / GIVEAWAYS TAB ====================
+with tab14:  # Add to your tabs list
+    st.markdown('<div class="section-header">🎁 Free Items & Giveaways</div>', unsafe_allow_html=True)
+    
+    st.info("📌 **Track free samples and giveaways** - This helps you know your true inventory usage and marketing costs")
+    
+    # ========== RECORD GIVEAWAY ==========
+    with st.expander("➕ Record Giveaway / Free Item", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            giveaway_date = st.date_input("Date", value=date.today(), key="giveaway_date")
+            product_type = st.selectbox(
+                "Product", 
+                ["5 KES Sachet", "10 KES Sachet", "20 KES Sachet", "30 KES Sachet", "40 KES Sachet", 
+                 "100g Bottle", "100g Refill", "Hot Sauce"],
+                key="giveaway_product"
+            )
+            quantity = st.number_input("Quantity", min_value=1, step=1, value=1, key="giveaway_qty")
+        
+        with col2:
+            reason = st.selectbox(
+                "Reason for Giveaway",
+                ["Sample - New Customer", "Sample - Existing Customer", "Promotion", 
+                 "Damaged Product", "Customer Appreciation", "Testing/Feedback", "Bulk Sample"],
+                key="giveaway_reason"
+            )
+            customer_name = st.text_input("Customer Name (optional)", placeholder="Who received it?", key="giveaway_customer")
+            notes = st.text_area("Notes", placeholder="Any additional details...", key="giveaway_notes")
+        
+        # Calculate value
+        product_prices = {
+            "5 KES Sachet": 5,
+            "10 KES Sachet": 10,
+            "20 KES Sachet": 20,
+            "30 KES Sachet": 30,
+            "40 KES Sachet": 40,
+            "100g Bottle": 150,
+            "100g Refill": 120,
+            "Hot Sauce": 200
+        }
+        unit_price = product_prices.get(product_type, 0)
+        total_value = quantity * unit_price
+        
+        st.info(f"💰 Estimated value of giveaway: KES {total_value:,.0f}")
+        
+        if st.button("💾 Record Giveaway", type="primary", use_container_width=True):
+            giveaway_data = {
+                "giveaway_date": str(giveaway_date),
+                "customer_name": customer_name if customer_name else None,
+                "product_type": product_type,
+                "quantity": quantity,
+                "reason": reason,
+                "unit_cost": unit_price,
+                "total_value": total_value,
+                "notes": notes
+            }
+            
+            result = save_free_item(giveaway_data)
+            if result:
+                st.success(f"✅ Recorded {quantity} x {product_type} given away for: {reason}")
+                st.caption(f"💡 This helps track your true inventory usage - {total_value} KES worth of product")
+                st.rerun()
+    
+    # ========== GIVEAWAY SUMMARY ==========
+    st.markdown("---")
+    st.markdown("### 📊 Giveaway Summary")
+    
+    free_items = get_free_items()
+    
+    if free_items:
+        df_free = pd.DataFrame(free_items)
+        df_free['giveaway_date'] = pd.to_datetime(df_free['giveaway_date']).dt.strftime('%Y-%m-%d')
+        df_free['total_value'] = df_free['total_value'].apply(lambda x: f"KES {x:,.0f}")
+        
+        # Summary metrics
+        total_free_quantity = df_free['quantity'].sum() if 'quantity' in df_free.columns else 0
+        total_free_value = sum([f['total_value'] for f in free_items]) if free_items else 0
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("🎁 Total Items Given", f"{total_free_quantity:,}")
+        with col2:
+            st.metric("💰 Total Value Given", f"KES {total_free_value:,.0f}")
+        with col3:
+            reasons_count = df_free['reason'].nunique() if 'reason' in df_free.columns else 0
+            st.metric("📋 Types of Giveaways", reasons_count)
+        with col4:
+            if total_sales > 0:
+                giveaway_percentage = (total_free_value / total_sales * 100)
+                st.metric("📊 % of Sales Value", f"{giveaway_percentage:.1f}%")
+        
+        # Giveaway by reason chart
+        if 'reason' in df_free.columns:
+            reason_summary = df_free.groupby('reason')['quantity'].sum().reset_index()
+            fig = px.pie(reason_summary, values='quantity', names='reason',
+                        title='Giveaways by Reason',
+                        color_discrete_sequence=px.colors.qualitative.Set3)
+            st.plotly_chart(fig, width='stretch')
+        
+        # Giveaway by product chart
+        if 'product_type' in df_free.columns:
+            product_summary = df_free.groupby('product_type')['quantity'].sum().reset_index()
+            fig = px.bar(product_summary, x='product_type', y='quantity',
+                        title='Giveaways by Product',
+                        color='quantity', color_continuous_scale='Oranges',
+                        text='quantity')
+            fig.update_traces(textposition='outside')
+            st.plotly_chart(fig, width='stretch')
+        
+        # Recent giveaways table
+        st.markdown("### 📋 Recent Giveaways")
+        st.dataframe(
+            df_free[['giveaway_date', 'product_type', 'quantity', 'reason', 'customer_name', 'notes']],
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # Insight
+        st.markdown("---")
+        st.markdown("### 💡 Marketing Insight")
+        
+        sample_count = df_free[df_free['reason'].str.contains('Sample', case=False)]['quantity'].sum() if 'reason' in df_free.columns else 0
+        if sample_count > 0:
+            st.info(f"📊 You've given away {sample_count} samples. Track which customers buy after receiving samples!")
+        else:
+            st.info("📊 Start giving samples to new customers - it's a great way to acquire customers!")
+        
+        # Update inventory button
+        st.warning("⚠️ Remember: These items have been removed from your inventory. Make sure your stock levels reflect these giveaways.")
+        
+    else:
+        st.info("No giveaways recorded yet. Use the form above to track free samples and promotions.")
 
 # Footer
 st.markdown("---")

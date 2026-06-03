@@ -1380,3 +1380,49 @@ def get_mama_purchases(mama_id: str = None):
     except Exception as e:
         st.error(f"Error fetching purchases: {str(e)}")
         return []
+    
+# -------------------------------
+# FREE ITEMS / GIVEAWAYS FUNCTIONS
+# -------------------------------
+
+def save_free_item(giveaway_data: dict):
+    """Record a free item giveaway"""
+    try:
+        giveaway_data["id"] = str(uuid.uuid4())
+        response = supabase.table("FREE_ITEMS").insert(giveaway_data).execute()
+        if hasattr(response, 'error') and response.error:
+            st.error(f"Error saving giveaway: {response.error.message}")
+            return None
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving giveaway: {str(e)}")
+        return None
+
+def get_free_items(start_date=None, end_date=None):
+    """Get all free items giveaways"""
+    try:
+        query = supabase.table("FREE_ITEMS").select("*").order("giveaway_date", desc=True)
+        if start_date:
+            query = query.gte("giveaway_date", str(start_date))
+        if end_date:
+            query = query.lte("giveaway_date", str(end_date))
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        st.error(f"Error fetching giveaways: {str(e)}")
+        return []
+
+def get_free_items_summary():
+    """Get summary of giveaways by product and reason"""
+    try:
+        response = supabase.table("FREE_ITEMS").select("*").execute()
+        if response.data:
+            df = pd.DataFrame(response.data)
+            summary = df.groupby(['product_type', 'reason']).agg({
+                'quantity': 'sum',
+                'total_value': 'sum'
+            }).reset_index()
+            return summary
+        return pd.DataFrame()
+    except Exception as e:
+        return pd.DataFrame()    
