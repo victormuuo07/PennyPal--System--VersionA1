@@ -79,7 +79,10 @@ from supabase_client import (
     save_mama_mboga,
     get_all_mama_mbogas,
     save_mama_purchase,
-    get_mama_purchases
+    get_mama_purchases,
+    save_free_item,
+    get_free_items,
+    get_free_items_summary
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
