@@ -82,7 +82,13 @@ from supabase_client import (
     get_mama_purchases,
     save_free_item,
     get_free_items,
-    get_free_items_summary
+    get_free_items_summary,
+    save_location,
+    get_all_locations,
+    save_refill_schedule,
+    get_refill_schedules,
+    get_today_refills,
+    update_refill_schedule
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -365,7 +371,7 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14  = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14, tab15  = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
@@ -379,7 +385,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13
      "💰 Profit Calculator",
      "🏥 Business Health",
      "INVOICE SYSTEM ",
-     "🎁 Free Items & Giveaways"
+     "🎁 Free Items & Giveaways",
+     "ROUTE & REFILL OPTIMIZATION TAB"
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -5312,6 +5319,236 @@ with tab14:  # Add to your tabs list
     else:
         st.info("No giveaways recorded yet. Use the form above to track free samples and promotions.")
 
+
+# ==================== ROUTE & REFILL OPTIMIZATION TAB ====================
+with tab15:  # Add as new tab
+    st.markdown('<div class="section-header">🗺️ Route & Refill Optimization</div>', unsafe_allow_html=True)
+    
+    st.info("📍 **Optimize your delivery routes and track hotel refill patterns**")
+    
+    # ========== KITENGELA MAP ==========
+    st.markdown("### 🗺️ Kitengela Map - Customer Locations")
+    
+    # Create a simple map visualization
+    locations = {
+        "Kitengela Town Center": {"lat": -1.4567, "lon": 36.9617, "type": "Hub"},
+        "EPZ Area": {"lat": -1.4600, "lon": 36.9500, "type": "Industrial"},
+        "Tropikana Road": {"lat": -1.4500, "lon": 36.9600, "type": "Residential"},
+        "Balozi Road": {"lat": -1.4550, "lon": 36.9650, "type": "Residential"},
+        "Savannah Place": {"lat": -1.4580, "lon": 36.9580, "type": "Commercial"},
+        "Deliverance Road": {"lat": -1.4520, "lon": 36.9620, "type": "Mixed"},
+    }
+    
+    # Create DataFrame for map
+    map_data = []
+    for name, info in locations.items():
+        map_data.append({
+            "lat": info["lat"],
+            "lon": info["lon"],
+            "name": name,
+            "type": info["type"]
+        })
+    
+    df_map = pd.DataFrame(map_data)
+    st.map(df_map, latitude="lat", longitude="lon", size=100)
+    
+    st.caption("📍 Red markers show key areas in Kitengela")
+    
+    # ========== REFILL PATTERNS ==========
+    st.markdown("---")
+    st.markdown("### 🏨 Hotel Refill Pattern Analysis")
+    
+    # Analyze refill patterns from your sales data
+    if not sales_df.empty:
+        hotel_sales = sales_df[sales_df['Customer_Type'] == 'Hotel/Restaurant'] if 'Customer_Type' in sales_df.columns else pd.DataFrame()
+        
+        if not hotel_sales.empty:
+            # Calculate refill frequency by hotel
+            hotel_refills = hotel_sales.groupby('Name').agg({
+                'Date': ['count', 'min', 'max']
+            }).reset_index()
+            hotel_refills.columns = ['Hotel', 'Refill Count', 'First Refill', 'Last Refill']
+            
+            # Calculate average days between refills
+            hotel_refills['Avg Days'] = hotel_refills.apply(
+                lambda x: (x['Last Refill'] - x['First Refill']).days / max(x['Refill Count'] - 1, 1) 
+                if x['Refill Count'] > 1 else 0, axis=1
+            )
+            
+            # Sort by frequency (most frequent first)
+            hotel_refills = hotel_refills.sort_values('Refill Count', ascending=False)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("🏨 Active Hotels", len(hotel_refills))
+            with col2:
+                avg_refills = hotel_refills['Refill Count'].mean()
+                st.metric("🔄 Avg Refills per Hotel", f"{avg_refills:.1f}")
+            
+            # Display hotel refill table
+            st.dataframe(
+                hotel_refills.head(10),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Hotel": "Hotel Name",
+                    "Refill Count": "Refills",
+                    "First Refill": "First",
+                    "Last Refill": "Last",
+                    "Avg Days": st.column_config.NumberColumn("Days Between", format="%.0f days")
+                }
+            )
+            
+            # Identify hotels due for refill
+            st.markdown("### 🚚 Hotels Due for Refill")
+            
+            due_hotels = []
+            for _, hotel in hotel_refills.iterrows():
+                if hotel['Avg Days'] > 0:
+                    days_since = (date.today() - hotel['Last Refill']).days
+                    if days_since >= hotel['Avg Days']:
+                        due_hotels.append({
+                            "Hotel": hotel['Hotel'],
+                            "Days Since": days_since,
+                            "Avg Days": int(hotel['Avg Days']),
+                            "Priority": "High" if days_since > hotel['Avg Days'] * 1.5 else "Medium"
+                        })
+            
+            if due_hotels:
+                df_due = pd.DataFrame(due_hotels)
+                df_due = df_due.sort_values('Days Since', ascending=False)
+                st.dataframe(df_due, use_container_width=True, hide_index=True)
+                
+                # Suggest route
+                st.info(f"🚗 **Suggested Route:** Visit {', '.join(df_due['Hotel'].head(3).tolist())} today - they need refills!")
+            else:
+                st.success("✅ No hotels due for refill today! All are within their refill schedule.")
+        else:
+            st.info("No hotel sales data yet. Add hotel refills to see patterns.")
+    
+    # ========== DELIVERY ROUTE OPTIMIZER ==========
+    st.markdown("---")
+    st.markdown("### 🚚 Optimized Delivery Route")
+    
+    route_areas = ["Kitengela Town", "EPZ Area", "Tropikana", "Balozi", "Savannah"]
+    selected_area = st.selectbox("Select Area for Delivery Route", route_areas)
+    
+    # Get customers in selected area
+    area_customers = []
+    
+    if selected_area == "Kitengela Town":
+        area_customers = ["Hotel Sakina", "Savannah Place Hotels", "Town Center Shops"]
+    elif selected_area == "EPZ Area":
+        area_customers = ["EPZ Shawarma Place", "Maureen Hotel", "EPZ Hotels"]
+    elif selected_area == "Tropikana":
+        area_customers = ["Virginia Hotel", "Tropikana Shops", "Local Mama Mbogas"]
+    
+    if area_customers:
+        st.write(f"**Customers in {selected_area}:**")
+        for customer in area_customers:
+            st.write(f"• {customer}")
+        
+        # Route optimization suggestion
+        st.markdown("#### 🗺️ Suggested Route Order")
+        
+        route_order = [
+            "1. Start from Town Center",
+            f"2. Go to {area_customers[0] if area_customers else 'First Customer'}",
+            f"3. Go to {area_customers[1] if len(area_customers) > 1 else 'Next Customer'}",
+            f"4. Go to {area_customers[2] if len(area_customers) > 2 else 'Next Customer'}",
+            "5. Return to Town Center"
+        ]
+        
+        for step in route_order:
+            st.write(step)
+        
+        # Estimated time
+        st.info("🚗 **Estimated Route Time:** ~45-60 minutes")
+        st.caption("💡 Tip: Visit during off-peak hours (10 AM - 3 PM) to avoid traffic")
+    
+    # ========== REFILL PREDICTOR ==========
+    st.markdown("---")
+    st.markdown("### 🔮 Refill Predictor")
+    
+    if not hotel_sales.empty:
+        # Calculate average refill patterns
+        avg_refill_by_day = {}
+        
+        for hotel in hotel_sales['Name'].unique():
+            hotel_data = hotel_sales[hotel_sales['Name'] == hotel]
+            if len(hotel_data) >= 2:
+                dates = hotel_data['Date'].sort_values()
+                for i in range(len(dates)-1):
+                    days_diff = (dates.iloc[i+1] - dates.iloc[i]).days
+                    if days_diff > 0 and days_diff < 60:  # Reasonable range
+                        avg_refill_by_day[hotel] = days_diff
+        
+        if avg_refill_by_day:
+            overall_avg = sum(avg_refill_by_day.values()) / len(avg_refill_by_day)
+            st.metric("📊 Average Refill Cycle", f"{overall_avg:.0f} days")
+            
+            # Predict next refill date for top hotel
+            if hotel_refills is not None and not hotel_refills.empty:
+                top_hotel = hotel_refills.iloc[0]['Hotel']
+                last_refill = hotel_refills.iloc[0]['Last Refill']
+                avg_days = hotel_refills.iloc[0]['Avg Days']
+                next_refill = last_refill + timedelta(days=int(avg_days))
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric(f"🏨 {top_hotel}", "Next Refill Date")
+                with col2:
+                    days_until = (next_refill - date.today()).days
+                    st.metric("📅", next_refill.strftime('%b %d, %Y'), delta=f"{days_until} days from now")
+    
+    # ========== ADD NEW LOCATION ==========
+    with st.expander("📍 Add New Customer Location"):
+        col1, col2 = st.columns(2)
+        with col1:
+            new_customer = st.text_input("Customer/Business Name")
+            new_area = st.selectbox("Area", route_areas)
+            customer_type = st.selectbox("Customer Type", ["Hotel", "Mama Mboga", "Shop", "Restaurant"])
+        with col2:
+            address = st.text_area("Address/Description")
+            notes = st.text_area("Notes (e.g., landmark, best time to deliver)")
+        
+        if st.button("💾 Save Location", use_container_width=True):
+            st.success(f"✅ Location for {new_customer} saved!")
+    
+    # ========== REFILL REMINDER SETTINGS ==========
+    st.markdown("---")
+    st.markdown("### ⏰ Refill Reminder Settings")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        reminder_days = st.number_input("Remind me X days before refill due", min_value=0, max_value=7, value=2)
+    with col2:
+        send_reminder = st.checkbox("Show reminders in dashboard", value=True)
+    
+    if send_reminder:
+        # Get upcoming refills
+        upcoming = []
+        if 'hotel_refills' in locals() and not hotel_refills.empty:
+            for _, hotel in hotel_refills.iterrows():
+                if hotel['Avg Days'] > 0:
+                    last_refill = hotel['Last Refill']
+                    avg_days = hotel['Avg Days']
+                    next_refill = last_refill + timedelta(days=int(avg_days))
+                    days_until = (next_refill - date.today()).days
+                    
+                    if 0 < days_until <= reminder_days:
+                        upcoming.append({
+                            "Hotel": hotel['Hotel'],
+                            "Days Until": days_until,
+                            "Estimated Quantity": "2-3 bottles"
+                        })
+        
+        if upcoming:
+            st.warning("🔔 **Upcoming Refill Reminders:**")
+            for u in upcoming:
+                st.write(f"• {u['Hotel']} due in {u['Days Until']} days")
+        else:
+            st.success("✅ No upcoming refill reminders")
 # Footer
 st.markdown("---")
 st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")

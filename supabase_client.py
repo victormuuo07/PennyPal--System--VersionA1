@@ -1425,4 +1425,71 @@ def get_free_items_summary():
             return summary
         return pd.DataFrame()
     except Exception as e:
-        return pd.DataFrame()    
+        return pd.DataFrame() 
+
+# -------------------------------
+# ROUTE & REFILL OPTIMIZATION FUNCTIONS
+# -------------------------------
+
+def save_location(location_data: dict):
+    """Save a location for mapping"""
+    try:
+        location_data["id"] = str(uuid.uuid4())
+        response = supabase.table("LOCATIONS").insert(location_data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving location: {str(e)}")
+        return None
+
+def get_all_locations():
+    """Get all locations"""
+    try:
+        response = supabase.table("LOCATIONS").select("*").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def save_refill_schedule(schedule_data: dict):
+    """Save a refill schedule for a customer"""
+    try:
+        schedule_data["id"] = str(uuid.uuid4())
+        response = supabase.table("REFILL_SCHEDULES").insert(schedule_data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        st.error(f"Error saving schedule: {str(e)}")
+        return None
+
+def get_refill_schedules():
+    """Get all refill schedules"""
+    try:
+        response = supabase.table("REFILL_SCHEDULES").select("*").order("next_refill_date", asc=True).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def get_today_refills():
+    """Get customers due for refill today"""
+    try:
+        today = date.today().isoformat()
+        response = supabase.table("REFILL_SCHEDULES").select("*").lte("next_refill_date", today).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def update_refill_schedule(customer_name: str, refill_date: date, quantity: int):
+    """Update refill schedule after a refill"""
+    try:
+        # Get current schedule
+        response = supabase.table("REFILL_SCHEDULES").select("*").eq("customer_name", customer_name).execute()
+        if response.data:
+            avg_days = response.data[0]['average_refill_days']
+            next_refill = refill_date + timedelta(days=avg_days)
+            
+            supabase.table("REFILL_SCHEDULES").update({
+                "last_refill_date": str(refill_date),
+                "next_refill_date": str(next_refill),
+                "estimated_quantity": quantity
+            }).eq("customer_name", customer_name).execute()
+        return True
+    except Exception as e:
+        return False   
