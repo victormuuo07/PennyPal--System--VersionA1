@@ -1492,4 +1492,78 @@ def update_refill_schedule(customer_name: str, refill_date: date, quantity: int)
             }).eq("customer_name", customer_name).execute()
         return True
     except Exception as e:
-        return False   
+        return False
+
+# -------------------------------
+# COMMISSION TRACKING FUNCTIONS
+# -------------------------------
+
+def get_commission_rate(product_name: str):
+    """Get commission rate for a product"""
+    try:
+        response = supabase.table("COMMISSION_RATES").select("*").eq("product_name", product_name).eq("is_active", True).execute()
+        if response.data:
+            return response.data[0]
+        return None
+    except Exception as e:
+        print(f"Error getting commission rate: {str(e)}")
+        return None
+
+def save_sale_commission(commission_data: dict):
+    """Save commission for a sale"""
+    try:
+        commission_data["id"] = str(uuid.uuid4())
+        response = supabase.table("SALES_COMMISSIONS").insert(commission_data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error saving commission: {str(e)}")
+        return None
+
+def get_salesperson_commission(sales_person_id: str, start_date=None, end_date=None):
+    """Get total commission for a salesperson"""
+    try:
+        query = supabase.table("SALES_COMMISSIONS").select("*").eq("sales_person_id", sales_person_id)
+        if start_date:
+            query = query.gte("created_at", str(start_date))
+        if end_date:
+            query = query.lte("created_at", str(end_date))
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def get_all_commissions_pending():
+    """Get all unpaid commissions"""
+    try:
+        response = supabase.table("SALES_COMMISSIONS").select("*, SALES_PEOPLE(full_name)").eq("commission_paid", False).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def mark_commission_paid(commission_id: str, payment_date: date):
+    """Mark commission as paid"""
+    try:
+        supabase.table("SALES_COMMISSIONS").update({
+            "commission_paid": True,
+            "payment_date": str(payment_date)
+        }).eq("id", commission_id).execute()
+        return True
+    except Exception as e:
+        return False
+
+def get_commission_summary():
+    """Get summary of all commissions"""
+    try:
+        response = supabase.table("SALES_COMMISSIONS").select("*").execute()
+        if response.data:
+            df = pd.DataFrame(response.data)
+            summary = {
+                'total_commission': df['commission_amount'].sum(),
+                'paid_commission': df[df['commission_paid'] == True]['commission_amount'].sum(),
+                'pending_commission': df[df['commission_paid'] == False]['commission_amount'].sum(),
+                'total_transactions': len(df)
+            }
+            return summary
+        return {'total_commission': 0, 'paid_commission': 0, 'pending_commission': 0, 'total_transactions': 0}
+    except Exception as e:
+        return {'total_commission': 0, 'paid_commission': 0, 'pending_commission': 0, 'total_transactions': 0}   

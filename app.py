@@ -88,7 +88,13 @@ from supabase_client import (
     save_refill_schedule,
     get_refill_schedules,
     get_today_refills,
-    update_refill_schedule
+    update_refill_schedule,
+     get_commission_rate,
+    save_sale_commission,
+    get_salesperson_commission,
+    get_all_commissions_pending,
+    mark_commission_paid,
+    get_commission_summary
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -371,7 +377,7 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14, tab15  = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14, tab15, tab16  = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
@@ -386,7 +392,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13
      "🏥 Business Health",
      "INVOICE SYSTEM ",
      "🎁 Free Items & Giveaways",
-     "ROUTE & REFILL OPTIMIZATION TAB"
+     "ROUTE & REFILL OPTIMIZATION TAB",
+     "COMMISSION TRACKING"
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -542,10 +549,10 @@ with tab2:
             st.markdown("### Sale Details")
             
             product_main = st.radio(
-                "Product Type",
-                ["Sachet - Standard (5 KES)", "Sachet - Premium (30 KES)", "Bottle (100g New)", "Bottle (100g Refill)"],
-                horizontal=True
-            )
+    "Product Type",
+    ["Sachet - 5 KES", "Sachet - 20 KES", "Sachet - 40 KES", "Bottle (100g New)", "Bottle (100g Refill)"],
+    horizontal=True
+)
             
             customer_type = st.radio(
                 "Customer Type",
@@ -564,6 +571,16 @@ with tab2:
                 else:
                     price, min_qty, default_qty, unit = 2.9, 18, 18, "sachets"
                     product_name = "SpiseUp Spicy Salt Sachet (2.9 KES) - Hotel"
+            elif product_main == "Sachet - 20 KES":
+                price, min_qty, default_qty, unit = 20.0, 1, 1, "sachets"
+                product_name = f"SpiseUp Spicy Salt Sachet (20 KES) - {customer_type}"
+                st.info("💰 **Commission:** KES 4 per sachet for salesperson")
+
+            elif product_main == "Sachet - 40 KES":
+                price, min_qty, default_qty, unit = 40.0, 1, 1, "sachets"
+                product_name = f"SpiseUp Spicy Salt Sachet (40 KES) - {customer_type}"
+                st.info("💰 **Commission:** KES 8 per sachet for salesperson")
+                
             elif product_main == "Sachet - Premium (30 KES)":
                 price, min_qty, default_qty, unit = 30.0, 1, 1, "sachets"
                 product_name = f"SpiseUp Spicy Salt Sachet (30 KES) - {customer_type}"
@@ -678,7 +695,28 @@ with tab2:
             
             if sale_id:
                 st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
-                
+                # ========== COMMISSION CALCULATION ==========
+                commission_amount = 0
+                if "20 KES" in product_name:
+                    commission_amount = quantity * 4
+                    st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
+                elif "40 KES" in product_name:
+                    commission_amount = quantity * 8
+                    st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
+
+                if commission_amount > 0 and sales_person_name not in ["Select...", "N/A"]:
+                    commission_data = {
+            "sale_id": sale_id,
+            "sales_person_id": sales_person_options[sales_person_name],
+            "product_name": product_name,
+            "quantity": quantity,
+            "unit_price": price,
+            "total_sale_amount": total,
+            "commission_amount": commission_amount,
+            "commission_paid": False,
+            "notes": f"Commission for {quantity} x {product_name}"
+        }
+                    save_sale_commission(commission_data)
                 # Map product for inventory
                 product_mapping = {
                     "SpiseUp Spicy Salt Sachet (5 KES) - Consumer": "Sachet 5",
@@ -4049,6 +4087,129 @@ with tab15:  # Add as new tab
                 st.write(f"• {u['Hotel']} due in {u['Days Until']} days")
         else:
             st.success("✅ No upcoming refill reminders")
+
+# ==================== COMMISSION TRACKING TAB ====================
+with tab16:  # Add to your tabs list
+    st.markdown('<div class="section-header">💰 Commission Tracking</div>', unsafe_allow_html=True)
+    
+    st.info("💰 **Track sales commissions for your team**")
+    
+    # Commission Summary
+    st.markdown("### 📊 Commission Summary")
+    
+    commission_summary = get_commission_summary()
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("💰 Total Commission", f"KES {commission_summary['total_commission']:,.0f}")
+    with col2:
+        st.metric("✅ Paid Commission", f"KES {commission_summary['paid_commission']:,.0f}")
+    with col3:
+        st.metric("⏳ Pending Commission", f"KES {commission_summary['pending_commission']:,.0f}")
+    with col4:
+        st.metric("📊 Transactions", commission_summary['total_transactions'])
+    
+    # Commission Rates
+    with st.expander("📋 Commission Rates", expanded=True):
+        st.markdown("Current commission structure:")
+        
+        commission_rates = [
+            {"Product": "20 KES Sachet", "Selling Price": 20, "Commission": 4, "Rate": "20%"},
+            {"Product": "40 KES Sachet", "Selling Price": 40, "Commission": 8, "Rate": "20%"},
+            {"Product": "5 KES Sachet", "Selling Price": 5, "Commission": 0, "Rate": "0%"},
+            {"Product": "10 KES Sachet", "Selling Price": 10, "Commission": 0, "Rate": "0%"},
+            {"Product": "30 KES Sachet", "Selling Price": 30, "Commission": 0, "Rate": "0%"},
+            {"Product": "100g Bottle", "Selling Price": 150, "Commission": 0, "Rate": "0%"},
+            {"Product": "100g Refill", "Selling Price": 120, "Commission": 0, "Rate": "0%"}
+        ]
+        
+        df_rates = pd.DataFrame(commission_rates)
+        st.dataframe(df_rates, use_container_width=True, hide_index=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            new_product = st.text_input("Add New Commission Product")
+            new_commission = st.number_input("Commission Amount (KES)", min_value=0, step=1)
+        with col2:
+            new_price = st.number_input("Selling Price (KES)", min_value=0, step=10)
+            if st.button("➕ Add Commission Rate"):
+                st.success(f"Added {new_product} - KES {new_commission} commission")
+    
+    # Pending Commissions
+    st.markdown("---")
+    st.markdown("### ⏳ Pending Commissions")
+    
+    pending_commissions = get_all_commissions_pending()
+    
+    if pending_commissions:
+        df_pending = pd.DataFrame(pending_commissions)
+        
+        # Format for display
+        if 'SALES_PEOPLE' in df_pending.columns:
+            df_pending['Salesperson'] = df_pending['SALES_PEOPLE'].apply(lambda x: x.get('full_name', 'Unknown') if isinstance(x, dict) else 'Unknown')
+        
+        df_display = df_pending[['Salesperson', 'product_name', 'quantity', 'total_sale_amount', 'commission_amount', 'created_at']].copy() if 'Salesperson' in df_pending.columns else pd.DataFrame()
+        df_display['created_at'] = pd.to_datetime(df_display['created_at']).dt.strftime('%Y-%m-%d') if 'created_at' in df_display.columns else ''
+        
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
+        
+        # Bulk pay
+        st.markdown("### 💰 Pay Commissions")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            pay_all = st.button("💰 Pay All Pending Commissions", type="primary", use_container_width=True)
+        
+        if pay_all:
+            for comm in pending_commissions:
+                mark_commission_paid(comm['id'], date.today())
+            st.success(f"✅ Paid {len(pending_commissions)} commission(s)!")
+            st.rerun()
+    else:
+        st.success("✅ No pending commissions! All commissions are paid.")
+    
+    # Salesperson Performance
+    st.markdown("---")
+    st.markdown("### 🏆 Salesperson Commission Performance")
+    
+    if sales_people:
+        salesperson_stats = []
+        for person in sales_people:
+            commissions = get_salesperson_commission(person['id'])
+            total_commission = sum(c['commission_amount'] for c in commissions)
+            total_sales = sum(c['total_sale_amount'] for c in commissions)
+            paid_commission = sum(c['commission_amount'] for c in commissions if c['commission_paid'])
+            
+            salesperson_stats.append({
+                "Salesperson": person['full_name'],
+                "Total Sales": f"KES {total_sales:,.0f}",
+                "Total Commission": f"KES {total_commission:,.0f}",
+                "Paid": f"KES {paid_commission:,.0f}",
+                "Pending": f"KES {total_commission - paid_commission:,.0f}",
+                "Transactions": len(commissions)
+            })
+        
+        df_stats = pd.DataFrame(salesperson_stats)
+        st.dataframe(df_stats, use_container_width=True, hide_index=True)
+        
+        # Chart
+        chart_data = []
+        for person in sales_people:
+            commissions = get_salesperson_commission(person['id'])
+            total_commission = sum(c['commission_amount'] for c in commissions)
+            if total_commission > 0:
+                chart_data.append({"Salesperson": person['full_name'], "Commission": total_commission})
+        
+        if chart_data:
+            df_chart = pd.DataFrame(chart_data)
+            fig = px.bar(df_chart, x='Salesperson', y='Commission', 
+                        title='Total Commission by Salesperson',
+                        color='Commission', color_continuous_scale='Greens',
+                        text='Commission')
+            fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+            st.plotly_chart(fig, width='stretch')
+    
+    
 # Footer
 st.markdown("---")
 st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
