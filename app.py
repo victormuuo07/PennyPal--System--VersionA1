@@ -1402,7 +1402,8 @@ with tab5:
                 st.plotly_chart(fig, width='stretch')
         
         # Revenue by hotel chart
-            hotel_revenue = [(h['Hotel'], float(h['Total Revenue'].replace('KES ', '').replace(',', ''))) for h in hotel_stats if h['Total Revenue'] != 'KES 0']
+            # Revenue by hotel chart
+            hotel_revenue = [(h['Hotel'], h['Total Revenue']) for h in hotel_stats if h['Total Revenue'] > 0]
             if hotel_revenue:
                 df_revenue = pd.DataFrame(hotel_revenue, columns=['Hotel', 'Revenue'])
                 df_revenue = df_revenue.sort_values('Revenue', ascending=False).head(10)
