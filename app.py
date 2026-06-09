@@ -1525,13 +1525,16 @@ with tab5:
                 df_shop_rev = pd.DataFrame(shop_revenue, columns=['Shop', 'Revenue'])
                 df_shop_rev = df_shop_rev.sort_values('Revenue', ascending=False).head(10)
             # Remove 'KES ' from revenue for numeric conversion
-                df_shop_rev['Revenue'] = df_shop_rev['Revenue'].str.replace('KES ', '').str.replace(',', '').astype(float)
-                fig = px.bar(df_shop_rev, x='Shop', y='Revenue', 
+                shop_revenue = [(m['Shop'], m['Total Revenue']) for m in mama_stats if m['Total Revenue'] > 0]
+                if shop_revenue:
+                    df_shop_rev = pd.DataFrame(shop_revenue, columns=['Shop', 'Revenue'])
+                    df_shop_rev = df_shop_rev.sort_values('Revenue', ascending=False).head(10)
+                    fig = px.bar(df_shop_rev, x='Shop', y='Revenue', 
                         title='Revenue by Mama Mboga',
                         color='Revenue', color_continuous_scale='Greens',
                         text='Revenue')
-                fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
-                st.plotly_chart(fig, width='stretch')
+                    fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+                    st.plotly_chart(fig, width='stretch')
         else:
             st.info("No Mama Mboga shops added yet. Add your first shop above!")
     
