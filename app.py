@@ -1524,7 +1524,15 @@ with tab5:
                 purchase_product = st.selectbox("Product", ["Sachet 5", "Sachet 10", "Sachet 20", "Sachet 30", "Sachet 40", "100g Bottle"], key="purchase_product")
             with col2:
                 purchase_quantity = st.number_input("Quantity", min_value=1, step=1, value=1, key="purchase_quantity")
-                unit_price = st.number_input("Unit Price (KES)", min_value=0, step=1, value=2.77, key="unit_price")
+                if purchase_product == "Sachet 5":
+                    default_price = 2.77
+                elif purchase_product == "Sachet 20":
+                    default_price = 20.0
+                elif purchase_product == "Sachet 40":
+                    default_price = 40.0
+                else:  # Bottle
+                    default_price = 150.0
+                unit_price = st.number_input("Unit Price (KES)", min_value=0.0, step=1.0, value=default_price, key="unit_price", format="%.2f")
                 total_amount = purchase_quantity * unit_price
                 st.info(f"Total: KES {total_amount:,.0f}")
         
