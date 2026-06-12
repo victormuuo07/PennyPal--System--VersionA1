@@ -801,7 +801,7 @@ with tab2:
             else:
                 st.error("❌ Failed to save sale.")
     
-    # Recent Sales Table
+    # Recent Sales 
     st.markdown('<div class="section-header">📋 Recent Sales</div>', unsafe_allow_html=True)
     if not sales_df.empty:
         recent_sales = sales_df.sort_values('Date', ascending=False).head(20)
