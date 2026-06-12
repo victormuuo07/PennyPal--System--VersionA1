@@ -716,16 +716,7 @@ with tab2:
         st.success("✅ Form cleared!")
         st.rerun()
 
-    # ========== COMMISSION CALCULATION ==========
-    commission_amount = 0
-    if "20 KES" in product_name:
-        commission_amount = quantity * 5
-        st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
-    elif "40 KES" in product_name:
-        commission_amount = quantity * 10
-        st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
-                
-    net_amount = total - commission_amount
+    
     
     # Save sale logic
     if submitted_sale:
@@ -734,6 +725,18 @@ with tab2:
         elif sales_person_name == "Select...":
             st.error("Please select a salesperson!")
         else:
+            # ========== COMMISSION CALCULATION ==========
+            commission_amount = 0
+            if "20 KES" in product_name:
+                commission_amount = quantity * 5
+                st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
+            elif "40 KES" in product_name:
+                commission_amount = quantity * 10
+                st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
+                
+            net_amount = total - commission_amount
+            if commission_amount > 0:
+                st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
             sale_record = {
                 "Date": str(sale_date),
                 "Name": shop_name,
@@ -760,6 +763,10 @@ with tab2:
             
             if sale_id:
                 st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
+
+                if commission_amount > 0:
+                    st.write(f"💰 **Commission deducted:** KES {commission_amount:,.0f}")
+                    st.write(f"📊 **Net to business:** KES {net_amount:,.0f}")
                 
 
                 if commission_amount > 0 and sales_person_name not in ["Select...", "N/A"]:
@@ -774,12 +781,14 @@ with tab2:
             "commission_paid": False,
             "notes": f"Commission for {quantity} x {product_name}"
         }
-                    save_sale_commission(commission_data)
+                save_sale_commission(commission_data)
                 # Map product for inventory
                 product_mapping = {
                     "SpiseUp Spicy Salt Sachet (5 KES) - Consumer": "Sachet 5",
                     "SpiseUp Spicy Salt Sachet (5 KES) - Wholesale": "Sachet 5",
                     "SpiseUp Spicy Salt Sachet (5 KES) - Hotel": "Sachet 5",
+                    "SpiseUp Spicy Salt Sachet (20 KES)": "Sachet 20",
+                    "SpiseUp Spicy Salt Sachet (40 KES)": "Sachet 40",
                     "SpiseUp Spicy Salt Sachet (30 KES)": "Sachet 30",
                     "SpiseUp Spicy Salt Bottle (100g New) - Consumer": "Bottle 100g",
                     "SpiseUp Spicy Salt Bottle (100g New) - Wholesale": "Bottle 100g",
