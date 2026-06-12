@@ -578,13 +578,32 @@ with tab2:
             commission_per_unit = 0
             
             if product_main == "Sachet - 5 KES":
-                price = 5.0
-                min_qty = 1
-                default_qty = 1
-                unit = "sachets"
-                product_name = f"SpiseUp Spicy Salt Sachet (5 KES) - {customer_type}"
-                commission_per_unit = 0
+                if customer_type == "Consumer (B2C)":
+                    price = 5.0
+                    min_qty = 1
+                    default_qty = 1
+                    unit = "sachets"
+                    product_name = f"SpiseUp Spicy Salt Sachet (5 KES) - {customer_type}"
+                    commission_per_unit = 0
+
+                elif customer_type == "Shop/Mama Mboga (B2B)":
+        # Mama Mboga special: 36 sachets = KES 100, or 18 sachets = KES 50
+                    price = 2.78  # 100 / 36 = 2.777... or 50 / 18 = 2.777...
+                    min_qty = 18
+                    default_qty = 18
+                    unit = "sachets"
+                    product_name = "SpiseUp Spicy Salt Sachet (Wholesale) - Mama Mboga"
+                    commission_per_unit = 0
+                    st.info(f"📦 **Mama Mboga Special:** {min_qty} sachets for KES {price * min_qty:.0f} (KES {price:.2f} per sachet)")
                 
+                else:  # Hotel/Restaurant
+                    price = 2.9
+                    min_qty = 18
+                    default_qty = 18
+                    unit = "sachets"
+                    product_name = "SpiseUp Spicy Salt Sachet (2.9 KES) - Hotel"
+                    commission_per_unit = 0
+
             elif product_main == "Sachet - 20 KES":
                 price = 20.0
                 min_qty = 1
