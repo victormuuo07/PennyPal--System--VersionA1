@@ -715,6 +715,17 @@ with tab2:
                 del st.session_state[key]
         st.success("✅ Form cleared!")
         st.rerun()
+
+    # ========== COMMISSION CALCULATION ==========
+    commission_amount = 0
+    if "20 KES" in product_name:
+        commission_amount = quantity * 5
+        st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
+    elif "40 KES" in product_name:
+        commission_amount = quantity * 10
+        st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
+                
+    net_amount = total - commission_amount
     
     # Save sale logic
     if submitted_sale:
@@ -749,16 +760,7 @@ with tab2:
             
             if sale_id:
                 st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
-                # ========== COMMISSION CALCULATION ==========
-                commission_amount = 0
-                if "20 KES" in product_name:
-                    commission_amount = quantity * 5
-                    st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
-                elif "40 KES" in product_name:
-                    commission_amount = quantity * 10
-                    st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
                 
-                net_amount = total - commission_amount
 
                 if commission_amount > 0 and sales_person_name not in ["Select...", "N/A"]:
                     commission_data = {
@@ -4572,7 +4574,7 @@ if 'last_check' not in st.session_state:
 if time.time() - st.session_state.last_check > 60:
     st.session_state.last_check = time.time()
     st.rerun()
-    
+
 st.caption(f"📦 Version: {APP_VERSION} • Last refresh: {datetime.now().strftime('%H:%M:%S')}")
 
 # Footer
