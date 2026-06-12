@@ -11,7 +11,14 @@ import uuid
 from sklearn.linear_model import LinearRegression
 import pandas as pd
 
+APP_VERSION = "2.0.0"
+st.cache_data.clear()
 
+# Add this to your sidebar
+with st.sidebar:
+    if st.button("🔄 Force Refresh App", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
 # Auto-refresh every 30 seconds
 if 'last_refresh' not in st.session_state:
@@ -4559,7 +4566,15 @@ with tab16:  # Add to your tabs list
             fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
             st.plotly_chart(fig, width='stretch')
     
+if 'last_check' not in st.session_state:
+    st.session_state.last_check = time.time()
+
+if time.time() - st.session_state.last_check > 60:
+    st.session_state.last_check = time.time()
+    st.rerun()
     
+st.caption(f"📦 Version: {APP_VERSION} • Last refresh: {datetime.now().strftime('%H:%M:%S')}")
+
 # Footer
 st.markdown("---")
 st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
