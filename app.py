@@ -547,21 +547,31 @@ with tab2:
     with col2:
         with st.container():
             st.markdown("### Sale Details")
-            
+        
             product_main = st.radio(
-    "Product Type",
-    ["Sachet - 5 KES", "Sachet - 20 KES", "Sachet - 40 KES", "Bottle (100g New)", "Bottle (100g Refill)"],
-    horizontal=True
-)
-            
+            "Product Type",
+            ["Sachet - 5 KES", "Sachet - 20 KES", "Sachet - 40 KES", "Bottle (100g New)", "Bottle (100g Refill)"],
+            horizontal=True,
+            key="product_type_main"  # Add a unique key
+        )
+        
             customer_type = st.radio(
-                "Customer Type",
-                ["Consumer (B2C)", "Shop/Mama Mboga (B2B)", "Hotel/Restaurant"],
-                horizontal=True
-            )
-            
-            # Pricing logic based on selections
-            if product_main == "Sachet - Standard (5 KES)":
+            "Customer Type",
+            ["Consumer (B2C)", "Shop/Mama Mboga (B2B)", "Hotel/Restaurant"],
+            horizontal=True,
+            key="customer_type_main"  # Add a unique key
+        )
+        
+        # Initialize variables
+            price = 0
+            min_qty = 1
+            default_qty = 1
+            unit = ""
+            product_name = ""
+            commission_per_unit = 0
+        
+        # Pricing logic - MUST check in order
+            if product_main == "Sachet - 5 KES":
                 if customer_type == "Consumer (B2C)":
                     price, min_qty, default_qty, unit = 5.0, 1, 1, "sachets"
                     product_name = "SpiseUp Spicy Salt Sachet (5 KES) - Consumer"
@@ -571,19 +581,20 @@ with tab2:
                 else:
                     price, min_qty, default_qty, unit = 2.9, 18, 18, "sachets"
                     product_name = "SpiseUp Spicy Salt Sachet (2.9 KES) - Hotel"
+                commission_per_unit = 0
+            
             elif product_main == "Sachet - 20 KES":
                 price, min_qty, default_qty, unit = 20.0, 1, 1, "sachets"
                 product_name = f"SpiseUp Spicy Salt Sachet (20 KES) - {customer_type}"
-                st.info("💰 **Commission:** KES 5 per sachet for salesperson")
-
+                commission_per_unit = 4
+                st.info("💰 **Commission:** KES 4 per sachet for salesperson")
+            
             elif product_main == "Sachet - 40 KES":
                 price, min_qty, default_qty, unit = 40.0, 1, 1, "sachets"
                 product_name = f"SpiseUp Spicy Salt Sachet (40 KES) - {customer_type}"
-                st.info("💰 **Commission:** KES 10 per sachet for salesperson")
-                
-            elif product_main == "Sachet - Premium (30 KES)":
-                price, min_qty, default_qty, unit = 30.0, 1, 1, "sachets"
-                product_name = f"SpiseUp Spicy Salt Sachet (30 KES) - {customer_type}"
+                commission_per_unit = 8
+                st.success("💰 **Commission:** KES 8 per sachet for salesperson")
+            
             elif product_main == "Bottle (100g New)":
                 if customer_type == "Consumer (B2C)":
                     price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
@@ -594,17 +605,51 @@ with tab2:
                 else:
                     price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
                     product_name = "SpiseUp Spicy Salt Bottle (100g New) - Hotel"
-            else:
+                    commission_per_unit = 0
+            
+            elif product_main == "Bottle (100g Refill)":
                 price, min_qty, default_qty, unit = 120.0, 1, 1, "refills"
                 product_name = f"SpiseUp Spicy Salt Bottle (100g Refill) - {customer_type}"
-                st.success("🔄 **REFILL BENEFIT:** Pay KES 120 and get 100g (save KES 30!)")
-            
+                commission_per_unit = 0
+                st.info("🔄 **REFILL BENEFIT:** Pay KES 120 and get 100g (save KES 30!)")
+        
+        # If none of the above matched (should not happen)
+            else:
+                st.error("Please select a product type")
+                st.stop()
+        
+        # Show minimum order notice
             if min_qty > 1:
                 st.info(f"📦 Minimum order: {min_qty} {unit}")
-            
-            quantity = st.number_input(f"Quantity ({unit})", min_value=min_qty, step=min_qty if min_qty > 1 else 1, value=default_qty)
-            price = st.number_input("Price per unit (KES)", min_value=0.0, max_value=500.0, step=1.0, value=float(price), format="%.1f")
+        
+        # Quantity input
+            quantity = st.number_input(
+                f"Quantity ({unit})", 
+                min_value=min_qty, 
+                step=min_qty if min_qty > 1 else 1, 
+                value=default_qty,
+                key="quantity_input"
+        )
+        
+        # Price input
+            price = st.number_input(
+            "Price per unit (KES)", 
+            min_value=0.0, 
+            max_value=500.0, 
+            step=1.0, 
+            value=float(price), 
+            format="%.1f",
+            key="price_input"
+        )
+        
+        # Calculate total
             total = quantity * price
+        
+        # Show commission info
+            if commission_per_unit > 0:
+                total_commission = quantity * commission_per_unit
+                st.info(f"💰 **Total Commission:** KES {total_commission:,.0f} (KES {commission_per_unit} per unit)")
+        
             st.success(f"**Total Amount:** KES {total:,.2f}")
             
             # Hotel Tracking
