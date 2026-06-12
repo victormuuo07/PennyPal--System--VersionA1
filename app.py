@@ -569,7 +569,7 @@ with tab2:
                 key="customer_type_main"
             )
             
-            # Initialize variables
+            # ========== PRODUCT PRICING LOGIC ==========
             price = 0
             min_qty = 1
             default_qty = 1
@@ -577,52 +577,48 @@ with tab2:
             product_name = ""
             commission_per_unit = 0
             
-            # Pricing logic
             if product_main == "Sachet - 5 KES":
-                if customer_type == "Consumer (B2C)":
-                    price, min_qty, default_qty, unit = 5.0, 1, 1, "sachets"
-                    product_name = "SpiseUp Spicy Salt Sachet (5 KES) - Consumer"
-                elif customer_type == "Shop/Mama Mboga (B2B)":
-                    price, min_qty, default_qty, unit = 2.9, 18, 18, "sachets"
-                    product_name = "SpiseUp Spicy Salt Sachet (2.9 KES) - Wholesale"
-                else:
-                    price, min_qty, default_qty, unit = 2.9, 18, 18, "sachets"
-                    product_name = "SpiseUp Spicy Salt Sachet (2.9 KES) - Hotel"
+                price = 5.0
+                min_qty = 1
+                default_qty = 1
+                unit = "sachets"
+                product_name = f"SpiseUp Spicy Salt Sachet (5 KES) - {customer_type}"
                 commission_per_unit = 0
                 
             elif product_main == "Sachet - 20 KES":
-                price, min_qty, default_qty, unit = 20.0, 1, 1, "sachets"
+                price = 20.0
+                min_qty = 1
+                default_qty = 1
+                unit = "sachets"
                 product_name = f"SpiseUp Spicy Salt Sachet (20 KES) - {customer_type}"
                 commission_per_unit = 5
                 st.info("💰 **Commission:** KES 5 per sachet for salesperson")
                 
             elif product_main == "Sachet - 40 KES":
-                price, min_qty, default_qty, unit = 40.0, 1, 1, "sachets"
+                price = 40.0
+                min_qty = 1
+                default_qty = 1
+                unit = "sachets"
                 product_name = f"SpiseUp Spicy Salt Sachet (40 KES) - {customer_type}"
                 commission_per_unit = 10
                 st.success("💰 **Commission:** KES 10 per sachet for salesperson")
                 
             elif product_main == "Bottle (100g New)":
-                if customer_type == "Consumer (B2C)":
-                    price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
-                    product_name = "SpiseUp Spicy Salt Bottle (100g New) - Consumer"
-                elif customer_type == "Shop/Mama Mboga (B2B)":
-                    price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
-                    product_name = "SpiseUp Spicy Salt Bottle (100g New) - Wholesale"
-                else:
-                    price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
-                    product_name = "SpiseUp Spicy Salt Bottle (100g New) - Hotel"
+                price = 150.0
+                min_qty = 1
+                default_qty = 1
+                unit = "bottles"
+                product_name = f"SpiseUp Spicy Salt Bottle (100g New) - {customer_type}"
                 commission_per_unit = 0
                 
             elif product_main == "Bottle (100g Refill)":
-                price, min_qty, default_qty, unit = 120.0, 1, 1, "refills"
+                price = 120.0
+                min_qty = 1
+                default_qty = 1
+                unit = "refills"
                 product_name = f"SpiseUp Spicy Salt Bottle (100g Refill) - {customer_type}"
                 commission_per_unit = 0
                 st.info("🔄 **REFILL BENEFIT:** Pay KES 120 (save KES 30!)")
-                
-            else:
-                st.error("Please select a product type")
-                st.stop()
             
             # Show minimum order notice
             if min_qty > 1:
@@ -635,17 +631,6 @@ with tab2:
                 step=min_qty if min_qty > 1 else 1, 
                 value=default_qty,
                 key="quantity_input"
-            )
-            
-            # Price input
-            price = st.number_input(
-                "Price per unit (KES)", 
-                min_value=0.0, 
-                max_value=500.0, 
-                step=1.0, 
-                value=float(price), 
-                format="%.1f",
-                key="price_input"
             )
             
             # Calculate total
@@ -722,7 +707,7 @@ with tab2:
         elif sales_person_name == "Select...":
             st.error("Please select a salesperson!")
         else:
-            # Calculate commission based on product_main
+            # Calculate commission
             commission_amount = 0
             if product_main == "Sachet - 20 KES":
                 commission_amount = quantity * 5
@@ -765,7 +750,7 @@ with tab2:
                 else:
                     st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
                 
-                # Save commission record to database
+                # Save commission record
                 if commission_amount > 0 and sales_person_name not in ["Select...", "N/A"]:
                     commission_data = {
                         "sale_id": sale_id,
@@ -780,27 +765,27 @@ with tab2:
                     }
                     save_sale_commission(commission_data)
                 
-                # Map product for inventory
-                product_mapping = {
-                    "SpiseUp Spicy Salt Sachet (5 KES) - Consumer": "Sachet 5",
-                    "SpiseUp Spicy Salt Sachet (5 KES) - Wholesale": "Sachet 5",
-                    "SpiseUp Spicy Salt Sachet (5 KES) - Hotel": "Sachet 5",
-                    "SpiseUp Spicy Salt Sachet (20 KES)": "Sachet 20",
-                    "SpiseUp Spicy Salt Sachet (40 KES)": "Sachet 40",
-                    "SpiseUp Spicy Salt Sachet (30 KES)": "Sachet 30",
-                    "SpiseUp Spicy Salt Bottle (100g New) - Consumer": "Bottle 100g",
-                    "SpiseUp Spicy Salt Bottle (100g New) - Wholesale": "Bottle 100g",
-                    "SpiseUp Spicy Salt Bottle (100g New) - Hotel": "Bottle 100g",
-                    "SpiseUp Spicy Salt Bottle (100g Refill)": "Refill 100g"
-                }
+                # Update inventory (using product_main to determine inventory type)
+                if "Bottle" in product_main:
+                    if "Refill" in product_main:
+                        inventory_product = "Refill 100g"
+                    else:
+                        inventory_product = "Bottle 100g"
+                elif "Sachet" in product_main:
+                    if "20 KES" in product_main:
+                        inventory_product = "Sachet 20"
+                    elif "40 KES" in product_main:
+                        inventory_product = "Sachet 40"
+                    else:
+                        inventory_product = "Sachet 5"
+                else:
+                    inventory_product = None
                 
-                base_product = product_name.split(' - ')[0] if ' - ' in product_name else product_name
-                mapped_product = product_mapping.get(base_product, None)
+                if inventory_product:
+                    update_finished_goods_sale(inventory_product, quantity)
+                    st.caption(f"📦 Updated inventory: -{quantity} {inventory_product}")
                 
-                if mapped_product:
-                    update_finished_goods_sale(mapped_product, quantity)
-                    st.caption(f"📦 Updated inventory: -{quantity} {mapped_product}(s)")
-                
+                # Save distribution
                 if sales_person_name not in ["Select...", "N/A"] and sales_person_name in sales_person_options:
                     success = save_distribution(
                         sale_id=sale_id,
