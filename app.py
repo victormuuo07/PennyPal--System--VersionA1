@@ -586,14 +586,14 @@ with tab2:
             elif product_main == "Sachet - 20 KES":
                 price, min_qty, default_qty, unit = 20.0, 1, 1, "sachets"
                 product_name = f"SpiseUp Spicy Salt Sachet (20 KES) - {customer_type}"
-                commission_per_unit = 4
-                st.info("💰 **Commission:** KES 4 per sachet for salesperson")
+                commission_per_unit = 5
+                st.info("💰 **Commission:** KES 5 per sachet for salesperson")
             
             elif product_main == "Sachet - 40 KES":
                 price, min_qty, default_qty, unit = 40.0, 1, 1, "sachets"
                 product_name = f"SpiseUp Spicy Salt Sachet (40 KES) - {customer_type}"
-                commission_per_unit = 8
-                st.success("💰 **Commission:** KES 8 per sachet for salesperson")
+                commission_per_unit = 10
+                st.success("💰 **Commission:** KES 10 per sachet for salesperson")
             
             elif product_main == "Bottle (100g New)":
                 if customer_type == "Consumer (B2C)":
@@ -728,6 +728,8 @@ with tab2:
                 "Quantity": quantity,
                 "Price_per_Unit": price,
                 "Total": total,
+                "Commission": commission_amount,
+                "Net_Amount": net_amount,
                 "Payment_Status": payment_status,
                 "Feedback": feedback,
                 "Follow_Up": follow_up,
@@ -748,6 +750,8 @@ with tab2:
                 elif "40 KES" in product_name:
                     commission_amount = quantity * 10
                     st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
+                
+                net_amount = total - commission_amount
 
                 if commission_amount > 0 and sales_person_name not in ["Select...", "N/A"]:
                     commission_data = {
