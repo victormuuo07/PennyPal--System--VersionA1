@@ -554,30 +554,30 @@ with tab2:
     with col2:
         with st.container():
             st.markdown("### Sale Details")
-        
+            
             product_main = st.radio(
-            "Product Type",
-            ["Sachet - 5 KES", "Sachet - 20 KES", "Sachet - 40 KES", "Bottle (100g New)", "Bottle (100g Refill)"],
-            horizontal=True,
-            key="product_type_main"  # Add a unique key
-        )
-        
+                "Product Type",
+                ["Sachet - 5 KES", "Sachet - 20 KES", "Sachet - 40 KES", "Bottle (100g New)", "Bottle (100g Refill)"],
+                horizontal=True,
+                key="product_type_main"
+            )
+            
             customer_type = st.radio(
-            "Customer Type",
-            ["Consumer (B2C)", "Shop/Mama Mboga (B2B)", "Hotel/Restaurant"],
-            horizontal=True,
-            key="customer_type_main"  # Add a unique key
-        )
-        
-        # Initialize variables
+                "Customer Type",
+                ["Consumer (B2C)", "Shop/Mama Mboga (B2B)", "Hotel/Restaurant"],
+                horizontal=True,
+                key="customer_type_main"
+            )
+            
+            # Initialize variables
             price = 0
             min_qty = 1
             default_qty = 1
             unit = ""
             product_name = ""
             commission_per_unit = 0
-        
-        # Pricing logic - MUST check in order
+            
+            # Pricing logic
             if product_main == "Sachet - 5 KES":
                 if customer_type == "Consumer (B2C)":
                     price, min_qty, default_qty, unit = 5.0, 1, 1, "sachets"
@@ -589,19 +589,19 @@ with tab2:
                     price, min_qty, default_qty, unit = 2.9, 18, 18, "sachets"
                     product_name = "SpiseUp Spicy Salt Sachet (2.9 KES) - Hotel"
                 commission_per_unit = 0
-            
+                
             elif product_main == "Sachet - 20 KES":
                 price, min_qty, default_qty, unit = 20.0, 1, 1, "sachets"
                 product_name = f"SpiseUp Spicy Salt Sachet (20 KES) - {customer_type}"
                 commission_per_unit = 5
                 st.info("💰 **Commission:** KES 5 per sachet for salesperson")
-            
+                
             elif product_main == "Sachet - 40 KES":
                 price, min_qty, default_qty, unit = 40.0, 1, 1, "sachets"
                 product_name = f"SpiseUp Spicy Salt Sachet (40 KES) - {customer_type}"
                 commission_per_unit = 10
                 st.success("💰 **Commission:** KES 10 per sachet for salesperson")
-            
+                
             elif product_main == "Bottle (100g New)":
                 if customer_type == "Consumer (B2C)":
                     price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
@@ -612,51 +612,50 @@ with tab2:
                 else:
                     price, min_qty, default_qty, unit = 150.0, 1, 1, "bottles"
                     product_name = "SpiseUp Spicy Salt Bottle (100g New) - Hotel"
-                    commission_per_unit = 0
-            
+                commission_per_unit = 0
+                
             elif product_main == "Bottle (100g Refill)":
                 price, min_qty, default_qty, unit = 120.0, 1, 1, "refills"
                 product_name = f"SpiseUp Spicy Salt Bottle (100g Refill) - {customer_type}"
                 commission_per_unit = 0
-                st.info("🔄 **REFILL BENEFIT:** Pay KES 120 and get 100g (save KES 30!)")
-        
-        # If none of the above matched (should not happen)
+                st.info("🔄 **REFILL BENEFIT:** Pay KES 120 (save KES 30!)")
+                
             else:
                 st.error("Please select a product type")
                 st.stop()
-        
-        # Show minimum order notice
+            
+            # Show minimum order notice
             if min_qty > 1:
                 st.info(f"📦 Minimum order: {min_qty} {unit}")
-        
-        # Quantity input
+            
+            # Quantity input
             quantity = st.number_input(
                 f"Quantity ({unit})", 
                 min_value=min_qty, 
                 step=min_qty if min_qty > 1 else 1, 
                 value=default_qty,
                 key="quantity_input"
-        )
-        
-        # Price input
+            )
+            
+            # Price input
             price = st.number_input(
-            "Price per unit (KES)", 
-            min_value=0.0, 
-            max_value=500.0, 
-            step=1.0, 
-            value=float(price), 
-            format="%.1f",
-            key="price_input"
-        )
-        
-        # Calculate total
+                "Price per unit (KES)", 
+                min_value=0.0, 
+                max_value=500.0, 
+                step=1.0, 
+                value=float(price), 
+                format="%.1f",
+                key="price_input"
+            )
+            
+            # Calculate total
             total = quantity * price
-        
-        # Show commission info
+            
+            # Show commission info
             if commission_per_unit > 0:
                 total_commission = quantity * commission_per_unit
                 st.info(f"💰 **Total Commission:** KES {total_commission:,.0f} (KES {commission_per_unit} per unit)")
-        
+            
             st.success(f"**Total Amount:** KES {total:,.2f}")
             
             # Hotel Tracking
@@ -695,7 +694,7 @@ with tab2:
                 sales_person_name = "N/A"
                 st.warning("No salespeople added yet.")
             
-            # Additional Details - NOW INSIDE the same block
+            # Additional Details
             st.markdown("---")
             st.markdown("### 📝 Additional Details")
             feedback = st.text_area("Customer Feedback", placeholder="Any feedback from the customer...", key="feedback")
@@ -708,15 +707,13 @@ with tab2:
             with col_btn2:
                 clear_form = st.button("🗑️ Clear Form", use_container_width=True)
     
-    # Clear form logic (outside columns but using session state)
+    # Clear form logic
     if clear_form:
         for key in ['shop_name', 'phone', 'location', 'quantity', 'price', 'payment_status', 'sales_person_name', 'feedback', 'follow_up']:
             if key in st.session_state:
                 del st.session_state[key]
         st.success("✅ Form cleared!")
         st.rerun()
-
-    
     
     # Save sale logic
     if submitted_sale:
@@ -725,18 +722,16 @@ with tab2:
         elif sales_person_name == "Select...":
             st.error("Please select a salesperson!")
         else:
-            # ========== COMMISSION CALCULATION ==========
+            # Calculate commission based on product_main
             commission_amount = 0
-            if "20 KES" in product_name:
+            if product_main == "Sachet - 20 KES":
                 commission_amount = quantity * 5
-                st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
-            elif "40 KES" in product_name:
+            elif product_main == "Sachet - 40 KES":
                 commission_amount = quantity * 10
-                st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
-                
+            
             net_amount = total - commission_amount
-            if commission_amount > 0:
-                st.info(f"💰 **Commission Earned:** KES {commission_amount:,.0f} for {sales_person_name}")
+            
+            # Create sale record
             sale_record = {
                 "Date": str(sale_date),
                 "Name": shop_name,
@@ -762,26 +757,29 @@ with tab2:
             sale_id = save_sale(sale_record)
             
             if sale_id:
-                st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
-
                 if commission_amount > 0:
-                    st.write(f"💰 **Commission deducted:** KES {commission_amount:,.0f}")
-                    st.write(f"📊 **Net to business:** KES {net_amount:,.0f}")
+                    st.success(f"✅ Sale saved successfully!")
+                    st.write(f"💰 **Customer Paid:** KES {total:,.0f}")
+                    st.write(f"👤 **Commission to {sales_person_name}:** KES {commission_amount:,.0f}")
+                    st.write(f"📊 **Net to Business:** KES {net_amount:,.0f}")
+                else:
+                    st.success(f"✅ Sale saved successfully! Total: **KES {total:,.0f}**")
                 
-
+                # Save commission record to database
                 if commission_amount > 0 and sales_person_name not in ["Select...", "N/A"]:
                     commission_data = {
-            "sale_id": sale_id,
-            "sales_person_id": sales_person_options[sales_person_name],
-            "product_name": product_name,
-            "quantity": quantity,
-            "unit_price": price,
-            "total_sale_amount": total,
-            "commission_amount": commission_amount,
-            "commission_paid": False,
-            "notes": f"Commission for {quantity} x {product_name}"
-        }
-                save_sale_commission(commission_data)
+                        "sale_id": sale_id,
+                        "sales_person_id": sales_person_options[sales_person_name],
+                        "product_name": product_name,
+                        "quantity": quantity,
+                        "unit_price": price,
+                        "total_sale_amount": total,
+                        "commission_amount": commission_amount,
+                        "commission_paid": False,
+                        "notes": f"Commission for {quantity} x {product_name}"
+                    }
+                    save_sale_commission(commission_data)
+                
                 # Map product for inventory
                 product_mapping = {
                     "SpiseUp Spicy Salt Sachet (5 KES) - Consumer": "Sachet 5",
@@ -826,7 +824,6 @@ with tab2:
         display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
         display_df['Total'] = display_df['Total'].apply(lambda x: f"KES {x:,.0f}")
         st.dataframe(display_df[['Date', 'Name', 'Quantity', 'Total', 'Payment_Status', 'Location']], use_container_width=True, hide_index=True)
-
 # ==================== TAB 3: EXPENSES ====================
 with tab3:
     st.markdown('<div class="section-header">💸 Record New Expense</div>', unsafe_allow_html=True)
