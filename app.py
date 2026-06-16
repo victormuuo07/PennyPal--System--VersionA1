@@ -536,7 +536,162 @@ with tab1:
                 st.write(f"💰 KES {row['Total']:,.0f}")
             st.divider()
 
+    # ========== PRODUCT CATEGORY BREAKDOWN ==========
+st.markdown("---")
+st.markdown("### 📦 Product Category Breakdown")
+st.caption("Track how many units of each product type are moving")
 
+if not sales_df.empty:
+    
+    # Create category mapping based on your product names
+    def categorize_product(product_name):
+        product_lower = str(product_name).lower()
+        if 'bottle' in product_lower:
+            return '🍾 Bottles'
+        elif 'sachet' in product_lower:
+            return '📦 Sachets'
+        elif 'refill' in product_lower:
+            return '🔄 Refills'
+        elif 'hot sauce' in product_lower:
+            return '🌶️ Hot Sauce'
+        else:
+            return '📌 Other'
+    
+    # Add category column
+    sales_df['Category'] = sales_df['Product'].apply(categorize_product)
+    
+    # Calculate category totals
+    category_sales = sales_df.groupby('Category').agg({
+        'Total': 'sum',
+        'Quantity': 'sum'
+    }).reset_index()
+    category_sales.columns = ['Category', 'Revenue', 'Units Sold']
+    category_sales = category_sales.sort_values('Revenue', ascending=False)
+    
+    # Display metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    # Get totals for each category
+    for idx, row in category_sales.iterrows():
+        category_name = row['Category']
+        revenue = row['Revenue']
+        units = row['Units Sold']
+        
+        # Display in columns
+        with col1 if idx == 0 else col2 if idx == 1 else col3 if idx == 2 else col4:
+            st.metric(
+                category_name,
+                f"{int(units):,} units",
+                delta=f"KES {revenue:,.0f}"
+            )
+    
+    # Visualization - Units sold by category
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Pie chart for units sold
+        fig = px.pie(
+            category_sales, 
+            values='Units Sold', 
+            names='Category',
+            title='Units Sold by Product Category',
+            color_discrete_sequence=px.colors.qualitative.Set2,
+            hole=0.3
+        )
+        fig.update_traces(textposition='inside', textinfo='percent+label')
+        st.plotly_chart(fig, width='stretch')
+    
+    with col2:
+        # Bar chart for units sold
+        fig = px.bar(
+            category_sales,
+            x='Category',
+            y='Units Sold',
+            title='Units Sold by Category',
+            color='Units Sold',
+            color_continuous_scale='Viridis',
+            text='Units Sold'
+        )
+        fig.update_traces(texttemplate='%{text:,}', textposition='outside')
+        st.plotly_chart(fig, width='stretch')
+    
+    # Detailed breakdown table
+    st.markdown("---")
+    st.markdown("### 📋 Detailed Product Breakdown")
+    
+    # Group by specific product (not just category)
+    product_detail = sales_df.groupby('Product').agg({
+        'Total': 'sum',
+        'Quantity': 'sum'
+    }).reset_index()
+    product_detail.columns = ['Product', 'Revenue', 'Units Sold']
+    product_detail = product_detail.sort_values('Revenue', ascending=False)
+    
+    st.dataframe(
+        product_detail.head(20),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Product": "Product Name",
+            "Revenue": st.column_config.NumberColumn("Revenue", format="KES %d"),
+            "Units Sold": st.column_config.NumberColumn("Units", format="%d")
+        }
+    )
+    
+    # Summary insights
+    st.markdown("---")
+    st.markdown("### 💡 Product Movement Insights")
+    
+    insights = []
+    
+    # Find best selling category
+    if not category_sales.empty:
+        top_category = category_sales.iloc[0]
+        insights.append(f"🏆 **Best selling category:** {top_category['Category']} with {int(top_category['Units Sold']):,} units sold")
+    
+    # Find highest revenue category
+    top_revenue = category_sales.loc[category_sales['Revenue'].idxmax()]
+    insights.append(f"💰 **Highest revenue category:** {top_revenue['Category']} with KES {top_revenue['Revenue']:,.0f}")
+    
+    # Check if sachets are moving
+    sachet_data = category_sales[category_sales['Category'] == '📦 Sachets']
+    if not sachet_data.empty:
+        sachet_units = sachet_data.iloc[0]['Units Sold']
+        insights.append(f"📦 **Sachets moving:** {int(sachet_units):,} units sold")
+    
+    # Check if bottles are moving
+    bottle_data = category_sales[category_sales['Category'] == '🍾 Bottles']
+    if not bottle_data.empty:
+        bottle_units = bottle_data.iloc[0]['Units Sold']
+        insights.append(f"🍾 **Bottles moving:** {int(bottle_units):,} units sold")
+    
+    for insight in insights:
+        st.info(insight)
+    
+    # Daily movement trend
+    st.markdown("---")
+    st.markdown("### 📈 Daily Unit Movement")
+    
+    # Group by date and category
+    daily_category = sales_df.groupby([sales_df['Date'].dt.date, 'Category'])['Quantity'].sum().reset_index()
+    daily_category.columns = ['Date', 'Category', 'Units Sold']
+    
+    # Pivot for stacked area chart
+    pivot_data = daily_category.pivot(index='Date', columns='Category', values='Units Sold').fillna(0)
+    
+    if not pivot_data.empty:
+        fig = px.area(
+            pivot_data,
+            title='Daily Unit Movement by Category',
+            labels={'value': 'Units Sold', 'Date': ''},
+            color_discrete_sequence=px.colors.qualitative.Set2
+        )
+        fig.update_layout(height=400)
+        st.plotly_chart(fig, width='stretch')
+    
+else:
+    st.info("No sales data available to show product breakdown")
 # ==================== TAB 2: SALES ====================
 with tab2:
     st.markdown('<div class="section-header">💰 Record New Sale</div>', unsafe_allow_html=True)
