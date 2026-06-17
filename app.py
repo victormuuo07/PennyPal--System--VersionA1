@@ -101,7 +101,14 @@ from supabase_client import (
     get_salesperson_commission,
     get_all_commissions_pending,
     mark_commission_paid,
-    get_commission_summary
+    get_commission_summary,
+     get_hotel_retention_metrics,
+    save_hotel_consumption,
+    get_hotel_consumption,
+    save_hotel_reorder,
+    get_hotel_reorders,
+    save_hotel_chef,
+    get_hotel_chefs
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
