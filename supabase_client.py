@@ -1870,6 +1870,7 @@ def update_customer_last_contact(customer_id: str):
 
 import requests
 import streamlit as st
+from datetime import date, datetime
 
 def send_sms_africastalking(phone_number, message):
     """Send SMS via Africa's Talking API"""
@@ -1912,6 +1913,18 @@ def send_sms_africastalking(phone_number, message):
         print(f"Error sending SMS: {str(e)}")
         return {"status": "error", "message": str(e)}
 
+def send_bulk_sms(phone_numbers, message):
+    """Send SMS to multiple recipients"""
+    try:
+        results = []
+        for phone in phone_numbers:
+            result = send_sms_africastalking(phone, message)
+            results.append({"phone": phone, "result": result})
+        return {"status": "success", "results": results}
+    except Exception as e:
+        print(f"Error sending bulk SMS: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
 def send_test_sms(phone_number, message):
     """Send a test SMS with detailed error reporting"""
     try:
@@ -1951,4 +1964,53 @@ def send_test_sms(phone_number, message):
         }
         
     except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def send_scheduled_messages():
+    """Send all scheduled messages for today"""
+    try:
+        today = date.today().strftime('%A')
+        
+        # Get today's scheduled messages
+        response = supabase.table("AUTOMATED_MESSAGES")\
+            .select("*")\
+            .eq("schedule_day", today)\
+            .eq("is_active", True)\
+            .execute()
+        
+        messages = response.data if response.data else []
+        sent_count = 0
+        
+        for msg in messages:
+            # Get recipients
+            customer_type = msg.get('customer_type')
+            recipients = get_customer_contacts(customer_type)
+            
+            for customer in recipients:
+                phone = customer.get('phone_number')
+                if phone:
+                    result = send_sms_africastalking(phone, msg['message_content'])
+                    if result.get('status') == 'success':
+                        sent_count += 1
+                        
+                        # Save to history
+                        history_data = {
+                            "customer_id": customer['id'],
+                            "message_id": msg['id'],
+                            "phone_number": phone,
+                            "message_content": msg['message_content'],
+                            "sent_date": str(datetime.now()),
+                            "was_delivered": True
+                        }
+                        save_message_history(history_data)
+            
+            # Update last sent date
+            supabase.table("AUTOMATED_MESSAGES")\
+                .update({"last_sent_date": str(date.today())})\
+                .eq("id", msg['id'])\
+                .execute()
+        
+        return {"status": "success", "sent_count": sent_count}
+    except Exception as e:
+        print(f"Error sending scheduled messages: {str(e)}")
         return {"status": "error", "message": str(e)}
