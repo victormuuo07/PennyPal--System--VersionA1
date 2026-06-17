@@ -5395,24 +5395,60 @@ AFRICASTALKING_SENDER_ID = "SpiseUp"
         st.success("✅ No messages scheduled for today")
     
     # ========== SEND TEST SMS ==========
+st.markdown("---")
+st.markdown("### 📱 Send Test SMS")
+
+st.info("⚠️ **For testing:** Use your own phone number first. Make sure you have SMS credits in your Africa's Talking account.")
+
+col1, col2 = st.columns([2, 1])
+with col1:
+    test_phone = st.text_input("Test Phone Number", placeholder="0712345678", help="Use your own number for testing")
+    test_message = st.text_area("Test Message", placeholder="Hello! This is a test message from SpiseUp...", height=100)
+with col2:
+    st.write("")
+    st.write("")
+    if st.button("📤 Send Test SMS", type="primary", use_container_width=True):
+        if test_phone and test_message:
+            with st.spinner("Sending SMS..."):
+                result = send_test_sms(test_phone, test_message)
+                
+                if result.get("status") == "success":
+                    st.success(f"✅ SMS sent successfully to {result.get('phone')}!")
+                    st.info("📱 Check your phone for the message")
+                    st.balloons()
+                else:
+                    st.error(f"❌ Failed to send SMS")
+                    st.write("**Error Details:**", result)
+                    
+                    # Show helpful tips
+                    if "API key" in str(result):
+                        st.warning("⚠️ API key not found. Add AFRICASTALKING_API_KEY to secrets.toml")
+                    elif "sandbox" in str(result):
+                        st.warning("⚠️ Make sure you have SMS credits in your Africa's Talking sandbox account")
+        else:
+            st.error("Please enter phone number and message")
+
+# ========== SMS CREDITS CHECK ==========
     st.markdown("---")
-    st.markdown("### 📱 Send Test SMS")
-    
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        test_phone = st.text_input("Test Phone Number", placeholder="0712345678")
-        test_message = st.text_area("Test Message", placeholder="Hello! This is a test message from SpiseUp...")
-    with col2:
-        st.write("")
-        st.write("")
-        if st.button("📤 Send Test SMS", type="primary", use_container_width=True):
-            if test_phone and test_message:
-                # This would call Africa's Talking API
-                st.success(f"✅ Test SMS sent to {test_phone}!")
-                st.info("📱 Check your phone for the message")
-                st.balloons()
+    st.markdown("### 💰 SMS Credits Check")
+
+    if st.button("🔍 Check SMS Credits"):
+        try:
+            api_key = st.secrets["AFRICASTALKING_API_KEY"]
+            url = "https://api.africastalking.com/version1/user"
+            headers = {"apiKey": api_key}
+            response = requests.get(url, headers=headers)
+        
+            if response.status_code == 200:
+                data = response.json()
+            # Display user info
+                st.success("✅ Connected to Africa's Talking!")
+                st.write(f"**Username:** {data.get('UserData', {}).get('username', 'N/A')}")
+                st.write(f"**Balance:** {data.get('UserData', {}).get('balance', 'Check dashboard')}")
             else:
-                st.error("Please enter phone number and message")
+                st.error(f"❌ Failed to connect: {response.status_code}")
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
     
     # ========== MESSAGE HISTORY ==========
     st.markdown("---")

@@ -1868,83 +1868,87 @@ def update_customer_last_contact(customer_id: str):
 # SMS FUNCTIONS (AFRICA'S TALKING)
 # -------------------------------
 
-import requests  # Make sure this is at the top of the file with other imports
+import requests
+import streamlit as st
 
 def send_sms_africastalking(phone_number, message):
     """Send SMS via Africa's Talking API"""
     try:
+        # Get config from secrets
+        api_key = st.secrets["AFRICASTALKING_API_KEY"]
+        username = st.secrets.get("AFRICASTALKING_USERNAME", "sandbox")
+        sender_id = st.secrets.get("AFRICASTALKING_SENDER_ID", "SpiseUp")
+        
+        # Format phone number correctly
+        phone = phone_number.strip().replace(" ", "").replace("+", "")
+        if phone.startswith("0"):
+            phone = "254" + phone[1:]
+        elif phone.startswith("7") and len(phone) == 9:
+            phone = "254" + phone
+        
         url = "https://api.africastalking.com/version1/messaging"
         headers = {
-            "apiKey": "YOUR_API_KEY",  # Replace with your actual API key
+            "apiKey": api_key,
             "Content-Type": "application/x-www-form-urlencoded"
         }
         data = {
-            "username": "sandbox",  # Change to your username when live
-            "to": phone_number,
+            "username": username,
+            "to": phone,
             "message": message,
-            "from": "SpiseUp"  # Your sender ID
+            "from": sender_id
         }
+        
         response = requests.post(url, headers=headers, data=data)
-        return response.json()
+        result = response.json()
+        
+        # Check if successful
+        if response.status_code == 200 and 'SMSMessageData' in result:
+            if result['SMSMessageData']['Recipients'][0]['status'] == 'Success':
+                return {"status": "success", "result": result}
+        
+        return {"status": "error", "result": result}
+        
     except Exception as e:
         print(f"Error sending SMS: {str(e)}")
         return {"status": "error", "message": str(e)}
 
-def send_bulk_sms(phone_numbers, message):
-    """Send SMS to multiple recipients"""
+def send_test_sms(phone_number, message):
+    """Send a test SMS with detailed error reporting"""
     try:
-        results = []
-        for phone in phone_numbers:
-            result = send_sms_africastalking(phone, message)
-            results.append({"phone": phone, "result": result})
-        return results
+        # Check if API key exists
+        try:
+            api_key = st.secrets["AFRICASTALKING_API_KEY"]
+        except:
+            return {"status": "error", "message": "AFRICASTALKING_API_KEY not found in secrets"}
+        
+        # Format phone
+        phone = phone_number.strip().replace(" ", "").replace("+", "")
+        if phone.startswith("0"):
+            phone = "254" + phone[1:]
+        
+        url = "https://api.africastalking.com/version1/messaging"
+        headers = {
+            "apiKey": api_key,
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = {
+            "username": "sandbox",
+            "to": phone,
+            "message": message,
+            "from": "SpiseUp"
+        }
+        
+        response = requests.post(url, headers=headers, data=data)
+        result = response.json()
+        
+        # Return detailed result for debugging
+        return {
+            "status": "success" if response.status_code == 200 else "error",
+            "response_code": response.status_code,
+            "result": result,
+            "phone": phone,
+            "message": message
+        }
+        
     except Exception as e:
-        print(f"Error sending bulk SMS: {str(e)}")
-        return []
-
-def send_scheduled_messages():
-    """Send all scheduled messages for today"""
-    try:
-        # Get today's scheduled messages
-        today = date.today().strftime('%A')
-        response = supabase.table("AUTOMATED_MESSAGES")\
-            .select("*")\
-            .eq("schedule_day", today)\
-            .eq("is_active", True)\
-            .execute()
-        
-        messages = response.data if response.data else []
-        sent_count = 0
-        
-        for msg in messages:
-            # Get recipients
-            customer_type = msg.get('customer_type')
-            recipients = get_customer_contacts(customer_type)
-            
-            for customer in recipients:
-                phone = customer.get('phone_number')
-                if phone:
-                    send_sms_africastalking(phone, msg['message_content'])
-                    sent_count += 1
-                    
-                    # Save to history
-                    history_data = {
-                        "customer_id": customer['id'],
-                        "message_id": msg['id'],
-                        "phone_number": phone,
-                        "message_content": msg['message_content'],
-                        "sent_date": str(datetime.now()),
-                        "was_delivered": True
-                    }
-                    save_message_history(history_data)
-            
-            # Update last sent date
-            supabase.table("AUTOMATED_MESSAGES")\
-                .update({"last_sent_date": str(date.today())})\
-                .eq("id", msg['id'])\
-                .execute()
-        
-        return {"status": "success", "sent_count": sent_count}
-    except Exception as e:
-        print(f"Error sending scheduled messages: {str(e)}")
-        return {"status": "error", "message": str(e)}    
+        return {"status": "error", "message": str(e)}
