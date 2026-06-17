@@ -5260,6 +5260,103 @@ with tab17:
     
     st.info("📢 **Automate customer communication** - Send scheduled messages and receive replies to your phone")
     
+    # ========== ADD THE DEBUG CODE RIGHT HERE ==========
+    with st.expander("🔧 SMS System Debug", expanded=True):
+        st.markdown("### SMS System Diagnostics")
+        
+        # Check 1: Secrets exist
+        st.markdown("**1. Checking Secrets:**")
+        try:
+            api_key = st.secrets["AFRICASTALKING_API_KEY"]
+            username = st.secrets.get("AFRICASTALKING_USERNAME", "sandbox")
+            st.success(f"✅ API Key found: {api_key[:5]}...{api_key[-5:]}")
+            st.success(f"✅ Username: {username}")
+        except Exception as e:
+            st.error(f"❌ Secrets error: {e}")
+        
+        # Check 2: Test API connection
+        st.markdown("**2. Testing API Connection:**")
+        if st.button("🔍 Test Africa's Talking Connection"):
+            try:
+                api_key = st.secrets["AFRICASTALKING_API_KEY"]
+                url = "https://api.africastalking.com/version1/user"
+                headers = {"apiKey": api_key}
+                
+                response = requests.get(url, headers=headers)
+                st.write(f"Response Code: {response.status_code}")
+                
+                if response.status_code == 200:
+                    st.success("✅ Connected to Africa's Talking successfully!")
+                    data = response.json()
+                    st.write(f"Username: {data.get('UserData', {}).get('username', 'N/A')}")
+                    st.write(f"Balance: {data.get('UserData', {}).get('balance', 'Check dashboard')}")
+                else:
+                    st.error(f"❌ Connection failed: {response.status_code}")
+                    st.write(response.text)
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+        
+        # Check 3: Test SMS with detailed response
+        st.markdown("**3. Test SMS with Detailed Response:**")
+        test_phone_debug = st.text_input("Test Phone Number (for debug)", placeholder="0712345678", key="debug_phone")
+        test_msg_debug = st.text_input("Test Message", placeholder="Hello from SpiseUp!", key="debug_msg")
+        
+        if st.button("📤 Send Debug SMS"):
+            if test_phone_debug and test_msg_debug:
+                with st.spinner("Sending..."):
+                    # Format phone
+                    phone = test_phone_debug.strip().replace(" ", "").replace("+", "")
+                    if phone.startswith("0"):
+                        phone = "254" + phone[1:]
+                    
+                    try:
+                        api_key = st.secrets["AFRICASTALKING_API_KEY"]
+                        username = st.secrets.get("AFRICASTALKING_USERNAME", "sandbox")
+                        
+                        url = "https://api.africastalking.com/version1/messaging"
+                        headers = {
+                            "apiKey": api_key,
+                            "Content-Type": "application/x-www-form-urlencoded"
+                        }
+                        data = {
+                            "username": username,
+                            "to": phone,
+                            "message": test_msg_debug,
+                            "from": "SpiseUp"
+                        }
+                        
+                        st.write("📤 **Sending request with:**")
+                        st.write(f"URL: {url}")
+                        st.write(f"Phone: {phone}")
+                        st.write(f"Message: {test_msg_debug}")
+                        
+                        response = requests.post(url, headers=headers, data=data)
+                        
+                        st.write(f"📥 **Response:**")
+                        st.write(f"Status Code: {response.status_code}")
+                        st.write(f"Response: {response.json()}")
+                        
+                        if response.status_code == 200:
+                            result = response.json()
+                            if 'SMSMessageData' in result:
+                                recipients = result['SMSMessageData'].get('Recipients', [])
+                                if recipients and recipients[0].get('status') == 'Success':
+                                    st.success("✅ SMS sent successfully!")
+                                else:
+                                    st.warning(f"⚠️ SMS not delivered: {recipients}")
+                            else:
+                                st.warning(f"⚠️ Unexpected response: {result}")
+                        else:
+                            st.error(f"❌ Failed with status {response.status_code}")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Error: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
+    
+    # ========== REST OF YOUR CUSTOMER ENGAGEMENT CODE ==========
+    # ... your existing code continues here ...
+
     # ========== ADD CONTACT ==========
     with st.expander("➕ Add Customer Contact", expanded=True):
         st.markdown("### Add New Contact")
