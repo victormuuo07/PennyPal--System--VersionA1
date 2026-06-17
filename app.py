@@ -5255,7 +5255,7 @@ if time.time() - st.session_state.last_check > 60:
 st.caption(f"📦 Version: {APP_VERSION} • Last refresh: {datetime.now().strftime('%H:%M:%S')}")
 
 # ==================== CUSTOMER ENGAGEMENT TAB ====================
-with tab18:
+with tab17:
     st.markdown('<div class="section-header">📱 Customer Engagement & Automation</div>', unsafe_allow_html=True)
     
     st.info("📢 **Automate customer communication** - Send scheduled messages and receive replies to your phone")
