@@ -128,7 +128,11 @@ from supabase_client import (
     send_sms_africastalking,
     send_bulk_sms,
     send_test_sms,
-    send_scheduled_messages
+    send_scheduled_messages,
+    verify_api_key,
+    check_at_balance,
+    format_phone,
+    sanitize_message
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -5256,156 +5260,63 @@ if time.time() - st.session_state.last_check > 60:
 st.caption(f"📦 Version: {APP_VERSION} • Last refresh: {datetime.now().strftime('%H:%M:%S')}")
 
 # ==================== CUSTOMER ENGAGEMENT TAB ====================
-with tab17:
+with tab17:  # or whatever tab number you used
     st.markdown('<div class="section-header">📱 Customer Engagement & Automation</div>', unsafe_allow_html=True)
     
     st.info("📢 **Automate customer communication** - Send scheduled messages and receive replies to your phone")
     
-    # ========== ADD THE DEBUG CODE RIGHT HERE ==========
-    with st.expander("🔧 SMS System Debug", expanded=True):
-        st.markdown("### SMS System Diagnostics")
-        
-        # Check 1: Secrets exist
-        st.markdown("**1. Checking Secrets:**")
-        try:
-            api_key = st.secrets["AFRICASTALKING_API_KEY"]
-            username = st.secrets.get("AFRICASTALKING_USERNAME", "SpiseUp")
-            st.success(f"✅ API Key found: {api_key[:5]}...{api_key[-5:]}")
-            st.success(f"✅ Username: {username}")
-        except Exception as e:
-            st.error(f"❌ Secrets error: {e}")
-        
-        # Check 2: Test API connection
-        st.markdown("**2. Testing API Connection:**")
-        if st.button("🔍 Test Africa's Talking Connection"):
-            try:
-                api_key = st.secrets["AFRICASTALKING_API_KEY"]
-                url = "https://api.africastalking.com/version1/user"
-                headers = {"apiKey": api_key}
-                
-                response = requests.get(url, headers=headers)
-                st.write(f"Response Code: {response.status_code}")
-                
-                if response.status_code == 200:
-                    st.success("✅ Connected to Africa's Talking successfully!")
-                    data = response.json()
-                    st.write(f"Username: {data.get('UserData', {}).get('username', 'N/A')}")
-                    st.write(f"Balance: {data.get('UserData', {}).get('balance', 'Check dashboard')}")
-                else:
-                    st.error(f"❌ Connection failed: {response.status_code}")
-                    st.write(response.text)
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
-        
-        # Check 3: Test SMS with detailed response
-        st.markdown("**3. Test SMS with Detailed Response:**")
-        test_phone_debug = st.text_input("Test Phone Number (for debug)", placeholder="0712345678", key="debug_phone")
-        test_msg_debug = st.text_input("Test Message", placeholder="Hello from SpiseUp!", key="debug_msg")
-        
-        if st.button("📤 Send Debug SMS"):
-            if test_phone_debug and test_msg_debug:
-                with st.spinner("Sending..."):
-                    # Format phone
-                    phone = test_phone_debug.strip().replace(" ", "").replace("+", "")
-                    if phone.startswith("0"):
-                        phone = "254" + phone[1:]
-                    
-                    try:
-                        api_key = st.secrets["AFRICASTALKING_API_KEY"]
-                        username = st.secrets.get("AFRICASTALKING_USERNAME", "SpiseUp")
-                        
-                        url = "https://api.africastalking.com/version1/messaging"
-                        headers = {
-                            "apiKey": api_key,
-                            "Content-Type": "application/x-www-form-urlencoded"
-                        }
-                        data = {
-                            "username": username,
-                            "to": phone,
-                            "message": test_msg_debug,
-                            "from": "SpiseUp"
-                        }
-                        
-                        st.write("📤 **Sending request with:**")
-                        st.write(f"URL: {url}")
-                        st.write(f"Phone: {phone}")
-                        st.write(f"Message: {test_msg_debug}")
-                        
-                        response = requests.post(url, headers=headers, data=data)
-                        
-                        st.write(f"📥 **Response:**")
-                        st.write(f"Status Code: {response.status_code}")
-                        st.write(f"Response: {response.json()}")
-                        
-                        if response.status_code == 200:
-                            result = response.json()
-                            if 'SMSMessageData' in result:
-                                recipients = result['SMSMessageData'].get('Recipients', [])
-                                if recipients and recipients[0].get('status') == 'Success':
-                                    st.success("✅ SMS sent successfully!")
-                                else:
-                                    st.warning(f"⚠️ SMS not delivered: {recipients}")
-                            else:
-                                st.warning(f"⚠️ Unexpected response: {result}")
-                        else:
-                            st.error(f"❌ Failed with status {response.status_code}")
-                            
-                    except Exception as e:
-                        st.error(f"❌ Error: {e}")
-                        import traceback
-                        st.code(traceback.format_exc())
-    
+    # ========== SMS DIAGNOSTICS ==========
     with st.expander("📱 SMS Diagnostics - Complete", expanded=True):
         st.markdown("### 🔍 SMS System Check")
-    
-    # 1. Check API Key
+        
+        # 1. Check API Key
         st.markdown("**1. API Key Check:**")
         api_status = verify_api_key()
         st.write(api_status)
-    
-    # 2. Check Balance
+        
+        # 2. Check Balance
         st.markdown("**2. Balance Check:**")
         balance = check_at_balance()
         st.write(balance)
-    
-    # 3. Check Phone Format
+        
+        # 3. Check Phone Format
         st.markdown("**3. Phone Format:**")
-        test_phone = st.text_input("Enter phone to test:", "0712345678")
+        test_phone = st.text_input("Enter phone to test:", "0712345678", key="diag_phone")
         formatted = format_phone(test_phone)
         st.write(f"Original: {test_phone}")
         st.write(f"Formatted: {formatted}")
         st.write(f"Valid: {'✅' if len(formatted) == 12 else '❌'}")
-    
-    # 4. Send Test SMS
+        
+        # 4. Send Test SMS
         st.markdown("**4. Send Test SMS:**")
-        test_msg = st.text_area("Test Message:", "Hello from SpiseUp - testing SMS")
-    
-        if st.button("📤 Send Test"):
+        test_msg = st.text_area("Test Message:", "Hello from SpiseUp - testing SMS", key="diag_msg")
+        
+        if st.button("📤 Send Test", key="diag_send"):
             try:
                 phone = format_phone(test_phone)
                 message = sanitize_message(test_msg)
-            
+                
                 api_key = st.secrets["AFRICASTALKING_API_KEY"]
-            
+                
                 url = "https://api.africastalking.com/version1/messaging"
                 headers = {
-                "apiKey": api_key,
-                "Content-Type": "application/x-www-form-urlencoded"
-            }
+                    "apiKey": api_key,
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
                 data = {
-                "username": "sandbox",  # Use "sandbox" for testing
-                "to": phone,
-                "message": message,
-                "from": "SMS"  # Use "SMS" if "SpiseUp" isn't approved
-            }
-            
+                    "username": "sandbox",
+                    "to": phone,
+                    "message": message,
+                    "from": "SMS"
+                }
+                
                 with st.spinner("Sending..."):
                     response = requests.post(url, headers=headers, data=data)
                     result = response.json()
-                
+                    
                     st.write("**Response:**")
                     st.json(result)
-                
+                    
                     if response.status_code == 200:
                         if 'SMSMessageData' in result:
                             recipients = result['SMSMessageData'].get('Recipients', [])
@@ -5418,11 +5329,9 @@ with tab17:
                             st.error(f"❌ Error: {result}")
                     else:
                         st.error(f"❌ HTTP Error: {response.status_code}")
-                    
+                        
             except Exception as e:
                 st.error(f"❌ Error: {e}")
-            
-                st.code(traceback.format_exc())
     
     # ========== ADD CONTACT ==========
     with st.expander("➕ Add Customer Contact", expanded=True):
@@ -5448,7 +5357,6 @@ with tab17:
         
         if st.button("💾 Save Contact", type="primary", use_container_width=True):
             if customer_name and phone_number:
-                # Use the simplified function
                 result = save_customer_contact(
                     customer_name=customer_name,
                     phone_number=phone_number,
@@ -5572,6 +5480,37 @@ with tab17:
                         st.error(f"❌ Failed: {result}")
             else:
                 st.error("Please enter phone number and message")
+    
+    # ========== WHATSAPP INTEGRATION ==========
+    st.markdown("---")
+    st.markdown("### 📱 Quick WhatsApp Message")
+    
+    contacts = get_customer_contacts()
+    
+    if contacts:
+        contact_names = [c['customer_name'] for c in contacts]
+        selected_contact = st.selectbox("Select Customer", contact_names)
+        
+        # Get the selected contact's phone
+        contact_data = next((c for c in contacts if c['customer_name'] == selected_contact), None)
+        
+        if contact_data:
+            phone = contact_data['phone_number']
+            # Remove leading 0, add 254 for WhatsApp
+            if phone.startswith('0'):
+                wa_phone = '254' + phone[1:]
+            else:
+                wa_phone = phone
+            
+            whatsapp_message = st.text_area("WhatsApp Message", 
+                value=f"Hello {contact_data['customer_name']}! This is SpiseUp. How are you enjoying our Spicy Salt?")
+            
+            if st.button("📱 Send via WhatsApp"):
+                whatsapp_url = f"https://wa.me/{wa_phone}?text={whatsapp_message.replace(' ', '%20').replace('\n', '%0A')}"
+                st.markdown(f'<a href="{whatsapp_url}" target="_blank">📱 Click to Send on WhatsApp</a>', unsafe_allow_html=True)
+                st.info("Click the link above to open WhatsApp with your message")
+    else:
+        st.info("No contacts yet. Add some contacts first!")
 
 # Footer
 st.markdown("---")

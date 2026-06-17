@@ -1890,9 +1890,9 @@ def send_sms_africastalking(phone_number, message):
         }
         data = {
             "username": username,
-            "to": 0769138014
+            "to": phone,
             "message": message,
-            "from": "SMS"
+            "from": sender_id
         }
         
         response = requests.post(url, headers=headers, data=data)
@@ -2012,3 +2012,67 @@ def send_scheduled_messages():
         return {"status": "error", "message": str(e)}
     
 
+# -------------------------------
+# SMS HELPER FUNCTIONS
+# -------------------------------
+
+def verify_api_key():
+    """Check if API key exists and is valid"""
+    try:
+        api_key = st.secrets["AFRICASTALKING_API_KEY"]
+        
+        # Check key format
+        if not api_key.startswith("atsk_"):
+            return "❌ API key should start with 'atsk_'"
+        
+        # Test the key
+        url = "https://api.africastalking.com/version1/user"
+        response = requests.get(url, headers={"apiKey": api_key})
+        
+        if response.status_code == 200:
+            return "✅ API key is valid"
+        else:
+            return f"❌ API key invalid: {response.status_code}"
+    except:
+        return "❌ API key not found in secrets"
+
+def check_at_balance():
+    """Check Africa's Talking balance"""
+    try:
+        api_key = st.secrets["AFRICASTALKING_API_KEY"]
+        url = "https://api.africastalking.com/version1/user"
+        headers = {"apiKey": api_key}
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            balance = data.get('UserData', {}).get('balance', '0')
+            return f"💰 Balance: {balance}"
+        return "Could not check balance"
+    except:
+        return "Error checking balance"
+
+def format_phone(phone):
+    """Format phone number correctly for Africa's Talking"""
+    # Remove all non-digits
+    phone = ''.join(filter(str.isdigit, str(phone)))
+    
+    # Remove leading 0 and add 254
+    if phone.startswith('0'):
+        phone = '254' + phone[1:]
+    elif len(phone) == 9:  # 712345678
+        phone = '254' + phone
+    elif len(phone) == 12 and phone.startswith('254'):
+        pass  # Already correct
+    else:
+        phone = '254' + phone[-9:]  # Take last 9 digits
+    
+    return phone
+
+def sanitize_message(message):
+    """Remove problematic characters from message"""
+    # Remove % characters
+    message = message.replace('%', '')
+    # Remove other problematic characters
+    message = message.replace('&', 'and')
+    return message[:160]  # Max 160 characters
