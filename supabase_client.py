@@ -1876,7 +1876,7 @@ def send_sms_africastalking(phone_number, message):
     """Send SMS via Africa's Talking API"""
     try:
         # Get config from secrets
-        api_key = 'atsk_f00e64cd41173ff78a623b3ff8a6a2e44dbf7e2afe9a17f49f0be315c822e49b583b299a'
+        api_key = st.secrets["AFRICASTALKING_API_KEY"]
         username = st.secrets.get("AFRICASTALKING_USERNAME", "sandbox")
         sender_id = st.secrets.get("AFRICASTALKING_SENDER_ID", "SpiseUp")
         
