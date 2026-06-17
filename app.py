@@ -10,6 +10,7 @@ import time
 import uuid
 from sklearn.linear_model import LinearRegression
 import pandas as pd
+import requests
 
 APP_VERSION = "2.0.0"
 st.cache_data.clear()
@@ -5311,7 +5312,7 @@ with tab17:
                     
                     try:
                         api_key = st.secrets["AFRICASTALKING_API_KEY"]
-                        username = st.secrets.get("AFRICASTALKING_USERNAME", "sandbox")
+                        username = st.secrets.get("AFRICASTALKING_USERNAME", "SpiseUp")
                         
                         url = "https://api.africastalking.com/version1/messaging"
                         headers = {
@@ -5354,9 +5355,75 @@ with tab17:
                         import traceback
                         st.code(traceback.format_exc())
     
-    # ========== REST OF YOUR CUSTOMER ENGAGEMENT CODE ==========
-    # ... your existing code continues here ...
-
+    with st.expander("📱 SMS Diagnostics - Complete", expanded=True):
+        st.markdown("### 🔍 SMS System Check")
+    
+    # 1. Check API Key
+        st.markdown("**1. API Key Check:**")
+        api_status = verify_api_key()
+        st.write(api_status)
+    
+    # 2. Check Balance
+        st.markdown("**2. Balance Check:**")
+        balance = check_at_balance()
+        st.write(balance)
+    
+    # 3. Check Phone Format
+        st.markdown("**3. Phone Format:**")
+        test_phone = st.text_input("Enter phone to test:", "0712345678")
+        formatted = format_phone(test_phone)
+        st.write(f"Original: {test_phone}")
+        st.write(f"Formatted: {formatted}")
+        st.write(f"Valid: {'✅' if len(formatted) == 12 else '❌'}")
+    
+    # 4. Send Test SMS
+        st.markdown("**4. Send Test SMS:**")
+        test_msg = st.text_area("Test Message:", "Hello from SpiseUp - testing SMS")
+    
+        if st.button("📤 Send Test"):
+            try:
+                phone = format_phone(test_phone)
+                message = sanitize_message(test_msg)
+            
+                api_key = st.secrets["AFRICASTALKING_API_KEY"]
+            
+                url = "https://api.africastalking.com/version1/messaging"
+                headers = {
+                "apiKey": api_key,
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+                data = {
+                "username": "sandbox",  # Use "sandbox" for testing
+                "to": phone,
+                "message": message,
+                "from": "SMS"  # Use "SMS" if "SpiseUp" isn't approved
+            }
+            
+                with st.spinner("Sending..."):
+                    response = requests.post(url, headers=headers, data=data)
+                    result = response.json()
+                
+                    st.write("**Response:**")
+                    st.json(result)
+                
+                    if response.status_code == 200:
+                        if 'SMSMessageData' in result:
+                            recipients = result['SMSMessageData'].get('Recipients', [])
+                            if recipients and recipients[0].get('status') == 'Success':
+                                st.success("✅ SMS SENT SUCCESSFULLY!")
+                                st.balloons()
+                            else:
+                                st.error(f"❌ Failed: {recipients}")
+                        else:
+                            st.error(f"❌ Error: {result}")
+                    else:
+                        st.error(f"❌ HTTP Error: {response.status_code}")
+                    
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+            
+                st.code(traceback.format_exc())
+    
     # ========== ADD CONTACT ==========
     with st.expander("➕ Add Customer Contact", expanded=True):
         st.markdown("### Add New Contact")
