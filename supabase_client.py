@@ -2017,51 +2017,113 @@ def send_scheduled_messages():
     
 
 # -------------------------------
-# CUSTOMER ENGAGEMENT FUNCTIONS
+# CUSTOMER ENGAGEMENT FUNCTIONS (RELIABLE VERSION)
 # -------------------------------
 
-def save_customer_contact(data: dict):
-    """Save a customer contact"""
+def save_customer_contact(customer_name, phone_number, customer_type, location="", notes=""):
+    """Save a customer contact - simplified version with error handling"""
     try:
-        data["id"] = str(uuid.uuid4())
-        response = supabase.table("CUSTOMER_CONTACTS").insert(data).execute()
+        import uuid
+        from datetime import date
+        
+        # Validate input
+        if not customer_name or not phone_number:
+            return {"status": "error", "message": "Name and phone number are required"}
+        
+        # Check if contact already exists
+        existing = supabase.table("CUSTOMER_CONTACTS")\
+            .select("*")\
+            .eq("phone_number", phone_number)\
+            .execute()
+        
+        if existing.data:
+            return {"status": "exists", "message": f"Contact with phone {phone_number} already exists", "data": existing.data[0]}
+        
+        # Create new contact
+        contact_data = {
+            "id": str(uuid.uuid4()),
+            "customer_name": customer_name.strip(),
+            "phone_number": phone_number.strip(),
+            "customer_type": customer_type,
+            "location": location.strip() if location else "",
+            "notes": notes.strip() if notes else "",
+            "status": "Active",
+            "last_contact_date": str(date.today())
+        }
+        
+        response = supabase.table("CUSTOMER_CONTACTS").insert(contact_data).execute()
+        
         if hasattr(response, 'error') and response.error:
-            print(f"Error saving contact: {response.error.message}")
-            return None
-        return response.data[0]["id"] if response.data else None
+            return {"status": "error", "message": f"Database error: {response.error.message}"}
+        
+        if response.data:
+            return {"status": "success", "message": f"Contact {customer_name} saved successfully!", "data": response.data[0]}
+        else:
+            return {"status": "error", "message": "No data returned from database"}
+            
     except Exception as e:
-        print(f"Error saving contact: {str(e)}")
-        return None
+        return {"status": "error", "message": f"Exception: {str(e)}"}
 
-def get_customer_contacts(customer_type: str = None):
-    """Get customer contacts, optionally filtered by type"""
+def get_customer_contacts(customer_type=None):
+    """Get all customer contacts with optional filter"""
     try:
         query = supabase.table("CUSTOMER_CONTACTS").select("*").eq("status", "Active")
-        if customer_type:
+        if customer_type and customer_type != "All":
             query = query.eq("customer_type", customer_type)
         response = query.order("customer_name").execute()
+        
+        if hasattr(response, 'error') and response.error:
+            return []
         return response.data if response.data else []
     except Exception as e:
         print(f"Error getting contacts: {str(e)}")
         return []
 
-def save_automated_message(data: dict):
+def delete_customer_contact(contact_id):
+    """Delete a customer contact"""
+    try:
+        response = supabase.table("CUSTOMER_CONTACTS").delete().eq("id", contact_id).execute()
+        return {"status": "success", "message": "Contact deleted"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def save_automated_message(message_name, message_content, customer_type, schedule_type, schedule_day, schedule_time):
     """Save an automated message template"""
     try:
-        data["id"] = str(uuid.uuid4())
-        response = supabase.table("AUTOMATED_MESSAGES").insert(data).execute()
+        import uuid
+        from datetime import date
+        
+        if not message_name or not message_content:
+            return {"status": "error", "message": "Message name and content are required"}
+        
+        message_data = {
+            "id": str(uuid.uuid4()),
+            "message_name": message_name.strip(),
+            "message_content": message_content.strip(),
+            "customer_type": customer_type if customer_type != "All" else None,
+            "schedule_type": schedule_type,
+            "schedule_day": schedule_day,
+            "schedule_time": schedule_time,
+            "is_active": True
+        }
+        
+        response = supabase.table("AUTOMATED_MESSAGES").insert(message_data).execute()
+        
         if hasattr(response, 'error') and response.error:
-            print(f"Error saving message: {response.error.message}")
-            return None
-        return response.data[0]["id"] if response.data else None
+            return {"status": "error", "message": f"Database error: {response.error.message}"}
+        
+        if response.data:
+            return {"status": "success", "message": f"Message '{message_name}' created!", "data": response.data[0]}
+        else:
+            return {"status": "error", "message": "No data returned from database"}
+            
     except Exception as e:
-        print(f"Error saving message: {str(e)}")
-        return None
+        return {"status": "error", "message": f"Exception: {str(e)}"}
 
 def get_automated_messages():
-    """Get all automated messages"""
+    """Get all active automated messages"""
     try:
-        response = supabase.table("AUTOMATED_MESSAGES").select("*").eq("is_active", True).execute()
+        response = supabase.table("AUTOMATED_MESSAGES").select("*").eq("is_active", True).order("schedule_day").execute()
         return response.data if response.data else []
     except Exception as e:
         print(f"Error getting messages: {str(e)}")
@@ -2078,21 +2140,30 @@ def get_todays_messages():
         print(f"Error getting today's messages: {str(e)}")
         return []
 
-def save_message_history(data: dict):
+def save_message_history(customer_id, message_id, phone_number, message_content):
     """Save message history"""
     try:
-        data["id"] = str(uuid.uuid4())
-        response = supabase.table("MESSAGE_HISTORY").insert(data).execute()
-        if hasattr(response, 'error') and response.error:
-            print(f"Error saving message history: {response.error.message}")
-            return None
-        return response.data[0]["id"] if response.data else None
+        import uuid
+        from datetime import datetime
+        
+        history_data = {
+            "id": str(uuid.uuid4()),
+            "customer_id": customer_id,
+            "message_id": message_id,
+            "phone_number": phone_number,
+            "message_content": message_content,
+            "sent_date": datetime.now().isoformat(),
+            "was_delivered": True
+        }
+        
+        response = supabase.table("MESSAGE_HISTORY").insert(history_data).execute()
+        return {"status": "success"}
     except Exception as e:
         print(f"Error saving message history: {str(e)}")
-        return None
+        return {"status": "error", "message": str(e)}
 
-def get_message_history(customer_id: str = None):
-    """Get message history for a customer"""
+def get_message_history(customer_id=None):
+    """Get message history"""
     try:
         query = supabase.table("MESSAGE_HISTORY").select("*")
         if customer_id:
@@ -2103,14 +2174,13 @@ def get_message_history(customer_id: str = None):
         print(f"Error getting message history: {str(e)}")
         return []
 
-def update_customer_last_contact(customer_id: str):
-    """Update last contact date for a customer"""
+def update_customer_last_contact(customer_id):
+    """Update last contact date"""
     try:
         from datetime import date
-        supabase.table("CUSTOMER_CONTACTS").update({
+        response = supabase.table("CUSTOMER_CONTACTS").update({
             "last_contact_date": str(date.today())
         }).eq("id", customer_id).execute()
-        return True
+        return {"status": "success"}
     except Exception as e:
-        print(f"Error updating last contact: {str(e)}")
-        return False
+        return {"status": "error", "message": str(e)}

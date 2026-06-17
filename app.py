@@ -5255,37 +5255,15 @@ if time.time() - st.session_state.last_check > 60:
 st.caption(f"📦 Version: {APP_VERSION} • Last refresh: {datetime.now().strftime('%H:%M:%S')}")
 
 # ==================== CUSTOMER ENGAGEMENT TAB ====================
-with tab17:  # Add to your tabs list
+with tab18:
     st.markdown('<div class="section-header">📱 Customer Engagement & Automation</div>', unsafe_allow_html=True)
     
     st.info("📢 **Automate customer communication** - Send scheduled messages and receive replies to your phone")
     
-    # ========== SMS CONFIGURATION TEST (ADD THIS SECTION) ==========
-    with st.expander("📱 SMS Configuration Test", expanded=False):
-        st.write("Check if your SMS system is properly configured")
-        
-        if st.button("🔍 Test SMS Secrets"):
-            try:
-                api_key = st.secrets["AFRICASTALKING_API_KEY"]
-                st.success(f"✅ API Key found: {api_key[:5]}...{api_key[-5:]}")
-                st.info("📱 SMS system is configured and ready to use!")
-                
-                # Also test phone number format
-                st.write("**📋 Phone Number Format:**")
-                st.write("Use format: `0712345678` (no +254, no spaces)")
-                st.write("Example: `0712345678` or `254712345678`")
-                
-            except Exception as e:
-                st.error(f"❌ SMS secrets not configured: {e}")
-                st.info("Add AFRICASTALKING_API_KEY to your secrets.toml")
-                st.code("""
-# In .streamlit/secrets.toml add:
-AFRICASTALKING_API_KEY = "your-africastalking-api-key"
-AFRICASTALKING_USERNAME = "sandbox"
-AFRICASTALKING_SENDER_ID = "SpiseUp"
-                """)
     # ========== ADD CONTACT ==========
     with st.expander("➕ Add Customer Contact", expanded=True):
+        st.markdown("### Add New Contact")
+        
         col1, col2 = st.columns(2)
         
         with col1:
@@ -5297,19 +5275,32 @@ AFRICASTALKING_SENDER_ID = "SpiseUp"
             location = st.text_input("Location", placeholder="e.g., Kitengela, Machakos")
             notes = st.text_area("Notes", placeholder="Any additional information...")
         
+        # Debug info
+        st.write("---")
+        st.write("🔍 **Debug Info:**")
+        st.write(f"Name: {customer_name if customer_name else '(empty)'}")
+        st.write(f"Phone: {phone_number if phone_number else '(empty)'}")
+        st.write(f"Type: {customer_type}")
+        
         if st.button("💾 Save Contact", type="primary", use_container_width=True):
             if customer_name and phone_number:
-                contact_data = {
-                    "customer_name": customer_name,
-                    "phone_number": phone_number,
-                    "customer_type": customer_type,
-                    "location": location,
-                    "notes": notes,
-                    "status": "Active"
-                }
-                save_customer_contact(contact_data)
-                st.success(f"✅ {customer_name} added successfully!")
-                st.rerun()
+                # Use the simplified function
+                result = save_customer_contact(
+                    customer_name=customer_name,
+                    phone_number=phone_number,
+                    customer_type=customer_type,
+                    location=location,
+                    notes=notes
+                )
+                
+                if result.get("status") == "success":
+                    st.success(f"✅ {result.get('message')}")
+                    st.balloons()
+                    st.rerun()
+                elif result.get("status") == "exists":
+                    st.warning(f"⚠️ {result.get('message')}")
+                else:
+                    st.error(f"❌ {result.get('message')}")
             else:
                 st.error("Please enter customer name and phone number")
     
@@ -5324,7 +5315,6 @@ AFRICASTALKING_SENDER_ID = "SpiseUp"
     
     if contacts:
         df_contacts = pd.DataFrame(contacts)
-        df_contacts['last_contact_date'] = pd.to_datetime(df_contacts['last_contact_date']).dt.strftime('%Y-%m-%d') if 'last_contact_date' in df_contacts.columns else ''
         
         st.dataframe(
             df_contacts[['customer_name', 'phone_number', 'customer_type', 'location', 'status']],
@@ -5333,6 +5323,14 @@ AFRICASTALKING_SENDER_ID = "SpiseUp"
         )
         
         st.caption(f"📊 Total Contacts: {len(contacts)}")
+        
+        # Delete option
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            if st.button("🗑️ Clear All Contacts", use_container_width=True):
+                for contact in contacts:
+                    delete_customer_contact(contact['id'])
+                st.rerun()
     else:
         st.info("No contacts added yet. Add your first contact above!")
     
@@ -5355,18 +5353,20 @@ AFRICASTALKING_SENDER_ID = "SpiseUp"
         
         if st.button("💾 Save Message", type="primary", use_container_width=True):
             if message_name and message_content:
-                msg_data = {
-                    "message_name": message_name,
-                    "message_content": message_content,
-                    "customer_type": None if customer_type_filter == "All" else customer_type_filter,
-                    "schedule_type": schedule_type,
-                    "schedule_day": schedule_day,
-                    "schedule_time": schedule_time,
-                    "is_active": True
-                }
-                save_automated_message(msg_data)
-                st.success(f"✅ Message '{message_name}' created!")
-                st.rerun()
+                result = save_automated_message(
+                    message_name=message_name,
+                    message_content=message_content,
+                    customer_type=customer_type_filter,
+                    schedule_type=schedule_type,
+                    schedule_day=schedule_day,
+                    schedule_time=schedule_time
+                )
+                
+                if result.get("status") == "success":
+                    st.success(f"✅ {result.get('message')}")
+                    st.rerun()
+                else:
+                    st.error(f"❌ {result.get('message')}")
             else:
                 st.error("Please enter message name and content")
     
@@ -5382,87 +5382,32 @@ AFRICASTALKING_SENDER_ID = "SpiseUp"
                 st.write(f"**📌 {msg['message_name']}**")
                 st.write(f"📱 To: {msg['customer_type'] if msg['customer_type'] else 'All Customers'}")
                 st.write(f"📝 {msg['message_content']}")
-                
-                # Get recipients
-                recipients = get_customer_contacts(msg['customer_type'])
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.caption(f"👥 {len(recipients)} recipients")
-                
-                with col2:
-                    if st.button(f"Send Now ({msg['message_name']})", key=f"send_{msg['id']}"):
-                        # In production, this would call Africa's Talking API
-                        st.info(f"📱 Sent to {len(recipients)} customers!")
-                        st.balloons()
-                
                 st.divider()
     else:
         st.success("✅ No messages scheduled for today")
     
     # ========== SEND TEST SMS ==========
-st.markdown("---")
-st.markdown("### 📱 Send Test SMS")
-
-st.info("⚠️ **For testing:** Use your own phone number first. Make sure you have SMS credits in your Africa's Talking account.")
-
-col1, col2 = st.columns([2, 1])
-with col1:
-    test_phone = st.text_input("Test Phone Number", placeholder="0712345678", help="Use your own number for testing")
-    test_message = st.text_area("Test Message", placeholder="Hello! This is a test message from SpiseUp...", height=100)
-with col2:
-    st.write("")
-    st.write("")
-    if st.button("📤 Send Test SMS", type="primary", use_container_width=True):
-        if test_phone and test_message:
-            with st.spinner("Sending SMS..."):
-                result = send_test_sms(test_phone, test_message)
-                
-                if result.get("status") == "success":
-                    st.success(f"✅ SMS sent successfully to {result.get('phone')}!")
-                    st.info("📱 Check your phone for the message")
-                    st.balloons()
-                else:
-                    st.error(f"❌ Failed to send SMS")
-                    st.write("**Error Details:**", result)
-                    
-                    # Show helpful tips
-                    if "API key" in str(result):
-                        st.warning("⚠️ API key not found. Add AFRICASTALKING_API_KEY to secrets.toml")
-                    elif "sandbox" in str(result):
-                        st.warning("⚠️ Make sure you have SMS credits in your Africa's Talking sandbox account")
-        else:
-            st.error("Please enter phone number and message")
-
-# ========== SMS CREDITS CHECK ==========
     st.markdown("---")
-    st.markdown("### 💰 SMS Credits Check")
-
-    if st.button("🔍 Check SMS Credits"):
-        try:
-            api_key = st.secrets["AFRICASTALKING_API_KEY"]
-            url = "https://api.africastalking.com/version1/user"
-            headers = {"apiKey": api_key}
-            response = requests.get(url, headers=headers)
-        
-            if response.status_code == 200:
-                data = response.json()
-            # Display user info
-                st.success("✅ Connected to Africa's Talking!")
-                st.write(f"**Username:** {data.get('UserData', {}).get('username', 'N/A')}")
-                st.write(f"**Balance:** {data.get('UserData', {}).get('balance', 'Check dashboard')}")
+    st.markdown("### 📱 Send Test SMS")
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        test_phone = st.text_input("Test Phone Number", placeholder="0712345678")
+        test_message = st.text_area("Test Message", placeholder="Hello! This is a test message from SpiseUp...", height=100)
+    with col2:
+        st.write("")
+        st.write("")
+        if st.button("📤 Send Test SMS", type="primary", use_container_width=True):
+            if test_phone and test_message:
+                with st.spinner("Sending..."):
+                    result = send_sms_africastalking(test_phone, test_message)
+                    if result.get("status") == "success":
+                        st.success(f"✅ SMS sent to {test_phone}!")
+                        st.balloons()
+                    else:
+                        st.error(f"❌ Failed: {result}")
             else:
-                st.error(f"❌ Failed to connect: {response.status_code}")
-        except Exception as e:
-            st.error(f"❌ Error: {e}")
-    
-    # ========== MESSAGE HISTORY ==========
-    st.markdown("---")
-    st.markdown("### 📜 Message History")
-    
-    if st.button("📊 Show Recent Messages", use_container_width=True):
-        # This would fetch from MESSAGE_HISTORY table
-        st.info("📜 Message history will appear here once messages are sent")
+                st.error("Please enter phone number and message")
 
 # Footer
 st.markdown("---")
