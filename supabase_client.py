@@ -1664,3 +1664,118 @@ def get_hotel_retention_metrics():
     except Exception as e:
         print(f"Error: {str(e)}")
         return None
+
+# -------------------------------
+# HOTEL SUCCESS & RETENTION FUNCTIONS
+# -------------------------------
+
+def get_hotel_retention_metrics():
+    """Get key retention metrics for hotels"""
+    try:
+        # Get all hotels
+        hotels = get_all_hotels()
+        if not hotels:
+            return {
+                'total_hotels': 0,
+                'reordering_hotels': 0,
+                'retention_rate': 0,
+                'proactive_reorders': 0,
+                'prompted_reorders': 0,
+                'total_reorders': 0
+            }
+        
+        total_hotels = len(hotels)
+        
+        # Get reorder data
+        reorders = get_hotel_reorders()
+        reorder_count = len(reorders)
+        
+        # Get unique hotels that reordered
+        reorder_hotels = set([r['hotel_id'] for r in reorders])
+        reordering_hotels = len(reorder_hotels)
+        
+        # Calculate retention rate
+        retention_rate = (reordering_hotels / total_hotels * 100) if total_hotels > 0 else 0
+        
+        # Get proactive vs prompted reorders
+        proactive = len([r for r in reorders if r.get('was_proactive', False)])
+        prompted = len([r for r in reorders if r.get('was_prompted', True)])
+        
+        return {
+            'total_hotels': total_hotels,
+            'reordering_hotels': reordering_hotels,
+            'retention_rate': retention_rate,
+            'proactive_reorders': proactive,
+            'prompted_reorders': prompted,
+            'total_reorders': reorder_count
+        }
+    except Exception as e:
+        print(f"Error getting retention metrics: {str(e)}")
+        return {
+            'total_hotels': 0,
+            'reordering_hotels': 0,
+            'retention_rate': 0,
+            'proactive_reorders': 0,
+            'prompted_reorders': 0,
+            'total_reorders': 0
+        }
+
+def save_hotel_consumption(data: dict):
+    """Save hotel consumption pattern"""
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTEL_CONSUMPTION").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def get_hotel_consumption(hotel_id: str):
+    """Get consumption patterns for a hotel"""
+    try:
+        response = supabase.table("HOTEL_CONSUMPTION").select("*").eq("hotel_id", hotel_id).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def save_hotel_reorder(data: dict):
+    """Record a hotel reorder"""
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTEL_REORDERS").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def get_hotel_reorders(hotel_id: str = None):
+    """Get reorder history for a hotel or all hotels"""
+    try:
+        query = supabase.table("HOTEL_REORDERS").select("*")
+        if hotel_id:
+            query = query.eq("hotel_id", hotel_id)
+        response = query.order("reorder_date", desc=True).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def save_hotel_chef(data: dict):
+    """Save chef relationship"""
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTEL_CHEFS").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def get_hotel_chefs(hotel_id: str = None):
+    """Get chefs for a hotel or all hotels"""
+    try:
+        query = supabase.table("HOTEL_CHEFS").select("*")
+        if hotel_id:
+            query = query.eq("hotel_id", hotel_id)
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []

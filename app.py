@@ -108,7 +108,8 @@ from supabase_client import (
     save_hotel_reorder,
     get_hotel_reorders,
     save_hotel_chef,
-    get_hotel_chefs
+    get_hotel_chefs,
+    
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -231,6 +232,10 @@ with col2:
 
 st.markdown("---")
 
+# Add this temporarily to test
+if st.sidebar.button("Test Hotel Functions"):
+    test = get_hotel_retention_metrics()
+    st.sidebar.write("Retention metrics:", test)
 # Sidebar Filters
 with st.sidebar:
     st.markdown('<div class="section-header">📅 Filter Data</div>', unsafe_allow_html=True)
