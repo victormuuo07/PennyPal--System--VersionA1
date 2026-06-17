@@ -122,7 +122,12 @@ from supabase_client import (
     get_todays_messages,
     save_message_history,
     get_message_history,
-    update_customer_last_contact
+    update_customer_last_contact,
+    # SMS functions
+    send_sms_africastalking,
+    send_bulk_sms,
+    send_test_sms,
+    send_scheduled_messages
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
