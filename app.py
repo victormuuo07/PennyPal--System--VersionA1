@@ -1769,6 +1769,204 @@ with tab5:
         else:
             st.info("No Mama Mboga shops added yet. Add your first shop above!")
     
+    # ========== HOTEL SUCCESS & RETENTION DASHBOARD ==========
+st.markdown("---")
+st.markdown("### 📊 Hotel Success & Retention Dashboard")
+st.caption("Track which hotels are becoming dependent on SpiseUp")
+
+# Get retention metrics
+retention_metrics = get_hotel_retention_metrics()
+
+if retention_metrics:
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("🏨 Total Hotels", retention_metrics['total_hotels'])
+    with col2:
+        st.metric("🔄 Reordering Hotels", retention_metrics['reordering_hotels'])
+    with col3:
+        st.metric("📈 Retention Rate", f"{retention_metrics['retention_rate']:.0f}%")
+    with col4:
+        st.metric("📞 Proactive Reorders", retention_metrics['proactive_reorders'])
+    
+    # Progress bar for retention
+    st.progress(retention_metrics['retention_rate'] / 100)
+    if retention_metrics['retention_rate'] > 70:
+        st.success("✅ Excellent! Most hotels are reordering consistently")
+    elif retention_metrics['retention_rate'] > 40:
+        st.info("📈 Good retention. Focus on converting more hotels to repeat orders")
+    else:
+        st.warning("⚠️ Low retention. Focus on hotel satisfaction and product quality")
+
+# ========== HOTEL CONSUMPTION TRACKING ==========
+st.markdown("---")
+st.markdown("### 📦 Hotel Consumption Patterns")
+
+with st.expander("📝 Record Hotel Consumption Pattern", expanded=False):
+    hotels = get_all_hotels()
+    hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="consumption_hotel")
+        product_type = st.selectbox("Product", ["100g Bottle", "100g Refill", "Sachet 5", "Sachet 20", "Sachet 40"], key="consumption_product")
+        quantity_per_order = st.number_input("Quantity per order", min_value=1, step=1, value=5, key="consumption_qty")
+    with col2:
+        order_frequency_days = st.number_input("Order frequency (days)", min_value=1, step=1, value=14, key="consumption_freq")
+        last_order = st.date_input("Last order date", value=date.today(), key="consumption_last")
+        notes = st.text_area("Notes", key="consumption_notes")
+    
+    if st.button("💾 Save Consumption Pattern", key="save_consumption"):
+        if selected_hotel != "No hotels":
+            hotel_id = hotel_options[selected_hotel]
+            data = {
+                "hotel_id": hotel_id,
+                "product_type": product_type,
+                "quantity_per_order": quantity_per_order,
+                "order_frequency_days": order_frequency_days,
+                "average_daily_consumption": quantity_per_order / order_frequency_days,
+                "last_order_date": str(last_order),
+                "next_expected_order": str(last_order + timedelta(days=order_frequency_days)),
+                "notes": notes
+            }
+            save_hotel_consumption(data)
+            st.success(f"✅ Consumption pattern saved for {selected_hotel}")
+            st.rerun()
+
+# ========== REORDER TRACKING ==========
+st.markdown("---")
+st.markdown("### 🔄 Reorder Tracking")
+
+with st.expander("📞 Record Reorder", expanded=True):
+    hotels = get_all_hotels()
+    hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        reorder_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="reorder_hotel")
+        reorder_date = st.date_input("Reorder Date", value=date.today(), key="reorder_date")
+        reorder_product = st.selectbox("Product", ["100g Bottle", "100g Refill", "Sachet 5", "Sachet 20", "Sachet 40"], key="reorder_product")
+    with col2:
+        reorder_quantity = st.number_input("Quantity", min_value=1, step=1, value=5, key="reorder_qty")
+        was_proactive = st.checkbox("They called us (proactive)", value=False)
+        reorder_notes = st.text_area("Notes", key="reorder_notes")
+    
+    if st.button("💾 Record Reorder", key="save_reorder"):
+        if reorder_hotel != "No hotels":
+            hotel_id = hotel_options[reorder_hotel]
+            data = {
+                "hotel_id": hotel_id,
+                "reorder_date": str(reorder_date),
+                "product_type": reorder_product,
+                "quantity": reorder_quantity,
+                "was_proactive": was_proactive,
+                "was_prompted": not was_proactive,
+                "notes": reorder_notes
+            }
+            save_hotel_reorder(data)
+            st.success(f"✅ Reorder recorded for {reorder_hotel}")
+            st.balloons()
+            st.rerun()
+
+# ========== CHEF RELATIONSHIP TRACKING ==========
+st.markdown("---")
+st.markdown("👨‍🍳 Chef Relationship Tracking")
+
+with st.expander("👨‍🍳 Add/Update Chef Relationship", expanded=False):
+    hotels = get_all_hotels()
+    hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        chef_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="chef_hotel")
+        chef_name = st.text_input("Chef Name", key="chef_name")
+        chef_phone = st.text_input("Chef Phone", key="chef_phone")
+    with col2:
+        preferred_product = st.selectbox("Preferred Product", ["100g Bottle", "100g Refill", "Sachet 5", "Sachet 20", "Sachet 40"], key="chef_product")
+        relationship_score = st.slider("Relationship Score (1-10)", 1, 10, 5, key="chef_score")
+        chef_feedback = st.text_area("Feedback/Notes", key="chef_feedback")
+    
+    if st.button("💾 Save Chef Relationship", key="save_chef"):
+        if chef_hotel != "No hotels" and chef_name:
+            hotel_id = hotel_options[chef_hotel]
+            data = {
+                "hotel_id": hotel_id,
+                "chef_name": chef_name,
+                "phone": chef_phone,
+                "preferred_product": preferred_product,
+                "feedback_notes": chef_feedback,
+                "relationship_score": relationship_score
+            }
+            save_hotel_chef(data)
+            st.success(f"✅ Chef {chef_name} saved for {chef_hotel}")
+            st.rerun()
+
+# ========== HOTEL SUCCESS SCORECARD ==========
+st.markdown("---")
+st.markdown("### 🏆 Hotel Success Scorecard")
+
+# Display all hotels with their success metrics
+hotels = get_all_hotels()
+if hotels:
+    scorecard_data = []
+    for hotel in hotels:
+        # Get consumption patterns
+        consumption = get_hotel_consumption(hotel['id'])
+        avg_consumption = sum(c['quantity_per_order'] for c in consumption) / len(consumption) if consumption else 0
+        
+        # Get reorders
+        reorders = get_hotel_reorders(hotel['id'])
+        total_reorders = len(reorders)
+        proactive_reorders = len([r for r in reorders if r.get('was_proactive', False)])
+        
+        # Get chefs
+        chefs = get_hotel_chefs(hotel['id'])
+        
+        # Calculate score (simplified)
+        score = 0
+        if total_reorders > 0:
+            score += min(total_reorders * 5, 30)  # Up to 30 points for reorders
+        if proactive_reorders > 0:
+            score += min(proactive_reorders * 10, 30)  # Up to 30 points for proactive reorders
+        if chefs:
+            score += min(len(chefs) * 10, 20)  # Up to 20 points for chef relationships
+        if avg_consumption > 0:
+            score += min(int(avg_consumption * 2), 20)  # Up to 20 points for consumption
+        
+        scorecard_data.append({
+            "Hotel": hotel['hotel_name'],
+            "Total Reorders": total_reorders,
+            "Proactive Reorders": proactive_reorders,
+            "Chefs": len(chefs),
+            "Avg Consumption": f"{avg_consumption:.1f} units/order",
+            "Success Score": min(score, 100)
+        })
+    
+    df_scorecard = pd.DataFrame(scorecard_data)
+    df_scorecard = df_scorecard.sort_values('Success Score', ascending=False)
+    
+    st.dataframe(
+        df_scorecard,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Hotel": "Hotel Name",
+            "Total Reorders": "Reorders",
+            "Proactive Reorders": "Proactive",
+            "Chefs": "Chefs",
+            "Avg Consumption": "Consumption",
+            "Success Score": st.column_config.ProgressColumn("Score", format="%d", min_value=0, max_value=100)
+        }
+    )
+    
+    # Identify top hotels
+    top_hotels = df_scorecard.head(5)['Hotel'].tolist()
+    if top_hotels:
+        st.success(f"🏆 **Top 5 Hotels:** {', '.join(top_hotels)}")
+        
+    # Hotels needing attention
+    low_score_hotels = df_scorecard[df_scorecard['Success Score'] < 40]['Hotel'].tolist()
+    if low_score_hotels:
+        st.warning(f"⚠️ **Hotels needing attention:** {', '.join(low_score_hotels)}")
     # ========== REFILL PREDICTOR ==========
         st.markdown("---")
         st.markdown("### 🔮 Refill Predictor")
