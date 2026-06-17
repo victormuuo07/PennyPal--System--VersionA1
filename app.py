@@ -5268,7 +5268,7 @@ with tab17:
         st.markdown("**1. Checking Secrets:**")
         try:
             api_key = st.secrets["AFRICASTALKING_API_KEY"]
-            username = st.secrets.get("AFRICASTALKING_USERNAME", "sandbox")
+            username = st.secrets.get("AFRICASTALKING_USERNAME", "SpiseUp")
             st.success(f"✅ API Key found: {api_key[:5]}...{api_key[-5:]}")
             st.success(f"✅ Username: {username}")
         except Exception as e:
