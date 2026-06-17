@@ -1,4 +1,38 @@
 # .streamlit/config.toml
 [server]
-watchdog_polling = true
-fileWatcherType = "none"
+# Address to bind the server to
+# address = "0.0.0.0"
+
+# Port to bind the server to
+# port = 8501
+
+# Maximum size of messages that can be sent over the WebSocket
+# maxMessageSize = 200
+
+# Enable CORS headers
+# enableCORS = true
+
+# Enable XSRF protection
+# enableXsrfProtection = true
+
+# Path to the static assets directory
+# staticFolder = "./static"
+
+# Path to the assets directory
+# assetsFolder = "./assets"
+
+[theme]
+# Primary color
+# primaryColor = "#FF4B4B"
+
+# Background color
+# backgroundColor = "#FFFFFF"
+
+# Secondary background color
+# secondaryBackgroundColor = "#F0F2F6"
+
+# Text color
+# textColor = "#31333F"
+
+# Font
+# font = "sans serif"
