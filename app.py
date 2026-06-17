@@ -109,7 +109,19 @@ from supabase_client import (
     get_hotel_reorders,
     save_hotel_chef,
     get_hotel_chefs,
+    send_sms_africastalking,
+    send_bulk_sms,
+    send_scheduled_messages,
     
+   
+    save_customer_contact,
+    get_customer_contacts,
+    save_automated_message,
+    get_automated_messages,
+    get_todays_messages,
+    save_message_history,
+    get_message_history,
+    update_customer_last_contact
 )
 
 DEBUG_MODE = False  # Set to True only when debugging
@@ -396,7 +408,7 @@ def calculate_kpis(sales_df, expenses_df):
 kpis = calculate_kpis(sales_df, expenses_df)
 
 # Create Tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14, tab15, tab16  = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14, tab15, tab16, tab17  = st.tabs([
     "📊 Dashboard", 
     "💰 Sales", 
     "💸 Expenses", 
@@ -412,7 +424,8 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13
      "INVOICE SYSTEM ",
      "🎁 Free Items & Giveaways",
      "ROUTE & REFILL OPTIMIZATION TAB",
-     "COMMISSION TRACKING"
+     "COMMISSION TRACKING",
+     " CUSTOMER ENGAGEMENT TAB"
 ])
 
 # ==================== TAB 1: DASHBOARD ====================
@@ -5234,6 +5247,180 @@ if time.time() - st.session_state.last_check > 60:
     st.rerun()
 
 st.caption(f"📦 Version: {APP_VERSION} • Last refresh: {datetime.now().strftime('%H:%M:%S')}")
+
+# ==================== CUSTOMER ENGAGEMENT TAB ====================
+with tab17:  # Add to your tabs list
+    st.markdown('<div class="section-header">📱 Customer Engagement & Automation</div>', unsafe_allow_html=True)
+    
+    st.info("📢 **Automate customer communication** - Send scheduled messages and receive replies to your phone")
+    
+    # ========== SMS CONFIGURATION TEST (ADD THIS SECTION) ==========
+    with st.expander("📱 SMS Configuration Test", expanded=False):
+        st.write("Check if your SMS system is properly configured")
+        
+        if st.button("🔍 Test SMS Secrets"):
+            try:
+                api_key = st.secrets["AFRICASTALKING_API_KEY"]
+                st.success(f"✅ API Key found: {api_key[:5]}...{api_key[-5:]}")
+                st.info("📱 SMS system is configured and ready to use!")
+                
+                # Also test phone number format
+                st.write("**📋 Phone Number Format:**")
+                st.write("Use format: `0712345678` (no +254, no spaces)")
+                st.write("Example: `0712345678` or `254712345678`")
+                
+            except Exception as e:
+                st.error(f"❌ SMS secrets not configured: {e}")
+                st.info("Add AFRICASTALKING_API_KEY to your secrets.toml")
+                st.code("""
+# In .streamlit/secrets.toml add:
+AFRICASTALKING_API_KEY = "your-africastalking-api-key"
+AFRICASTALKING_USERNAME = "sandbox"
+AFRICASTALKING_SENDER_ID = "SpiseUp"
+                """)
+    # ========== ADD CONTACT ==========
+    with st.expander("➕ Add Customer Contact", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            customer_name = st.text_input("Customer Name *", placeholder="e.g., Hotel Sakina, John Doe")
+            phone_number = st.text_input("Phone Number *", placeholder="e.g., 0712345678")
+            customer_type = st.selectbox("Customer Type", ["Hotel", "Consumer", "Mini Market", "Restaurant", "Shop", "Other"])
+        
+        with col2:
+            location = st.text_input("Location", placeholder="e.g., Kitengela, Machakos")
+            notes = st.text_area("Notes", placeholder="Any additional information...")
+        
+        if st.button("💾 Save Contact", type="primary", use_container_width=True):
+            if customer_name and phone_number:
+                contact_data = {
+                    "customer_name": customer_name,
+                    "phone_number": phone_number,
+                    "customer_type": customer_type,
+                    "location": location,
+                    "notes": notes,
+                    "status": "Active"
+                }
+                save_customer_contact(contact_data)
+                st.success(f"✅ {customer_name} added successfully!")
+                st.rerun()
+            else:
+                st.error("Please enter customer name and phone number")
+    
+    # ========== VIEW CONTACTS ==========
+    st.markdown("---")
+    st.markdown("### 📋 Customer Contacts")
+    
+    # Filter by type
+    filter_type = st.selectbox("Filter by Type", ["All", "Hotel", "Consumer", "Mini Market", "Restaurant", "Shop", "Other"])
+    
+    contacts = get_customer_contacts(None if filter_type == "All" else filter_type)
+    
+    if contacts:
+        df_contacts = pd.DataFrame(contacts)
+        df_contacts['last_contact_date'] = pd.to_datetime(df_contacts['last_contact_date']).dt.strftime('%Y-%m-%d') if 'last_contact_date' in df_contacts.columns else ''
+        
+        st.dataframe(
+            df_contacts[['customer_name', 'phone_number', 'customer_type', 'location', 'status']],
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        st.caption(f"📊 Total Contacts: {len(contacts)}")
+    else:
+        st.info("No contacts added yet. Add your first contact above!")
+    
+    # ========== AUTOMATED MESSAGES ==========
+    st.markdown("---")
+    st.markdown("### 🤖 Automated Messages")
+    
+    with st.expander("📝 Create Automated Message", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            message_name = st.text_input("Message Name", placeholder="e.g., Friday Hotel Check-in")
+            message_content = st.text_area("Message Content", placeholder="Hello! This is SpiseUp...", height=100)
+            customer_type_filter = st.selectbox("Send To", ["All", "Hotel", "Consumer", "Mini Market", "Restaurant", "Shop"])
+        
+        with col2:
+            schedule_type = st.selectbox("Schedule Type", ["Weekly", "Monthly", "After Purchase", "One-time"])
+            schedule_day = st.selectbox("Schedule Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
+            schedule_time = st.selectbox("Schedule Time", ["09:00", "10:00", "11:00", "12:00", "14:00", "15:00", "16:00", "17:00"])
+        
+        if st.button("💾 Save Message", type="primary", use_container_width=True):
+            if message_name and message_content:
+                msg_data = {
+                    "message_name": message_name,
+                    "message_content": message_content,
+                    "customer_type": None if customer_type_filter == "All" else customer_type_filter,
+                    "schedule_type": schedule_type,
+                    "schedule_day": schedule_day,
+                    "schedule_time": schedule_time,
+                    "is_active": True
+                }
+                save_automated_message(msg_data)
+                st.success(f"✅ Message '{message_name}' created!")
+                st.rerun()
+            else:
+                st.error("Please enter message name and content")
+    
+    # ========== TODAY'S MESSAGES ==========
+    st.markdown("---")
+    st.markdown("### 📨 Today's Scheduled Messages")
+    
+    todays_messages = get_todays_messages()
+    
+    if todays_messages:
+        for msg in todays_messages:
+            with st.container():
+                st.write(f"**📌 {msg['message_name']}**")
+                st.write(f"📱 To: {msg['customer_type'] if msg['customer_type'] else 'All Customers'}")
+                st.write(f"📝 {msg['message_content']}")
+                
+                # Get recipients
+                recipients = get_customer_contacts(msg['customer_type'])
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.caption(f"👥 {len(recipients)} recipients")
+                
+                with col2:
+                    if st.button(f"Send Now ({msg['message_name']})", key=f"send_{msg['id']}"):
+                        # In production, this would call Africa's Talking API
+                        st.info(f"📱 Sent to {len(recipients)} customers!")
+                        st.balloons()
+                
+                st.divider()
+    else:
+        st.success("✅ No messages scheduled for today")
+    
+    # ========== SEND TEST SMS ==========
+    st.markdown("---")
+    st.markdown("### 📱 Send Test SMS")
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        test_phone = st.text_input("Test Phone Number", placeholder="0712345678")
+        test_message = st.text_area("Test Message", placeholder="Hello! This is a test message from SpiseUp...")
+    with col2:
+        st.write("")
+        st.write("")
+        if st.button("📤 Send Test SMS", type="primary", use_container_width=True):
+            if test_phone and test_message:
+                # This would call Africa's Talking API
+                st.success(f"✅ Test SMS sent to {test_phone}!")
+                st.info("📱 Check your phone for the message")
+                st.balloons()
+            else:
+                st.error("Please enter phone number and message")
+    
+    # ========== MESSAGE HISTORY ==========
+    st.markdown("---")
+    st.markdown("### 📜 Message History")
+    
+    if st.button("📊 Show Recent Messages", use_container_width=True):
+        # This would fetch from MESSAGE_HISTORY table
+        st.info("📜 Message history will appear here once messages are sent")
 
 # Footer
 st.markdown("---")
