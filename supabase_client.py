@@ -12,11 +12,34 @@ import requests
 # -------------------------------
 # Initialize Supabase client
 # -------------------------------
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_SERVICE_KEY"]
+def get_supabase_client():
+    """Get Supabase client with retry logic and timeout"""
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            SUPABASE_URL = st.secrets["SUPABASE_URL"]
+            SUPABASE_KEY = st.secrets["SUPABASE_SERVICE_KEY"]
+            
+            client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            
+            # Test connection
+            test_response = client.table("SALES").select("*").limit(1).execute()
+            return client
+            
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                st.error(f"❌ Failed to connect to Supabase after {max_retries} attempts")
+                st.error(f"Error: {str(e)}")
+                st.info("💡 Check your internet connection and Supabase credentials")
+                st.stop()
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+# Initialize client
+supabase = get_supabase_client()
 # -------------------------------
 # SALES FUNCTIONS
 # -------------------------------
