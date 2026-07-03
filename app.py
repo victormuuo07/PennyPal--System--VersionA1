@@ -5184,10 +5184,16 @@ with tab17:  # or whatever tab number you used
         test_msg = st.text_area("Test Message:", "Hello from SpiseUp - testing SMS", key="diag_msg")
         
         if st.button("📤 Send Test", key="diag_send"):
+            st.write("🔵 Button clicked")
             phone = format_phone(test_phone)
+            st.write(f"🔵 Formatted phone: {phone}")
             message = sanitize_message(test_msg)
+            st.write(f"🔵 Sanitized message: '{message}' (length: {len(message)})")
+    
             with st.spinner("Sending..."):
+                st.write("🔵 About to call send_sms_africastalking...")
                 result = send_sms_africastalking(phone, message)
+                st.write("🔵 Call completed, result received")
                 st.write("**Response:**")
                 st.json(result)
                 if result.get("status") == "success":
