@@ -104,6 +104,7 @@ from supabase_client import (
     mark_commission_paid,
     get_commission_summary,
      get_hotel_retention_metrics,
+      get_hotel_territory_analysis,
     save_hotel_consumption,
     get_hotel_consumption,
     save_hotel_reorder,
