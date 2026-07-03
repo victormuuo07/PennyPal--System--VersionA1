@@ -1985,12 +1985,10 @@ def update_customer_last_contact(customer_id: str):
 def send_sms_africastalking(phone_number, message):
     """Send SMS via Africa's Talking API"""
     try:
-        # Get config from secrets
         api_key = st.secrets["AFRICASTALKING_API_KEY"]
         username = st.secrets.get("AFRICASTALKING_USERNAME", "sandbox")
         sender_id = st.secrets.get("AFRICASTALKING_SENDER_ID", "SpiseUp")
         
-        # Format phone number correctly
         phone = phone_number.strip().replace(" ", "").replace("+", "")
         if phone.startswith("0"):
             phone = "254" + phone[1:]
@@ -2009,18 +2007,18 @@ def send_sms_africastalking(phone_number, message):
             "from": sender_id
         }
         
-        response = requests.post(url, headers=headers, data=data)
+        response = requests.post(url, headers=headers, data=data, timeout=15)
         result = response.json()
         
-        # Check if successful
         if response.status_code == 200 and 'SMSMessageData' in result:
             if result['SMSMessageData']['Recipients'][0]['status'] == 'Success':
                 return {"status": "success", "result": result}
         
-        return {"status": "error", "result": result}
+        return {"status": "error", "http_status": response.status_code, "result": result}
         
+    except requests.exceptions.Timeout:
+        return {"status": "error", "message": "Request timed out after 15s — Africa's Talking API may be unreachable"}
     except Exception as e:
-        print(f"Error sending SMS: {str(e)}")
         return {"status": "error", "message": str(e)}
 
 def send_bulk_sms(phone_numbers, message):
