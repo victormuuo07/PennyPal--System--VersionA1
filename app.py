@@ -5185,8 +5185,10 @@ with tab17:  # or whatever tab number you used
         st.markdown("**4. Send Test SMS:**")
         test_msg = st.text_area("Test Message:", "Hello from SpiseUp - testing SMS", key="diag_msg")
         
-        if st.button("📤 Send Test", key="diag_send"):
-            st.error("🚨 BUTTON WAS CLICKED")
+        st.write("---")
+        if st.button("🚨 TOP-LEVEL TEST BUTTON"):
+            st.error("🚨 THIS BUTTON WORKS")
+            st.write("---")
             phone = format_phone(test_phone)
             st.write(f"🔵 Formatted phone: {phone}")
             message = sanitize_message(test_msg)
