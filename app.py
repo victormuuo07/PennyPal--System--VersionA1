@@ -24,14 +24,7 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
 
-# Auto-refresh every 30 seconds
-if 'last_refresh' not in st.session_state:
-    st.session_state.last_refresh = datetime.now()
 
-time_since_refresh = (datetime.now() - st.session_state.last_refresh).total_seconds()
-if time_since_refresh > 30:
-    st.session_state.last_refresh = datetime.now()
-    st.rerun()
 
 # Supabase functions
 from supabase_client import (
@@ -5384,6 +5377,13 @@ with tab17:  # or whatever tab number you used
                 st.info("Click the link above to open WhatsApp with your message")
     else:
         st.info("No contacts yet. Add some contacts first!")
+
+if 'last_check' not in st.session_state:
+    st.session_state.last_check = time.time()
+
+if time.time() - st.session_state.last_check > 60:
+    st.session_state.last_check = time.time()
+    st.rerun()
 
 # Footer
 st.markdown("---")
