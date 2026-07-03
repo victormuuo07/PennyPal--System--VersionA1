@@ -11,6 +11,7 @@ import uuid
 from sklearn.linear_model import LinearRegression
 import pandas as pd
 import requests
+import urllib.parse
 
 APP_VERSION = "2.0.0"
 st.cache_data.clear()
@@ -118,7 +119,7 @@ from supabase_client import (
     
    
     save_customer_contact,
-    get_customer_contacts,
+    delete_customer_contact,
     save_automated_message,
     get_automated_messages,
     get_todays_messages,
@@ -5183,46 +5184,17 @@ with tab17:  # or whatever tab number you used
         test_msg = st.text_area("Test Message:", "Hello from SpiseUp - testing SMS", key="diag_msg")
         
         if st.button("📤 Send Test", key="diag_send"):
-            try:
-                phone = format_phone(test_phone)
-                message = sanitize_message(test_msg)
-                
-                api_key = st.secrets["AFRICASTALKING_API_KEY"]
-                
-                url = "https://api.africastalking.com/version1/messaging"
-                headers = {
-                    "apiKey": api_key,
-                    "Content-Type": "application/x-www-form-urlencoded"
-                }
-                data = {
-                    "username": "sandbox",
-                    "to": phone,
-                    "message": message,
-                    "from": "SMS"
-                }
-                
-                with st.spinner("Sending..."):
-                    response = requests.post(url, headers=headers, data=data)
-                    result = response.json()
-                    
-                    st.write("**Response:**")
-                    st.json(result)
-                    
-                    if response.status_code == 200:
-                        if 'SMSMessageData' in result:
-                            recipients = result['SMSMessageData'].get('Recipients', [])
-                            if recipients and recipients[0].get('status') == 'Success':
-                                st.success("✅ SMS SENT SUCCESSFULLY!")
-                                st.balloons()
-                            else:
-                                st.error(f"❌ Failed: {recipients}")
-                        else:
-                            st.error(f"❌ Error: {result}")
-                    else:
-                        st.error(f"❌ HTTP Error: {response.status_code}")
-                        
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
+            phone = format_phone(test_phone)
+            message = sanitize_message(test_msg)
+            with st.spinner("Sending..."):
+                result = send_sms_africastalking(phone, message)
+                st.write("**Response:**")
+                st.json(result)
+                if result.get("status") == "success":
+                    st.success("✅ SMS SENT SUCCESSFULLY!")
+                    st.balloons()
+                else:
+                    st.error(f"❌ Failed: {result}")
     
     # ========== ADD CONTACT ==========
     with st.expander("➕ Add Customer Contact", expanded=True):
@@ -5397,7 +5369,7 @@ with tab17:  # or whatever tab number you used
                 value=f"Hello {contact_data['customer_name']}! This is SpiseUp. How are you enjoying our Spicy Salt?")
             
             if st.button("📱 Send via WhatsApp"):
-                whatsapp_url = f"https://wa.me/{wa_phone}?text={whatsapp_message.replace(' ', '%20').replace('\n', '%0A')}"
+                whatsapp_url = f"https://wa.me/{wa_phone}?text={urllib.parse.quote(whatsapp_message)}"
                 st.markdown(f'<a href="{whatsapp_url}" target="_blank">📱 Click to Send on WhatsApp</a>', unsafe_allow_html=True)
                 st.info("Click the link above to open WhatsApp with your message")
     else:

@@ -1,9 +1,6 @@
 from supabase import create_client, Client
 import uuid
 import streamlit as st
-from supabase import create_client, Client
-import uuid
-import streamlit as st
 import pandas as pd
 from datetime import date, datetime, timedelta
 import requests 
@@ -1880,36 +1877,58 @@ def get_hotel_chefs(hotel_id: str = None):
 # CUSTOMER ENGAGEMENT FUNCTIONS
 # -------------------------------
 
-def save_customer_contact(data: dict):
-    """Save a customer contact"""
+def save_customer_contact(customer_name: str, phone_number: str, customer_type: str, location: str = "", notes: str = ""):
+    """Save a customer contact. Returns dict with status/message for app.py to check."""
     try:
-        data["id"] = str(uuid.uuid4())
+        formatted_phone = format_phone(phone_number)
+        existing = supabase.table("CUSTOMER_CONTACTS").select("*").eq("phone_number", formatted_phone).execute()
+        if existing.data:
+            return {"status": "exists", "message": f"Contact with phone {phone_number} already exists"}
+
+        data = {
+            "id": str(uuid.uuid4()),
+            "customer_name": customer_name,
+            "phone_number": formatted_phone,
+            "customer_type": customer_type,
+            "location": location,
+            "notes": notes,
+            "status": "Active"
+        }
         response = supabase.table("CUSTOMER_CONTACTS").insert(data).execute()
-        return response.data[0]["id"] if response.data else None
+        if response.data:
+            return {"status": "success", "message": f"Saved {customer_name}"}
+        return {"status": "error", "message": "No data returned from insert"}
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return None
-
-def get_customer_contacts(customer_type: str = None):
-    """Get customer contacts, optionally filtered by type"""
+        return {"status": "error", "message": str(e)}
+def delete_customer_contact(contact_id: str):
+    """Delete a customer contact"""
     try:
-        query = supabase.table("CUSTOMER_CONTACTS").select("*").eq("status", "Active")
-        if customer_type:
-            query = query.eq("customer_type", customer_type)
-        response = query.order("customer_name").execute()
-        return response.data if response.data else []
+        supabase.table("CUSTOMER_CONTACTS").delete().eq("id", contact_id).execute()
+        return True
     except Exception as e:
-        return []
+        st.error(f"Error deleting contact: {str(e)}")
+        return False
+    
 
-def save_automated_message(data: dict):
-    """Save an automated message template"""
+def save_automated_message(message_name: str, message_content: str, customer_type: str, schedule_type: str, schedule_day: str, schedule_time: str):
+    """Save an automated message template. Returns dict with status/message."""
     try:
-        data["id"] = str(uuid.uuid4())
+        data = {
+            "id": str(uuid.uuid4()),
+            "message_name": message_name,
+            "message_content": message_content,
+            "customer_type": None if customer_type == "All" else customer_type,
+            "schedule_type": schedule_type,
+            "schedule_day": schedule_day,
+            "schedule_time": schedule_time,
+            "is_active": True
+        }
         response = supabase.table("AUTOMATED_MESSAGES").insert(data).execute()
-        return response.data[0]["id"] if response.data else None
+        if response.data:
+            return {"status": "success", "message": f"Saved message '{message_name}'"}
+        return {"status": "error", "message": "No data returned from insert"}
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return None
+        return {"status": "error", "message": str(e)}
 
 def get_automated_messages():
     """Get all automated messages"""
