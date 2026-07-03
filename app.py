@@ -5186,7 +5186,7 @@ with tab17:  # or whatever tab number you used
         test_msg = st.text_area("Test Message:", "Hello from SpiseUp - testing SMS", key="diag_msg")
         
         if st.button("📤 Send Test", key="diag_send"):
-            st.write("🔵 Button clicked")
+            st.error("🚨 BUTTON WAS CLICKED")
             phone = format_phone(test_phone)
             st.write(f"🔵 Formatted phone: {phone}")
             message = sanitize_message(test_msg)
