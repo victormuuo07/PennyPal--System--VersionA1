@@ -2134,27 +2134,28 @@ def verify_api_key():
     """Check if API key exists and is valid"""
     try:
         api_key = st.secrets["AFRICASTALKING_API_KEY"]
+        username = st.secrets.get("AFRICASTALKING_USERNAME", "sandbox")
         
-        # Check key format
         if not api_key.startswith("atsk_"):
             return "❌ API key should start with 'atsk_'"
         
-        # Test the key
-        url = "https://api.africastalking.com/version1/user"
+        url = f"https://api.africastalking.com/version1/user?username={username}"
         response = requests.get(url, headers={"apiKey": api_key})
         
         if response.status_code == 200:
             return "✅ API key is valid"
         else:
-            return f"❌ API key invalid: {response.status_code}"
-    except:
-        return "❌ API key not found in secrets"
+            return f"❌ API key invalid: {response.status_code} - {response.text}"
+    except Exception as e:
+        return f"❌ API key not found in secrets: {str(e)}"
 
 def check_at_balance():
     """Check Africa's Talking balance"""
     try:
         api_key = st.secrets["AFRICASTALKING_API_KEY"]
-        url = "https://api.africastalking.com/version1/user"
+        username = st.secrets.get("AFRICASTALKING_USERNAME", "sandbox")
+        
+        url = f"https://api.africastalking.com/version1/user?username={username}"
         headers = {"apiKey": api_key}
         response = requests.get(url, headers=headers)
         
@@ -2162,9 +2163,9 @@ def check_at_balance():
             data = response.json()
             balance = data.get('UserData', {}).get('balance', '0')
             return f"💰 Balance: {balance}"
-        return "Could not check balance"
-    except:
-        return "Error checking balance"
+        return f"Could not check balance: {response.status_code} - {response.text}"
+    except Exception as e:
+        return f"Error checking balance: {str(e)}"
 
 def format_phone(phone):
     """Format phone number correctly for Africa's Talking"""
