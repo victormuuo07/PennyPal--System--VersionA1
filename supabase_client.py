@@ -1,26 +1,51 @@
 from supabase import create_client, Client
 import uuid
 import streamlit as st
+from supabase import create_client, Client
+import uuid
+import streamlit as st
 import pandas as pd
 from datetime import date, datetime
-from datetime import date, datetime
+import requests 
 
 
 # -------------------------------
 # Initialize Supabase client
 # -------------------------------
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_SERVICE_KEY"]
+def get_supabase_client():
+    """Get Supabase client with retry logic and timeout"""
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            SUPABASE_URL = st.secrets["SUPABASE_URL"]
+            SUPABASE_KEY = st.secrets["SUPABASE_SERVICE_KEY"]
+            
+            client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            
+            # Test connection
+            test_response = client.table("SALES").select("*").limit(1).execute()
+            return client
+            
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                st.error(f"❌ Failed to connect to Supabase after {max_retries} attempts")
+                st.error(f"Error: {str(e)}")
+                st.info("💡 Check your internet connection and Supabase credentials")
+                st.stop()
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+# Initialize client
+supabase = get_supabase_client()
 # -------------------------------
 # SALES FUNCTIONS
 # -------------------------------
 def save_sale(record: dict):
     """Save a sale to the SALES table - returns sale_id if successful, None if failed"""
     try:
-        st.cache_data.clear()
         if "id" not in record or not record["id"]:
             record["id"] = str(uuid.uuid4())
 
@@ -57,7 +82,6 @@ def save_sale(record: dict):
 def save_distribution(record: dict):
     """Save a distribution record linking a sale to a salesperson - returns True if successful"""
     try:
-        st.cache_data.clear()
         if "id" not in record or not record["id"]:
             record["id"] = str(uuid.uuid4())
         
@@ -81,7 +105,6 @@ def save_distribution(record: dict):
         st.error(f"Error saving distribution: {str(e)}")
         return False
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_sales_summary():
     """Fetch all sales from Supabase"""
     response = supabase.table("SALES").select("*").execute()
@@ -111,7 +134,6 @@ def save_expense(record: dict):
     if error:
         st.error(f"Error saving expense: {error}")
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_expenses_summary():
     """Fetch all expenses from Supabase"""
     response = supabase.table("EXPENSES").select("*").execute()
@@ -124,7 +146,6 @@ def get_expenses_summary():
 # -------------------------------
 # SALESPEOPLE FUNCTIONS
 # -------------------------------
-@st.cache_data(ttl=30, show_spinner=False)
 def get_sales_people():
     """Fetch all salespeople"""
     response = supabase.table("SALES_PEOPLE").select("*").execute()
@@ -160,7 +181,6 @@ def save_sales_person(full_name: str, phone: str, role: str, location: str, stat
 def save_distribution(sale_id: str, sales_person_id: str, quantity: int, sale_date: str, price: float, sale_data: dict = None):
     """Save a distribution record linking a sale to a salesperson"""
     try:
-        st.cache_data.clear()
         distribution_record = {
             "id": str(uuid.uuid4()),
             "date": sale_date,
@@ -189,7 +209,6 @@ def save_distribution(sale_id: str, sales_person_id: str, quantity: int, sale_da
         st.error(f"Exception while saving distribution: {str(e)}")
         return False
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_distribution_data(start_date=None, end_date=None):
     """Fetch distribution records with optional date filtering"""
     query = supabase.table("DISTRIBUTION").select("*")
@@ -213,7 +232,6 @@ def get_distribution_data(start_date=None, end_date=None):
 def save_batch(batch_data: dict):
     """Save a production batch"""
     try:
-        st.cache_data.clear()
         batch_data["id"] = str(uuid.uuid4())
         response = supabase.table("BATCHES").insert(batch_data).execute()
         if hasattr(response, 'error') and response.error:
@@ -224,7 +242,6 @@ def save_batch(batch_data: dict):
         st.error(f"Error saving batch: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_batches():
     """Get all production batches"""
     try:
@@ -237,7 +254,6 @@ def get_batches():
 def save_production_output(output_data: dict):
     """Save finished goods from batch"""
     try:
-        st.cache_data.clear()
         output_data["id"] = str(uuid.uuid4())
         response = supabase.table("PRODUCTION_OUTPUT").insert(output_data).execute()
         return True
@@ -245,7 +261,6 @@ def save_production_output(output_data: dict):
         st.error(f"Error saving production output: {str(e)}")
         return False
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_raw_materials():
     """Get current raw materials inventory"""
     try:
@@ -258,7 +273,6 @@ def get_raw_materials():
 def save_restock(restock_data: dict):
     """Save restock record and update inventory"""
     try:
-        st.cache_data.clear()
         restock_data["id"] = str(uuid.uuid4())
         response = supabase.table("STOCK_RESTOCK").insert(restock_data).execute()
         
@@ -281,7 +295,6 @@ def save_restock(restock_data: dict):
         st.error(f"Error saving restock: {str(e)}")
         return False
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_finished_goods():
     """Get finished goods inventory"""
     try:
@@ -294,7 +307,6 @@ def get_finished_goods():
 def update_raw_material_stock(material_name: str, quantity_used_kg: float):
     """Update raw material stock after production"""
     try:
-        st.cache_data.clear()
         response = supabase.table("RAW_MATERIALS_INVENTORY").select("*").eq("material_name", material_name).execute()
         if response.data:
             current_stock = response.data[0]["current_stock_kg"]
@@ -308,7 +320,6 @@ def update_raw_material_stock(material_name: str, quantity_used_kg: float):
 def update_finished_goods_production(product_type: str, quantity_produced: int):
     """Increase finished goods stock when production is made"""
     try:
-        st.cache_data.clear()
         response = supabase.table("FINISHED_GOODS_INVENTORY")\
             .select("*")\
             .eq("product_type", product_type)\
@@ -350,7 +361,6 @@ def update_finished_goods_production(product_type: str, quantity_produced: int):
 def save_funding(funding_data: dict):
     """Save a funding record"""
     try:
-        st.cache_data.clear()
         funding_data["id"] = str(uuid.uuid4())
         response = supabase.table("FUNDING").insert(funding_data).execute()
         if hasattr(response, 'error') and response.error:
@@ -361,7 +371,6 @@ def save_funding(funding_data: dict):
         st.error(f"Error saving funding: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_funding():
     """Get all funding records"""
     try:
@@ -371,7 +380,6 @@ def get_funding():
         st.error(f"Error fetching funding: {str(e)}")
         return []
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_total_funding():
     """Get total funding amount"""
     try:
@@ -385,7 +393,6 @@ def get_total_funding():
 def update_funding(funding_id: str, updates: dict):
     """Update a funding record"""
     try:
-        st.cache_data.clear()
         response = supabase.table("FUNDING").update(updates).eq("id", funding_id).execute()
         return True
     except Exception as e:
@@ -395,7 +402,6 @@ def update_funding(funding_id: str, updates: dict):
 def delete_funding(funding_id: str):
     """Delete a funding record"""
     try:
-        st.cache_data.clear()
         response = supabase.table("FUNDING").delete().eq("id", funding_id).execute()
         return True
     except Exception as e:
@@ -406,7 +412,6 @@ def delete_funding(funding_id: str):
 # ADVANCED INVENTORY TRACKING FUNCTIONS
 # -------------------------------
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_material_balance(material_name: str):
     """Calculate current stock based on all transactions"""
     try:
@@ -512,7 +517,6 @@ def record_material_usage(batch_id: str, material_name: str, quantity_used_kg: f
         print(f"Error recording usage: {str(e)}")
         return False
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_inventory_transactions(material_name: str = None, start_date=None, end_date=None):
     """Get inventory transactions with filters"""
     try:
@@ -530,7 +534,6 @@ def get_inventory_transactions(material_name: str = None, start_date=None, end_d
         print(f"Error fetching transactions: {str(e)}")
         return []
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_material_usage_summary(batch_id: str = None):
     """Get summary of material usage for a batch"""
     try:
@@ -552,7 +555,6 @@ def get_material_usage_summary(batch_id: str = None):
         print(f"Error fetching usage summary: {str(e)}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_all_material_usage():
     """Get all material usage across all batches"""
     try:
@@ -749,7 +751,6 @@ def record_material_usage_with_balance(batch_id: str, material_name: str, quanti
         st.error(f"Error recording usage: {str(e)}")
         return False
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_current_material_balance(material_name: str):
     """Get current balance for a material from RAW_MATERIALS_INVENTORY"""
     try:
@@ -768,7 +769,6 @@ def get_current_material_balance(material_name: str):
 def update_raw_material_inventory(material_name: str, purchased_kg: float = 0, used_kg: float = 0):
     """Update the raw materials inventory table"""
     try:
-        st.cache_data.clear()
         response = supabase.table("RAW_MATERIALS_INVENTORY")\
             .select("*")\
             .eq("material_name", material_name)\
@@ -793,7 +793,6 @@ def update_raw_material_inventory(material_name: str, purchased_kg: float = 0, u
         print(f"Error updating inventory: {str(e)}")
         return False
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_material_restock_history(material_name: str):
     """Get all restock history for a material"""
     try:
@@ -807,7 +806,6 @@ def get_material_restock_history(material_name: str):
         print(f"Error: {str(e)}")
         return []
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_inventory_balance_history(material_name: str):
     """Get the balance history over time"""
     try:
@@ -824,7 +822,6 @@ def get_inventory_balance_history(material_name: str):
 def update_finished_goods_production(product_type: str, quantity_produced: int):
     """Increase finished goods stock when production is made"""
     try:
-        st.cache_data.clear()
         response = supabase.table("FINISHED_GOODS_INVENTORY")\
             .select("*")\
             .eq("product_type", product_type)\
@@ -859,7 +856,6 @@ def update_finished_goods_production(product_type: str, quantity_produced: int):
 def update_finished_goods_sale(product_type: str, quantity_sold: int):
     """Decrease finished goods stock when a sale is made"""
     try:
-        st.cache_data.clear()
         response = supabase.table("FINISHED_GOODS_INVENTORY")\
             .select("*")\
             .eq("product_type", product_type)\
@@ -886,7 +882,6 @@ def update_finished_goods_sale(product_type: str, quantity_sold: int):
         st.error(f"Error updating finished goods: {str(e)}")
         return False
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_price_for_product(product_type: str):
     """Get the selling price for a product type"""
     prices = {
@@ -904,7 +899,6 @@ def get_price_for_product(product_type: str):
 def update_finished_goods_production(product_type: str, quantity_produced: int):
     """Increase finished goods stock when production is made"""
     try:
-        st.cache_data.clear()
         from datetime import datetime
         
         response = supabase.table("FINISHED_GOODS_INVENTORY")\
@@ -955,7 +949,6 @@ def update_finished_goods_production(product_type: str, quantity_produced: int):
 def update_finished_goods_sale(product_type: str, quantity_sold: int):
     """Decrease finished goods stock when a sale is made"""
     try:
-        st.cache_data.clear()
         from datetime import datetime
         
         response = supabase.table("FINISHED_GOODS_INVENTORY")\
@@ -1124,7 +1117,6 @@ def record_material_usage_with_balance(batch_id: str, material_name: str, quanti
         st.error(f"Error recording usage: {str(e)}")
         return False
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_current_material_balance(material_name: str):
     """Get current balance for a material"""
     try:
@@ -1140,7 +1132,6 @@ def get_current_material_balance(material_name: str):
         print(f"Error getting balance: {str(e)}")
         return 0.0
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_material_restock_history(material_name: str):
     """Get all restock history for a material"""
     try:
@@ -1154,7 +1145,6 @@ def get_material_restock_history(material_name: str):
         print(f"Error: {str(e)}")
         return []
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_inventory_balance_history(material_name: str):
     """Get the balance history over time"""
     try:
@@ -1175,7 +1165,6 @@ def get_inventory_balance_history(material_name: str):
 def save_asset(asset_data: dict):
     """Save an asset to the ASSETS table"""
     try:
-        st.cache_data.clear()
         asset_data["id"] = str(uuid.uuid4())
         response = supabase.table("ASSETS").insert(asset_data).execute()
         if hasattr(response, 'error') and response.error:
@@ -1186,7 +1175,6 @@ def save_asset(asset_data: dict):
         st.error(f"Error saving asset: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_assets():
     """Get all assets"""
     try:
@@ -1199,7 +1187,6 @@ def get_assets():
 def delete_asset(asset_id: str):
     """Delete an asset"""
     try:
-        st.cache_data.clear()
         response = supabase.table("ASSETS").delete().eq("id", asset_id).execute()
         return True
     except Exception as e:
@@ -1209,7 +1196,6 @@ def delete_asset(asset_id: str):
 def update_asset(asset_id: str, updates: dict):
     """Update an asset"""
     try:
-        st.cache_data.clear()
         response = supabase.table("ASSETS").update(updates).eq("id", asset_id).execute()
         return True
     except Exception as e:
@@ -1223,7 +1209,6 @@ def update_asset(asset_id: str, updates: dict):
 def save_daily_stock_reconciliation(record: dict):
     """Save daily stock reconciliation record"""
     try:
-        st.cache_data.clear()
         record["id"] = str(uuid.uuid4())
         response = supabase.table("DAILY_STOCK_RECONCILIATION").insert(record).execute()
         if hasattr(response, 'error') and response.error:
@@ -1234,7 +1219,6 @@ def save_daily_stock_reconciliation(record: dict):
         st.error(f"Error saving stock reconciliation: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_daily_stock_reconciliation(date_filter=None, product_filter=None):
     """Get daily stock reconciliation records"""
     try:
@@ -1249,7 +1233,6 @@ def get_daily_stock_reconciliation(date_filter=None, product_filter=None):
         st.error(f"Error fetching stock reconciliation: {str(e)}")
         return []
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_daily_summary(date):
     """Get summary for a specific date"""
     try:
@@ -1265,7 +1248,6 @@ def get_daily_summary(date):
             return summary
         return None
     except Exception as e:
-        st.error(f"Error in get_daily_summary: {str(e)}")
         return None
 
 # -------------------------------
@@ -1275,7 +1257,6 @@ def get_daily_summary(date):
 def save_hotel(hotel_data: dict):
     """Save a new hotel"""
     try:
-        st.cache_data.clear()
         hotel_data["id"] = str(uuid.uuid4())
         response = supabase.table("HOTELS").insert(hotel_data).execute()
         return response.data[0]["id"] if response.data else None
@@ -1283,20 +1264,17 @@ def save_hotel(hotel_data: dict):
         st.error(f"Error saving hotel: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_all_hotels():
     """Get all hotels"""
     try:
         response = supabase.table("HOTELS").select("*").order("hotel_name").execute()
         return response.data if response.data else []
     except Exception as e:
-        st.error(f"Error in get_all_hotels: {str(e)}")
         return []
 
 def save_hotel_refill(refill_data: dict):
     """Record a hotel refill"""
     try:
-        st.cache_data.clear()
         refill_data["id"] = str(uuid.uuid4())
         response = supabase.table("HOTEL_REFILLS").insert(refill_data).execute()
         return response.data[0]["id"] if response.data else None
@@ -1304,7 +1282,6 @@ def save_hotel_refill(refill_data: dict):
         st.error(f"Error saving refill: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_hotel_refills(hotel_id: str = None):
     """Get refill history for a hotel or all"""
     try:
@@ -1314,10 +1291,8 @@ def get_hotel_refills(hotel_id: str = None):
         response = query.execute()
         return response.data if response.data else []
     except Exception as e:
-        st.error(f"Error in get_hotel_refills: {str(e)}")
         return []
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_hotel_refill_summary():
     """Get summary of refills by hotel"""
     try:
@@ -1333,7 +1308,78 @@ def get_hotel_refill_summary():
             return summary
         return pd.DataFrame()
     except Exception as e:
-        st.error(f"Error in get_hotel_refill_summary: {str(e)}")
+        return pd.DataFrame()
+
+
+
+def get_hotel_territory_analysis():
+    """
+    Real territory/velocity analysis using actual HOTELS + HOTEL_REFILLS tables.
+    Returns a DataFrame with one row per hotel: visit count, total units,
+    avg days between restocks, days since last restock, tier, and due_for_visit.
+    """
+    try:
+        hotels = get_all_hotels()
+        refills = get_hotel_refills()  # all refills, joined with HOTELS(*)
+
+        if not hotels:
+            return pd.DataFrame()
+
+        hotels_df = pd.DataFrame(hotels)
+        refills_df = pd.DataFrame(refills)
+
+        if refills_df.empty:
+            # No refills yet - everything is New/Unknown
+            hotels_df['visit_count'] = 0
+            hotels_df['total_units'] = 0
+            hotels_df['avg_days_between_restocks'] = None
+            hotels_df['days_since_last_restock'] = None
+            hotels_df['tier'] = 'New/Unknown'
+            hotels_df['due_for_visit'] = True
+            return hotels_df
+
+        refills_df['refill_date'] = pd.to_datetime(refills_df['refill_date'])
+
+        agg = refills_df.groupby('hotel_id').agg(
+            visit_count=('id', 'count'),
+            total_units=('quantity', 'sum'),
+            last_restock=('refill_date', 'max'),
+            first_restock=('refill_date', 'min')
+        ).reset_index()
+
+        agg['span_days'] = (agg['last_restock'] - agg['first_restock']).dt.days
+        # avoid divide-by-zero when there's only 1 visit
+        agg['avg_days_between_restocks'] = agg['span_days'] / (agg['visit_count'] - 1).clip(lower=1)
+
+        today = pd.Timestamp(date.today())
+        agg['days_since_last_restock'] = (today - agg['last_restock']).dt.days
+
+        merged = hotels_df.merge(agg, left_on='id', right_on='hotel_id', how='left')
+
+        def tier(row):
+            if pd.isna(row.get('visit_count')) or row['visit_count'] < 2:
+                return 'New/Unknown'
+            d = row['avg_days_between_restocks']
+            if d <= 10:
+                return 'High'
+            elif d <= 21:
+                return 'Medium'
+            else:
+                return 'Low'
+
+        merged['tier'] = merged.apply(tier, axis=1)
+
+        def is_due(row):
+            if pd.isna(row.get('avg_days_between_restocks')) or pd.isna(row.get('days_since_last_restock')):
+                return True  # never refilled or unknown pattern = worth a visit
+            return row['days_since_last_restock'] > row['avg_days_between_restocks']
+
+        merged['due_for_visit'] = merged.apply(is_due, axis=1)
+
+        return merged
+
+    except Exception as e:
+        st.error(f"Error running territory analysis: {str(e)}")
         return pd.DataFrame()
 
 # -------------------------------
@@ -1343,7 +1389,6 @@ def get_hotel_refill_summary():
 def save_mama_mboga(mama_data: dict):
     """Save a new Mama Mboga shop"""
     try:
-        st.cache_data.clear()
         mama_data["id"] = str(uuid.uuid4())
         response = supabase.table("MAMA_MBOGAS").insert(mama_data).execute()
         return response.data[0]["id"] if response.data else None
@@ -1351,20 +1396,17 @@ def save_mama_mboga(mama_data: dict):
         st.error(f"Error saving Mama Mboga: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_all_mama_mbogas():
     """Get all Mama Mboga shops"""
     try:
         response = supabase.table("MAMA_MBOGAS").select("*").order("shop_name").execute()
         return response.data if response.data else []
     except Exception as e:
-        st.error(f"Error in get_all_mama_mbogas: {str(e)}")
         return []
 
 def save_mama_purchase(purchase_data: dict):
     """Record a Mama Mboga purchase"""
     try:
-        st.cache_data.clear()
         purchase_data["id"] = str(uuid.uuid4())
         response = supabase.table("MAMA_MBOGAS_PURCHASES").insert(purchase_data).execute()
         return response.data[0]["id"] if response.data else None
@@ -1372,7 +1414,6 @@ def save_mama_purchase(purchase_data: dict):
         st.error(f"Error saving purchase: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_mama_purchases(mama_id: str = None):
     """Get purchase history for a Mama Mboga or all"""
     try:
@@ -1382,7 +1423,6 @@ def get_mama_purchases(mama_id: str = None):
         response = query.execute()
         return response.data if response.data else []
     except Exception as e:
-        st.error(f"Error in get_mama_purchases: {str(e)}")
         return []
 
 
@@ -1393,7 +1433,6 @@ def get_mama_purchases(mama_id: str = None):
 def save_mama_mboga(mama_data: dict):
     """Save a new Mama Mboga shop"""
     try:
-        st.cache_data.clear()
         mama_data["id"] = str(uuid.uuid4())
         response = supabase.table("MAMA_MBOGAS").insert(mama_data).execute()
         if hasattr(response, 'error') and response.error:
@@ -1404,7 +1443,6 @@ def save_mama_mboga(mama_data: dict):
         st.error(f"Error saving Mama Mboga: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_all_mama_mbogas():
     """Get all Mama Mboga shops"""
     try:
@@ -1417,7 +1455,6 @@ def get_all_mama_mbogas():
 def save_mama_purchase(purchase_data: dict):
     """Record a Mama Mboga purchase"""
     try:
-        st.cache_data.clear()
         purchase_data["id"] = str(uuid.uuid4())
         response = supabase.table("MAMA_MBOGAS_PURCHASES").insert(purchase_data).execute()
         if hasattr(response, 'error') and response.error:
@@ -1428,7 +1465,6 @@ def save_mama_purchase(purchase_data: dict):
         st.error(f"Error saving purchase: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_mama_purchases(mama_id: str = None):
     """Get purchase history for a Mama Mboga or all"""
     try:
@@ -1448,7 +1484,6 @@ def get_mama_purchases(mama_id: str = None):
 def save_free_item(giveaway_data: dict):
     """Record a free item giveaway"""
     try:
-        st.cache_data.clear()
         giveaway_data["id"] = str(uuid.uuid4())
         response = supabase.table("FREE_ITEMS").insert(giveaway_data).execute()
         if hasattr(response, 'error') and response.error:
@@ -1459,7 +1494,6 @@ def save_free_item(giveaway_data: dict):
         st.error(f"Error saving giveaway: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_free_items(start_date=None, end_date=None):
     """Get all free items giveaways"""
     try:
@@ -1474,7 +1508,6 @@ def get_free_items(start_date=None, end_date=None):
         st.error(f"Error fetching giveaways: {str(e)}")
         return []
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_free_items_summary():
     """Get summary of giveaways by product and reason"""
     try:
@@ -1488,7 +1521,6 @@ def get_free_items_summary():
             return summary
         return pd.DataFrame()
     except Exception as e:
-        st.error(f"Error in get_free_items_summary: {str(e)}")
         return pd.DataFrame() 
 
 # -------------------------------
@@ -1498,7 +1530,6 @@ def get_free_items_summary():
 def save_location(location_data: dict):
     """Save a location for mapping"""
     try:
-        st.cache_data.clear()
         location_data["id"] = str(uuid.uuid4())
         response = supabase.table("LOCATIONS").insert(location_data).execute()
         return response.data[0]["id"] if response.data else None
@@ -1506,20 +1537,17 @@ def save_location(location_data: dict):
         st.error(f"Error saving location: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_all_locations():
     """Get all locations"""
     try:
         response = supabase.table("LOCATIONS").select("*").execute()
         return response.data if response.data else []
     except Exception as e:
-        st.error(f"Error in get_all_locations: {str(e)}")
         return []
 
 def save_refill_schedule(schedule_data: dict):
     """Save a refill schedule for a customer"""
     try:
-        st.cache_data.clear()
         schedule_data["id"] = str(uuid.uuid4())
         response = supabase.table("REFILL_SCHEDULES").insert(schedule_data).execute()
         return response.data[0]["id"] if response.data else None
@@ -1527,17 +1555,14 @@ def save_refill_schedule(schedule_data: dict):
         st.error(f"Error saving schedule: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_refill_schedules():
     """Get all refill schedules"""
     try:
         response = supabase.table("REFILL_SCHEDULES").select("*").order("next_refill_date", asc=True).execute()
         return response.data if response.data else []
     except Exception as e:
-        st.error(f"Error in get_refill_schedules: {str(e)}")
         return []
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_today_refills():
     """Get customers due for refill today"""
     try:
@@ -1545,13 +1570,11 @@ def get_today_refills():
         response = supabase.table("REFILL_SCHEDULES").select("*").lte("next_refill_date", today).execute()
         return response.data if response.data else []
     except Exception as e:
-        st.error(f"Error in get_today_refills: {str(e)}")
         return []
 
 def update_refill_schedule(customer_name: str, refill_date: date, quantity: int):
     """Update refill schedule after a refill"""
     try:
-        st.cache_data.clear()
         # Get current schedule
         response = supabase.table("REFILL_SCHEDULES").select("*").eq("customer_name", customer_name).execute()
         if response.data:
@@ -1565,14 +1588,12 @@ def update_refill_schedule(customer_name: str, refill_date: date, quantity: int)
             }).eq("customer_name", customer_name).execute()
         return True
     except Exception as e:
-        st.error(f"Error in update_refill_schedule: {str(e)}")
         return False
 
 # -------------------------------
 # COMMISSION TRACKING FUNCTIONS
 # -------------------------------
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_commission_rate(product_name: str):
     """Get commission rate for a product"""
     try:
@@ -1587,7 +1608,6 @@ def get_commission_rate(product_name: str):
 def save_sale_commission(commission_data: dict):
     """Save commission for a sale"""
     try:
-        st.cache_data.clear()
         commission_data["id"] = str(uuid.uuid4())
         response = supabase.table("SALES_COMMISSIONS").insert(commission_data).execute()
         return response.data[0]["id"] if response.data else None
@@ -1595,7 +1615,6 @@ def save_sale_commission(commission_data: dict):
         print(f"Error saving commission: {str(e)}")
         return None
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_salesperson_commission(sales_person_id: str, start_date=None, end_date=None):
     """Get total commission for a salesperson"""
     try:
@@ -1607,33 +1626,28 @@ def get_salesperson_commission(sales_person_id: str, start_date=None, end_date=N
         response = query.execute()
         return response.data if response.data else []
     except Exception as e:
-        st.error(f"Error in get_salesperson_commission: {str(e)}")
         return []
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_all_commissions_pending():
     """Get all unpaid commissions"""
     try:
         response = supabase.table("SALES_COMMISSIONS").select("*, SALES_PEOPLE(full_name)").eq("commission_paid", False).execute()
         return response.data if response.data else []
     except Exception as e:
-        st.error(f"Error in get_all_commissions_pending: {str(e)}")
         return []
 
 def mark_commission_paid(commission_id: str, payment_date: date):
     """Mark commission as paid"""
     try:
-        st.cache_data.clear()
         supabase.table("SALES_COMMISSIONS").update({
             "commission_paid": True,
             "payment_date": str(payment_date)
         }).eq("id", commission_id).execute()
         return True
     except Exception as e:
-        st.error(f"Error in mark_commission_paid: {str(e)}")
+        print(f"Error: {str(e)}")
         return False
 
-@st.cache_data(ttl=30, show_spinner=False)
 def get_commission_summary():
     """Get summary of all commissions"""
     try:
@@ -1649,5 +1663,511 @@ def get_commission_summary():
             return summary
         return {'total_commission': 0, 'paid_commission': 0, 'pending_commission': 0, 'total_transactions': 0}
     except Exception as e:
-        st.error(f"Error in get_commission_summary: {str(e)}")
         return {'total_commission': 0, 'paid_commission': 0, 'pending_commission': 0, 'total_transactions': 0}
+       
+
+# -------------------------------
+# HOTEL SUCCESS & RETENTION FUNCTIONS
+# -------------------------------
+
+def save_hotel_consumption(data: dict):
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTEL_CONSUMPTION").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def save_hotel_reorder(data: dict):
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTEL_REORDERS").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def save_hotel_chef(data: dict):
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTEL_CHEFS").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def get_hotel_consumption(hotel_id: str):
+    try:
+        response = supabase.table("HOTEL_CONSUMPTION").select("*").eq("hotel_id", hotel_id).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def get_hotel_reorders(hotel_id: str = None):
+    try:
+        query = supabase.table("HOTEL_REORDERS").select("*")
+        if hotel_id:
+            query = query.eq("hotel_id", hotel_id)
+        response = query.order("reorder_date", desc=True).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def get_hotel_chefs(hotel_id: str = None):
+    try:
+        query = supabase.table("HOTEL_CHEFS").select("*")
+        if hotel_id:
+            query = query.eq("hotel_id", hotel_id)
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def get_hotel_retention_metrics():
+    """Get key retention metrics"""
+    try:
+        # Get all hotels
+        hotels = get_all_hotels()
+        if not hotels:
+            return None
+        
+        total_hotels = len(hotels)
+        
+        # Get reorder data
+        reorders = get_hotel_reorders()
+        reorder_count = len(reorders)
+        
+        # Get unique hotels that reordered
+        reorder_hotels = set([r['hotel_id'] for r in reorders])
+        reordering_hotels = len(reorder_hotels)
+        
+        # Calculate retention rate
+        retention_rate = (reordering_hotels / total_hotels * 100) if total_hotels > 0 else 0
+        
+        # Get proactive vs prompted reorders
+        proactive = len([r for r in reorders if r.get('was_proactive', False)])
+        prompted = len([r for r in reorders if r.get('was_prompted', True)])
+        
+        return {
+            'total_hotels': total_hotels,
+            'reordering_hotels': reordering_hotels,
+            'retention_rate': retention_rate,
+            'proactive_reorders': proactive,
+            'prompted_reorders': prompted,
+            'total_reorders': reorder_count
+        }
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+# -------------------------------
+# HOTEL SUCCESS & RETENTION FUNCTIONS
+# -------------------------------
+
+def get_hotel_retention_metrics():
+    """Get key retention metrics for hotels"""
+    try:
+        # Get all hotels
+        hotels = get_all_hotels()
+        if not hotels:
+            return {
+                'total_hotels': 0,
+                'reordering_hotels': 0,
+                'retention_rate': 0,
+                'proactive_reorders': 0,
+                'prompted_reorders': 0,
+                'total_reorders': 0
+            }
+        
+        total_hotels = len(hotels)
+        
+        # Get reorder data
+        reorders = get_hotel_reorders()
+        reorder_count = len(reorders)
+        
+        # Get unique hotels that reordered
+        reorder_hotels = set([r['hotel_id'] for r in reorders])
+        reordering_hotels = len(reorder_hotels)
+        
+        # Calculate retention rate
+        retention_rate = (reordering_hotels / total_hotels * 100) if total_hotels > 0 else 0
+        
+        # Get proactive vs prompted reorders
+        proactive = len([r for r in reorders if r.get('was_proactive', False)])
+        prompted = len([r for r in reorders if r.get('was_prompted', True)])
+        
+        return {
+            'total_hotels': total_hotels,
+            'reordering_hotels': reordering_hotels,
+            'retention_rate': retention_rate,
+            'proactive_reorders': proactive,
+            'prompted_reorders': prompted,
+            'total_reorders': reorder_count
+        }
+    except Exception as e:
+        print(f"Error getting retention metrics: {str(e)}")
+        return {
+            'total_hotels': 0,
+            'reordering_hotels': 0,
+            'retention_rate': 0,
+            'proactive_reorders': 0,
+            'prompted_reorders': 0,
+            'total_reorders': 0
+        }
+
+def save_hotel_consumption(data: dict):
+    """Save hotel consumption pattern"""
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTEL_CONSUMPTION").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def get_hotel_consumption(hotel_id: str):
+    """Get consumption patterns for a hotel"""
+    try:
+        response = supabase.table("HOTEL_CONSUMPTION").select("*").eq("hotel_id", hotel_id).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def save_hotel_reorder(data: dict):
+    """Record a hotel reorder"""
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTEL_REORDERS").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def get_hotel_reorders(hotel_id: str = None):
+    """Get reorder history for a hotel or all hotels"""
+    try:
+        query = supabase.table("HOTEL_REORDERS").select("*")
+        if hotel_id:
+            query = query.eq("hotel_id", hotel_id)
+        response = query.order("reorder_date", desc=True).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def save_hotel_chef(data: dict):
+    """Save chef relationship"""
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("HOTEL_CHEFS").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def get_hotel_chefs(hotel_id: str = None):
+    """Get chefs for a hotel or all hotels"""
+    try:
+        query = supabase.table("HOTEL_CHEFS").select("*")
+        if hotel_id:
+            query = query.eq("hotel_id", hotel_id)
+        response = query.execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+    
+# -------------------------------
+# CUSTOMER ENGAGEMENT FUNCTIONS
+# -------------------------------
+
+def save_customer_contact(data: dict):
+    """Save a customer contact"""
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("CUSTOMER_CONTACTS").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def get_customer_contacts(customer_type: str = None):
+    """Get customer contacts, optionally filtered by type"""
+    try:
+        query = supabase.table("CUSTOMER_CONTACTS").select("*").eq("status", "Active")
+        if customer_type:
+            query = query.eq("customer_type", customer_type)
+        response = query.order("customer_name").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def save_automated_message(data: dict):
+    """Save an automated message template"""
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("AUTOMATED_MESSAGES").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def get_automated_messages():
+    """Get all automated messages"""
+    try:
+        response = supabase.table("AUTOMATED_MESSAGES").select("*").eq("is_active", True).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def get_todays_messages():
+    """Get messages scheduled for today"""
+    try:
+        today = date.today().strftime('%A')  # Monday, Tuesday, etc.
+        response = supabase.table("AUTOMATED_MESSAGES").select("*").eq("schedule_day", today).eq("is_active", True).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def save_message_history(data: dict):
+    """Save message history"""
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("MESSAGE_HISTORY").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
+def get_message_history(customer_id: str = None):
+    """Get message history for a customer"""
+    try:
+        query = supabase.table("MESSAGE_HISTORY").select("*")
+        if customer_id:
+            query = query.eq("customer_id", customer_id)
+        response = query.order("sent_date", desc=True).execute()
+        return response.data if response.data else []
+    except Exception as e:
+        return []
+
+def update_customer_last_contact(customer_id: str):
+    """Update last contact date for a customer"""
+    try:
+        supabase.table("CUSTOMER_CONTACTS").update({
+            "last_contact_date": str(date.today())
+        }).eq("id", customer_id).execute()
+        return True
+    except Exception as e:
+        return False
+
+# -------------------------------
+# SMS FUNCTIONS (AFRICA'S TALKING)
+# -------------------------------
+
+def send_sms_africastalking(phone_number, message):
+    """Send SMS via Africa's Talking API"""
+    try:
+        # Get config from secrets
+        api_key = st.secrets["AFRICASTALKING_API_KEY"]
+        username = st.secrets.get("AFRICASTALKING_USERNAME", "sandbox")
+        sender_id = st.secrets.get("AFRICASTALKING_SENDER_ID", "SpiseUp")
+        
+        # Format phone number correctly
+        phone = phone_number.strip().replace(" ", "").replace("+", "")
+        if phone.startswith("0"):
+            phone = "254" + phone[1:]
+        elif phone.startswith("7") and len(phone) == 9:
+            phone = "254" + phone
+        
+        url = "https://api.africastalking.com/version1/messaging"
+        headers = {
+            "apiKey": api_key,
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = {
+            "username": username,
+            "to": phone,
+            "message": message,
+            "from": sender_id
+        }
+        
+        response = requests.post(url, headers=headers, data=data)
+        result = response.json()
+        
+        # Check if successful
+        if response.status_code == 200 and 'SMSMessageData' in result:
+            if result['SMSMessageData']['Recipients'][0]['status'] == 'Success':
+                return {"status": "success", "result": result}
+        
+        return {"status": "error", "result": result}
+        
+    except Exception as e:
+        print(f"Error sending SMS: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+def send_bulk_sms(phone_numbers, message):
+    """Send SMS to multiple recipients"""
+    try:
+        results = []
+        for phone in phone_numbers:
+            result = send_sms_africastalking(phone, message)
+            results.append({"phone": phone, "result": result})
+        return {"status": "success", "results": results}
+    except Exception as e:
+        print(f"Error sending bulk SMS: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+def send_test_sms(phone_number, message):
+    """Send a test SMS with detailed error reporting"""
+    try:
+        # Check if API key exists
+        try:
+            api_key = st.secrets["AFRICASTALKING_API_KEY"]
+        except:
+            return {"status": "error", "message": "AFRICASTALKING_API_KEY not found in secrets"}
+        
+        # Format phone
+        phone = phone_number.strip().replace(" ", "").replace("+", "")
+        if phone.startswith("0"):
+            phone = "254" + phone[1:]
+        
+        url = "https://api.africastalking.com/version1/messaging"
+        headers = {
+            "apiKey": api_key,
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        data = {
+            "username": "sandbox",
+            "to": phone,
+            "message": message,
+            "from": "SpiseUp"
+        }
+        
+        response = requests.post(url, headers=headers, data=data)
+        result = response.json()
+        
+        # Return detailed result for debugging
+        return {
+            "status": "success" if response.status_code == 200 else "error",
+            "response_code": response.status_code,
+            "result": result,
+            "phone": phone,
+            "message": message
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def send_scheduled_messages():
+    """Send all scheduled messages for today"""
+    try:
+        today = date.today().strftime('%A')
+        
+        # Get today's scheduled messages
+        response = supabase.table("AUTOMATED_MESSAGES")\
+            .select("*")\
+            .eq("schedule_day", today)\
+            .eq("is_active", True)\
+            .execute()
+        
+        messages = response.data if response.data else []
+        sent_count = 0
+        
+        for msg in messages:
+            # Get recipients
+            customer_type = msg.get('customer_type')
+            recipients = get_customer_contacts(customer_type)
+            
+            for customer in recipients:
+                phone = customer.get('phone_number')
+                if phone:
+                    result = send_sms_africastalking(phone, msg['message_content'])
+                    if result.get('status') == 'success':
+                        sent_count += 1
+                        
+                        # Save to history
+                        history_data = {
+                            "customer_id": customer['id'],
+                            "message_id": msg['id'],
+                            "phone_number": phone,
+                            "message_content": msg['message_content'],
+                            "sent_date": str(datetime.now()),
+                            "was_delivered": True
+                        }
+                        save_message_history(history_data)
+            
+            # Update last sent date
+            supabase.table("AUTOMATED_MESSAGES")\
+                .update({"last_sent_date": str(date.today())})\
+                .eq("id", msg['id'])\
+                .execute()
+        
+        return {"status": "success", "sent_count": sent_count}
+    except Exception as e:
+        print(f"Error sending scheduled messages: {str(e)}")
+        return {"status": "error", "message": str(e)}
+    
+
+# -------------------------------
+# SMS HELPER FUNCTIONS
+# -------------------------------
+
+def verify_api_key():
+    """Check if API key exists and is valid"""
+    try:
+        api_key = st.secrets["AFRICASTALKING_API_KEY"]
+        
+        # Check key format
+        if not api_key.startswith("atsk_"):
+            return "❌ API key should start with 'atsk_'"
+        
+        # Test the key
+        url = "https://api.africastalking.com/version1/user"
+        response = requests.get(url, headers={"apiKey": api_key})
+        
+        if response.status_code == 200:
+            return "✅ API key is valid"
+        else:
+            return f"❌ API key invalid: {response.status_code}"
+    except:
+        return "❌ API key not found in secrets"
+
+def check_at_balance():
+    """Check Africa's Talking balance"""
+    try:
+        api_key = st.secrets["AFRICASTALKING_API_KEY"]
+        url = "https://api.africastalking.com/version1/user"
+        headers = {"apiKey": api_key}
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            balance = data.get('UserData', {}).get('balance', '0')
+            return f"💰 Balance: {balance}"
+        return "Could not check balance"
+    except:
+        return "Error checking balance"
+
+def format_phone(phone):
+    """Format phone number correctly for Africa's Talking"""
+    # Remove all non-digits
+    phone = ''.join(filter(str.isdigit, str(phone)))
+    
+    # Remove leading 0 and add 254
+    if phone.startswith('0'):
+        phone = '254' + phone[1:]
+    elif len(phone) == 9:  # 712345678
+        phone = '254' + phone
+    elif len(phone) == 12 and phone.startswith('254'):
+        pass  # Already correct
+    else:
+        phone = '254' + phone[-9:]  # Take last 9 digits
+    
+    return phone
+
+def sanitize_message(message):
+    """Remove problematic characters from message"""
+    # Remove % characters
+    message = message.replace('%', '')
+    # Remove other problematic characters
+    message = message.replace('&', 'and')
+    return message[:160]  # Max 160 characters
