@@ -117,7 +117,7 @@ from supabase_client import (
      send_test_sms,
     send_scheduled_messages,
     
-     get_customer_contacts,
+    
     save_customer_contact,
     delete_customer_contact,
     save_automated_message,
