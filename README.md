@@ -1,6 +1,6 @@
-# 🌶️ SpiseUp Field & Finance Tracker
+# PennyPal System
 
-**SpiseUp Field & Finance Tracker** is a Streamlit app designed to help small businesses manage sales, expenses, distribution, and salespeople performance in real-time. Track your revenue, net profit, and get visual dashboards for decision-making.
+**PennyPal System** is a Streamlit app designed to help small businesses manage sales, expenses, distribution, and salespeople performance in real-time. Track your revenue, net profit, and get visual dashboards for decision-making.
 
 ---
 
