@@ -164,7 +164,7 @@ PRODUCT_LIST = [
 ]
 
 st.set_page_config(
-    page_title="🌶️ SpiseUp Finance Tracker",
+    page_title="PennyPal System",
     layout="wide",
     page_icon="🌶️",
     initial_sidebar_state="expanded"
@@ -247,7 +247,7 @@ col1, col2 = st.columns([1, 5])
 with col1:
     st.image("spicyup.jpeg", width=80)
 with col2:
-    st.markdown('<h1 class="main-header">🌶️ SpiseUp Field & Finance Tracker</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">PennyPal System</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Track sales, expenses, salespeople, distribution, and net profit in real-time!</p>', unsafe_allow_html=True)
 
 st.markdown("---")
