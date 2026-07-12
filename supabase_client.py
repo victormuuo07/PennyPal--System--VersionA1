@@ -1900,6 +1900,30 @@ def save_customer_contact(customer_name: str, phone_number: str, customer_type: 
         return {"status": "error", "message": "No data returned from insert"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def get_customer_contacts(customer_type: str = None):
+    """Get customer contacts, optionally filtered by type"""
+    try:
+        query = supabase.table("CUSTOMER_CONTACTS").select("*").eq("status", "Active")
+        if customer_type:
+            query = query.eq("customer_type", customer_type)
+        response = query.order("customer_name").execute()
+        return response.data if response.data else []
+    except Exception as e:
+        print(f"Error getting contacts: {str(e)}")
+        return []
+
+def save_customer_contact(data: dict):
+    """Save a customer contact"""
+    try:
+        data["id"] = str(uuid.uuid4())
+        response = supabase.table("CUSTOMER_CONTACTS").insert(data).execute()
+        return response.data[0]["id"] if response.data else None
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return None
+
 def delete_customer_contact(contact_id: str):
     """Delete a customer contact"""
     try:

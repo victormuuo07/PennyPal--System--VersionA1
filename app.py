@@ -112,7 +112,7 @@ from supabase_client import (
      send_test_sms,
     send_scheduled_messages,
     
-    
+    get_customer_contacts,
     save_customer_contact,
     delete_customer_contact,
     save_automated_message,
@@ -5387,4 +5387,4 @@ if time.time() - st.session_state.last_check > 60:
 
 # Footer
 st.markdown("---")
-st.caption(f"🌶️ SpiseUp Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
+st.caption(f"PennyPal Finance Tracker • Data range: {start_date} to {end_date} • {len(sales_df)} sales • {len(expenses_df)} expenses")
