@@ -1311,9 +1311,15 @@ def get_hotel_refill_summary():
 
 def get_hotel_territory_analysis():
     """
-    Real territory/velocity analysis using actual HOTELS + HOTEL_REFILLS tables.
-    Returns a DataFrame with one row per hotel: visit count, total units,
-    avg days between restocks, days since last restock, tier, and due_for_visit.
+    Full hotel performance analysis using the real HOTELS + HOTEL_REFILLS tables.
+    Returns one row per hotel with:
+      - visit_count, total_units, total_revenue, avg_order_value
+      - avg_days_between_restocks, days_since_last_restock
+      - tier: refill-FREQUENCY only (High/Medium/Low/New/Unknown) - used for routing
+      - performance_score (0-100) and performance_tier (Star/Growing/Steady/
+        At Risk/Dormant/New) - a blended view of revenue + frequency + recency,
+        i.e. "which hotels are actually working out well vs poorly"
+      - due_for_visit: True if this hotel is overdue for its next restock
     """
     try:
         hotels = get_all_hotels()
@@ -1329,21 +1335,30 @@ def get_hotel_territory_analysis():
             # No refills yet - everything is New/Unknown
             hotels_df['visit_count'] = 0
             hotels_df['total_units'] = 0
+            hotels_df['total_revenue'] = 0.0
+            hotels_df['avg_order_value'] = 0.0
             hotels_df['avg_days_between_restocks'] = None
             hotels_df['days_since_last_restock'] = None
             hotels_df['tier'] = 'New/Unknown'
+            hotels_df['performance_score'] = 0.0
+            hotels_df['performance_tier'] = 'New'
             hotels_df['due_for_visit'] = True
             return hotels_df
 
         refills_df['refill_date'] = pd.to_datetime(refills_df['refill_date'])
+        # amount_paid can be missing/None on old rows - treat as 0 rather than dropping the row
+        refills_df['amount_paid'] = pd.to_numeric(refills_df.get('amount_paid'), errors='coerce').fillna(0)
+        refills_df['quantity'] = pd.to_numeric(refills_df.get('quantity'), errors='coerce').fillna(0)
 
         agg = refills_df.groupby('hotel_id').agg(
             visit_count=('id', 'count'),
             total_units=('quantity', 'sum'),
+            total_revenue=('amount_paid', 'sum'),
             last_restock=('refill_date', 'max'),
             first_restock=('refill_date', 'min')
         ).reset_index()
 
+        agg['avg_order_value'] = agg['total_revenue'] / agg['visit_count'].clip(lower=1)
         agg['span_days'] = (agg['last_restock'] - agg['first_restock']).dt.days
         # avoid divide-by-zero when there's only 1 visit
         agg['avg_days_between_restocks'] = agg['span_days'] / (agg['visit_count'] - 1).clip(lower=1)
@@ -1353,8 +1368,13 @@ def get_hotel_territory_analysis():
 
         merged = hotels_df.merge(agg, left_on='id', right_on='hotel_id', how='left')
 
-        def tier(row):
-            if pd.isna(row.get('visit_count')) or row['visit_count'] < 2:
+        # Hotels with zero refills logged still need numeric defaults, not NaN
+        for col in ['visit_count', 'total_units', 'total_revenue', 'avg_order_value']:
+            merged[col] = merged[col].fillna(0)
+
+        # ---------- Frequency-only tier (used by route/visit planning) ----------
+        def freq_tier(row):
+            if pd.isna(row.get('avg_days_between_restocks')) or row['visit_count'] < 2:
                 return 'New/Unknown'
             d = row['avg_days_between_restocks']
             if d <= 10:
@@ -1364,7 +1384,7 @@ def get_hotel_territory_analysis():
             else:
                 return 'Low'
 
-        merged['tier'] = merged.apply(tier, axis=1)
+        merged['tier'] = merged.apply(freq_tier, axis=1)
 
         def is_due(row):
             if pd.isna(row.get('avg_days_between_restocks')) or pd.isna(row.get('days_since_last_restock')):
@@ -1372,6 +1392,60 @@ def get_hotel_territory_analysis():
             return row['days_since_last_restock'] > row['avg_days_between_restocks']
 
         merged['due_for_visit'] = merged.apply(is_due, axis=1)
+
+        # ---------- Composite performance score/tier (revenue + frequency + recency) ----------
+        max_revenue = merged['total_revenue'].max() or 1
+
+        def score_row(row):
+            if row['visit_count'] < 1:
+                return 0.0
+
+            # Revenue: up to 40 points, scaled against your single best hotel
+            revenue_score = min(row['total_revenue'] / max_revenue * 40, 40)
+
+            # Frequency: up to 30 points - faster, proven repeat cycles score higher
+            if row['visit_count'] < 2 or pd.isna(row['avg_days_between_restocks']):
+                freq_score = 10  # some credit just for a first order
+            else:
+                d = max(row['avg_days_between_restocks'], 1)
+                freq_score = max(0, min(30, 30 - (d / 2)))
+
+            # Recency: up to 30 points - penalize hotels that have gone quiet
+            dsr = row.get('days_since_last_restock')
+            if pd.isna(dsr):
+                recency_score = 0
+            else:
+                expected = row['avg_days_between_restocks']
+                if pd.isna(expected) or expected <= 0:
+                    expected = 14  # default expectation for a single-order hotel
+                overdue_ratio = dsr / expected
+                recency_score = max(0, min(30, 30 - overdue_ratio * 15))
+
+            return round(revenue_score + freq_score + recency_score, 1)
+
+        merged['performance_score'] = merged.apply(score_row, axis=1)
+
+        def perf_tier(row):
+            if row['visit_count'] < 2:
+                # 0 or 1 refills logged - too early to call this hotel a success or a
+                # failure, it just hasn't had a second order yet to prove the pattern
+                return 'New'
+            d = row.get('avg_days_between_restocks')
+            dsr = row.get('days_since_last_restock')
+            # Gone very quiet relative to its own normal rhythm = Dormant, regardless of score
+            if pd.notna(dsr) and pd.notna(d) and d > 0 and dsr > 2 * d:
+                return 'Dormant'
+            s = row['performance_score']
+            if s >= 65:
+                return 'Star'
+            elif s >= 45:
+                return 'Growing'
+            elif s >= 25:
+                return 'Steady'
+            else:
+                return 'At Risk'
+
+        merged['performance_tier'] = merged.apply(perf_tier, axis=1)
 
         return merged
 
@@ -1662,101 +1736,6 @@ def get_commission_summary():
     except Exception as e:
         return {'total_commission': 0, 'paid_commission': 0, 'pending_commission': 0, 'total_transactions': 0}
        
-
-# -------------------------------
-# HOTEL SUCCESS & RETENTION FUNCTIONS
-# -------------------------------
-
-def save_hotel_consumption(data: dict):
-    try:
-        data["id"] = str(uuid.uuid4())
-        response = supabase.table("HOTEL_CONSUMPTION").insert(data).execute()
-        return response.data[0]["id"] if response.data else None
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return None
-
-def save_hotel_reorder(data: dict):
-    try:
-        data["id"] = str(uuid.uuid4())
-        response = supabase.table("HOTEL_REORDERS").insert(data).execute()
-        return response.data[0]["id"] if response.data else None
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return None
-
-def save_hotel_chef(data: dict):
-    try:
-        data["id"] = str(uuid.uuid4())
-        response = supabase.table("HOTEL_CHEFS").insert(data).execute()
-        return response.data[0]["id"] if response.data else None
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return None
-
-def get_hotel_consumption(hotel_id: str):
-    try:
-        response = supabase.table("HOTEL_CONSUMPTION").select("*").eq("hotel_id", hotel_id).execute()
-        return response.data if response.data else []
-    except Exception as e:
-        return []
-
-def get_hotel_reorders(hotel_id: str = None):
-    try:
-        query = supabase.table("HOTEL_REORDERS").select("*")
-        if hotel_id:
-            query = query.eq("hotel_id", hotel_id)
-        response = query.order("reorder_date", desc=True).execute()
-        return response.data if response.data else []
-    except Exception as e:
-        return []
-
-def get_hotel_chefs(hotel_id: str = None):
-    try:
-        query = supabase.table("HOTEL_CHEFS").select("*")
-        if hotel_id:
-            query = query.eq("hotel_id", hotel_id)
-        response = query.execute()
-        return response.data if response.data else []
-    except Exception as e:
-        return []
-
-def get_hotel_retention_metrics():
-    """Get key retention metrics"""
-    try:
-        # Get all hotels
-        hotels = get_all_hotels()
-        if not hotels:
-            return None
-        
-        total_hotels = len(hotels)
-        
-        # Get reorder data
-        reorders = get_hotel_reorders()
-        reorder_count = len(reorders)
-        
-        # Get unique hotels that reordered
-        reorder_hotels = set([r['hotel_id'] for r in reorders])
-        reordering_hotels = len(reorder_hotels)
-        
-        # Calculate retention rate
-        retention_rate = (reordering_hotels / total_hotels * 100) if total_hotels > 0 else 0
-        
-        # Get proactive vs prompted reorders
-        proactive = len([r for r in reorders if r.get('was_proactive', False)])
-        prompted = len([r for r in reorders if r.get('was_prompted', True)])
-        
-        return {
-            'total_hotels': total_hotels,
-            'reordering_hotels': reordering_hotels,
-            'retention_rate': retention_rate,
-            'proactive_reorders': proactive,
-            'prompted_reorders': prompted,
-            'total_reorders': reorder_count
-        }
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return None
 
 # -------------------------------
 # HOTEL SUCCESS & RETENTION FUNCTIONS

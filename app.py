@@ -1544,9 +1544,10 @@ with tab5:
                     st.plotly_chart(fig, width='stretch')
 
     with analytics_tab3:
-        st.markdown("### 🏨 Hotel Refill Performance")
-    
     # ========== HOTEL MANAGEMENT ==========
+        st.markdown("### 🏨 Hotel Performance Tracking")
+        st.caption("Add hotels, log every refill, and see which ones are actually earning their keep.")
+
         with st.expander("➕ Add New Hotel", expanded=False):
             col1, col2 = st.columns(2)
             with col1:
@@ -1555,26 +1556,26 @@ with tab5:
             with col2:
                 hotel_contact = st.text_input("Contact Phone", key="hotel_contact")
                 hotel_person = st.text_input("Contact Person", key="hotel_person")
-        
+
             if st.button("💾 Save Hotel", key="save_hotel"):
                 if new_hotel:
                     hotel_data = {
-                    "hotel_name": new_hotel,
-                    "location": hotel_location,
-                    "contact_phone": hotel_contact,
-                    "contact_person": hotel_person,
-                    "joined_date": str(date.today()),
-                    "status": "Active"
-                }
+                        "hotel_name": new_hotel,
+                        "location": hotel_location,
+                        "contact_phone": hotel_contact,
+                        "contact_person": hotel_person,
+                        "joined_date": str(date.today()),
+                        "status": "Active"
+                    }
                     save_hotel(hotel_data)
                     st.success(f"✅ Hotel '{new_hotel}' added!")
                     st.rerun()
-    
+
     # ========== RECORD REFILL ==========
         with st.expander("🔄 Record Hotel Refill", expanded=True):
             hotels = get_all_hotels()
             hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
-        
+
             col1, col2 = st.columns(2)
             with col1:
                 selected_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="refill_hotel")
@@ -1584,93 +1585,149 @@ with tab5:
                 refill_quantity = st.number_input("Quantity", min_value=1, step=1, value=1, key="refill_quantity")
                 refill_amount = st.number_input("Amount Paid (KES)", min_value=0, step=100, value=0, key="refill_amount")
                 refill_notes = st.text_area("Notes", key="refill_notes")
-        
+
             if st.button("💾 Record Refill", key="record_refill"):
                 if selected_hotel != "No hotels" and refill_quantity > 0:
                     hotel_id = hotel_options[selected_hotel]
                     refill_data = {
-                    "hotel_id": hotel_id,
-                    "refill_date": str(refill_date),
-                    "product_type": refill_product,
-                    "quantity": refill_quantity,
-                    "amount_paid": refill_amount if refill_amount > 0 else refill_quantity * (120 if "Refill" in refill_product else 150),
-                    "payment_status": "Paid",
-                    "notes": refill_notes
-                }
+                        "hotel_id": hotel_id,
+                        "refill_date": str(refill_date),
+                        "product_type": refill_product,
+                        "quantity": refill_quantity,
+                        "amount_paid": refill_amount if refill_amount > 0 else refill_quantity * (120 if "Refill" in refill_product else 150),
+                        "payment_status": "Paid",
+                        "notes": refill_notes
+                    }
                     save_hotel_refill(refill_data)
                     st.success(f"✅ Refill recorded for {selected_hotel}!")
                     st.rerun()
-    
-    # ========== HOTEL PERFORMANCE DASHBOARD ==========
+
+    # ========== HOTEL PERFORMANCE OVERVIEW ==========
         st.markdown("---")
-        st.markdown("### 📊 Hotel Performance Dashboard")
-    
-        hotels = get_all_hotels()
-        if hotels:
-        # Display all hotels with stats
-            hotel_stats = []
-            for hotel in hotels:
-                refills = get_hotel_refills(hotel['id'])
-                total_refills = len(refills)
-                total_quantity = sum(r['quantity'] for r in refills)
-                total_revenue = sum(r['amount_paid'] for r in refills)
-            
-            # Calculate average days between refills
-                if len(refills) >= 2:
-                    from datetime import datetime
-                    dates = []
-                    for r in refills:
-                        if isinstance(r['refill_date'], str):
-                            dates.append(datetime.strptime(r['refill_date'], '%Y-%m-%d'))
-                        else:
-                            dates.append(r['refill_date'])
-                    dates.sort()
-                    avg_days = sum((dates[i+1] - dates[i]).days for i in range(len(dates)-1)) / (len(dates)-1)
-                    frequency = f"Every {avg_days:.0f} days"
-                elif total_refills == 1:
-                    frequency = "First refill"
-                else:
-                    frequency = "No refills yet"
-            
-                hotel_stats.append({
-                "Hotel": hotel['hotel_name'],
-                "Location": hotel.get('location', 'N/A'),
-                "Refills": total_refills,
-                "Total Quantity": total_quantity,
-                "Total Revenue": total_revenue,
-                "Frequency": frequency
-            })
-        
-            df_hotels = pd.DataFrame(hotel_stats)
-            df_hotels['Total Revenue'] = df_hotels['Total Revenue'].apply(lambda x: f"KES {x:,.0f}")
-        
-            st.dataframe(df_hotels, use_container_width=True, hide_index=True)
-        
-        # Fastest refilling hotels chart
-            refill_counts = [(h['Hotel'], h['Refills']) for h in hotel_stats if h['Refills'] > 0]
-            if refill_counts:
-                df_refills = pd.DataFrame(refill_counts, columns=['Hotel', 'Number of Refills'])
-                df_refills = df_refills.sort_values('Number of Refills', ascending=False).head(10)
-                fig = px.bar(df_refills, x='Hotel', y='Number of Refills', 
-                        title='Hotels with Most Refills',
-                        color='Number of Refills', color_continuous_scale='Viridis',
-                        text='Number of Refills')
-                st.plotly_chart(fig, width='stretch')
-        
-        # Revenue by hotel chart
-            # Revenue by hotel chart
-            hotel_revenue = [(h['Hotel'], h['Total Revenue']) for h in hotel_stats if h['Total Revenue'] > 0]
-            if hotel_revenue:
-                df_revenue = pd.DataFrame(hotel_revenue, columns=['Hotel', 'Revenue'])
-                df_revenue = df_revenue.sort_values('Revenue', ascending=False).head(10)
-                fig = px.bar(df_revenue, x='Hotel', y='Revenue', 
-                        title='Revenue by Hotel',
-                        color='Revenue', color_continuous_scale='Blues',
-                        text='Revenue')
-                fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
-                st.plotly_chart(fig, width='stretch')
-        else:
+        st.markdown("### 📊 Hotel Performance Overview")
+        st.caption("Blends revenue, refill frequency and recency into one score, so you can see at a glance which hotels are working out and which need attention.")
+
+        perf_df = get_hotel_territory_analysis()
+
+        if perf_df.empty:
             st.info("No hotels added yet. Add your first hotel above!")
+        else:
+            active_df = perf_df[perf_df['visit_count'] > 0]
+
+        # ---- KPI row ----
+            col1, col2, col3, col4, col5 = st.columns(5)
+            with col1:
+                st.metric("🏨 Total Hotels", len(perf_df))
+            with col2:
+                st.metric("💰 Total Revenue", f"KES {perf_df['total_revenue'].sum():,.0f}")
+            with col3:
+                st.metric("⭐ Star Performers", int((perf_df['performance_tier'] == 'Star').sum()))
+            with col4:
+                st.metric("⚠️ At Risk", int((perf_df['performance_tier'] == 'At Risk').sum()))
+            with col5:
+                st.metric("🚚 Due for Refill", int(perf_df['due_for_visit'].sum()))
+
+            tier_colors = {
+                'Star': '#2ecc71', 'Growing': '#3498db', 'Steady': '#f1c40f',
+                'At Risk': '#e67e22', 'Dormant': '#e74c3c', 'New': '#95a5a6'
+            }
+
+        # ---- Performance tier distribution + top hotels by revenue ----
+            col1, col2 = st.columns(2)
+            with col1:
+                tier_counts = perf_df['performance_tier'].value_counts()
+                fig = px.pie(
+                    values=tier_counts.values, names=tier_counts.index,
+                    title='Hotels by Performance Tier', hole=0.3,
+                    color=tier_counts.index, color_discrete_map=tier_colors
+                )
+                fig.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig, width='stretch')
+            with col2:
+                top_revenue = active_df.nlargest(10, 'total_revenue')[['hotel_name', 'total_revenue']]
+                if not top_revenue.empty:
+                    fig = px.bar(
+                        top_revenue, x='hotel_name', y='total_revenue',
+                        title='Top 10 Hotels by Revenue',
+                        color='total_revenue', color_continuous_scale='Viridis',
+                        text='total_revenue', labels={'hotel_name': 'Hotel', 'total_revenue': 'Revenue (KES)'}
+                    )
+                    fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
+                    fig.update_layout(xaxis_tickangle=-45)
+                    st.plotly_chart(fig, width='stretch')
+                else:
+                    st.info("No refills recorded yet - revenue chart will appear once refills come in.")
+
+        # ---- Revenue vs frequency matrix ----
+            if not active_df.empty:
+                fig = px.scatter(
+                    active_df, x='avg_days_between_restocks', y='total_revenue',
+                    size='total_units', color='performance_tier',
+                    hover_name='hotel_name',
+                    title='Performance Matrix: Refill Speed vs Revenue (bubble size = units sold)',
+                    labels={'avg_days_between_restocks': 'Avg Days Between Refills (lower = faster)', 'total_revenue': 'Total Revenue (KES)'},
+                    color_discrete_map=tier_colors
+                )
+                fig.update_layout(height=450)
+                st.plotly_chart(fig, width='stretch')
+
+        # ---- Detailed table ----
+            st.markdown("#### 📋 Hotel Detail Table")
+            tier_filter = st.multiselect(
+                "Filter by performance tier",
+                options=['Star', 'Growing', 'Steady', 'At Risk', 'Dormant', 'New'],
+                default=['Star', 'Growing', 'Steady', 'At Risk', 'Dormant', 'New'],
+                key="perf_tier_filter"
+            )
+            table_df = perf_df[perf_df['performance_tier'].isin(tier_filter)].copy()
+            table_df = table_df.sort_values('performance_score', ascending=False)
+            table_df['total_revenue_display'] = table_df['total_revenue'].apply(lambda x: f"KES {x:,.0f}")
+            table_df['avg_order_value_display'] = table_df['avg_order_value'].apply(lambda x: f"KES {x:,.0f}")
+            table_df['avg_days_display'] = table_df['avg_days_between_restocks'].apply(lambda x: f"{x:.0f} days" if pd.notna(x) else "N/A")
+
+            show_cols = ['hotel_name', 'location', 'performance_tier', 'performance_score', 'visit_count',
+                         'total_revenue_display', 'avg_order_value_display', 'avg_days_display', 'due_for_visit']
+            show_cols = [c for c in show_cols if c in table_df.columns]
+
+            st.dataframe(
+                table_df[show_cols],
+                use_container_width=True, hide_index=True,
+                column_config={
+                    "hotel_name": "Hotel",
+                    "location": "Location",
+                    "performance_tier": "Tier",
+                    "performance_score": st.column_config.ProgressColumn("Score", format="%.0f", min_value=0, max_value=100),
+                    "visit_count": "Refills",
+                    "total_revenue_display": "Total Revenue",
+                    "avg_order_value_display": "Avg Order Value",
+                    "avg_days_display": "Refill Frequency",
+                    "due_for_visit": "Due Now?"
+                }
+            )
+
+        # ---- Actionable insights ----
+            st.markdown("#### 🎯 Actionable Insights")
+            star_hotels = perf_df[perf_df['performance_tier'] == 'Star']['hotel_name'].tolist()
+            if star_hotels:
+                st.success(f"⭐ **Star performers ({len(star_hotels)}):** {', '.join(star_hotels[:8])} — keep these relationships strong, they're your best accounts.")
+
+            risk_hotels = perf_df[perf_df['performance_tier'] == 'At Risk']['hotel_name'].tolist()
+            if risk_hotels:
+                st.warning(f"⚠️ **Needing attention ({len(risk_hotels)}):** {', '.join(risk_hotels[:8])} — low revenue and/or inconsistent refills. Worth a check-in call.")
+
+            dormant_hotels = perf_df[perf_df['performance_tier'] == 'Dormant']['hotel_name'].tolist()
+            if dormant_hotels:
+                st.error(f"🔴 **Gone quiet ({len(dormant_hotels)}):** {', '.join(dormant_hotels[:8])} — well overdue vs. their own normal restock rhythm. Follow up before you lose them.")
+
+            due_now = perf_df[perf_df['due_for_visit'] == True].sort_values('performance_score', ascending=False)
+            if not due_now.empty:
+                st.info(f"🚚 **{len(due_now)} hotels due for a refill visit right now:** {', '.join(due_now['hotel_name'].head(10).tolist())}")
+
+        # ---- Export ----
+            st.markdown("---")
+            if st.button("📥 Export Hotel Performance Report", key="export_hotel_perf", use_container_width=True):
+                csv = perf_df.to_csv(index=False)
+                st.download_button("Download CSV", csv, f"hotel_performance_{date.today()}.csv", "text/csv", key="dl_hotel_perf")
     
     # ========== MAMA MBOGAS SECTION ==========
         st.markdown("---")
@@ -1802,534 +1859,161 @@ with tab5:
         else:
             st.info("No Mama Mboga shops added yet. Add your first shop above!")
     
-    # ========== HOTEL SUCCESS & RETENTION DASHBOARD ==========
-st.markdown("---")
-st.markdown("### 📊 Hotel Success & Retention Dashboard")
-st.caption("Track which hotels are becoming dependent on SpiseUp")
-
-# Get retention metrics
-retention_metrics = get_hotel_retention_metrics()
-
-if retention_metrics:
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("🏨 Total Hotels", retention_metrics['total_hotels'])
-    with col2:
-        st.metric("🔄 Reordering Hotels", retention_metrics['reordering_hotels'])
-    with col3:
-        st.metric("📈 Retention Rate", f"{retention_metrics['retention_rate']:.0f}%")
-    with col4:
-        st.metric("📞 Proactive Reorders", retention_metrics['proactive_reorders'])
-    
-    # Progress bar for retention
-    st.progress(retention_metrics['retention_rate'] / 100)
-    if retention_metrics['retention_rate'] > 70:
-        st.success("✅ Excellent! Most hotels are reordering consistently")
-    elif retention_metrics['retention_rate'] > 40:
-        st.info("📈 Good retention. Focus on converting more hotels to repeat orders")
-    else:
-        st.warning("⚠️ Low retention. Focus on hotel satisfaction and product quality")
-
-# ========== HOTEL CONSUMPTION TRACKING ==========
-st.markdown("---")
-st.markdown("### 📦 Hotel Consumption Patterns")
-
-with st.expander("📝 Record Hotel Consumption Pattern", expanded=False):
-    hotels = get_all_hotels()
-    hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        selected_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="consumption_hotel")
-        product_type = st.selectbox("Product", ["100g Bottle", "100g Refill", "Sachet 5", "Sachet 20", "Sachet 40"], key="consumption_product")
-        quantity_per_order = st.number_input("Quantity per order", min_value=1, step=1, value=5, key="consumption_qty")
-    with col2:
-        order_frequency_days = st.number_input("Order frequency (days)", min_value=1, step=1, value=14, key="consumption_freq")
-        last_order = st.date_input("Last order date", value=date.today(), key="consumption_last")
-        notes = st.text_area("Notes", key="consumption_notes")
-    
-    if st.button("💾 Save Consumption Pattern", key="save_consumption"):
-        if selected_hotel != "No hotels":
-            hotel_id = hotel_options[selected_hotel]
-            data = {
-                "hotel_id": hotel_id,
-                "product_type": product_type,
-                "quantity_per_order": quantity_per_order,
-                "order_frequency_days": order_frequency_days,
-                "average_daily_consumption": quantity_per_order / order_frequency_days,
-                "last_order_date": str(last_order),
-                "next_expected_order": str(last_order + timedelta(days=order_frequency_days)),
-                "notes": notes
-            }
-            save_hotel_consumption(data)
-            st.success(f"✅ Consumption pattern saved for {selected_hotel}")
-            st.rerun()
-
-# ========== REORDER TRACKING ==========
-st.markdown("---")
-st.markdown("### 🔄 Reorder Tracking")
-
-with st.expander("📞 Record Reorder", expanded=True):
-    hotels = get_all_hotels()
-    hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        reorder_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="reorder_hotel")
-        reorder_date = st.date_input("Reorder Date", value=date.today(), key="reorder_date")
-        reorder_product = st.selectbox("Product", ["100g Bottle", "100g Refill", "Sachet 5", "Sachet 20", "Sachet 40"], key="reorder_product")
-    with col2:
-        reorder_quantity = st.number_input("Quantity", min_value=1, step=1, value=5, key="reorder_qty")
-        was_proactive = st.checkbox("They called us (proactive)", value=False)
-        reorder_notes = st.text_area("Notes", key="reorder_notes")
-    
-    if st.button("💾 Record Reorder", key="save_reorder"):
-        if reorder_hotel != "No hotels":
-            hotel_id = hotel_options[reorder_hotel]
-            data = {
-                "hotel_id": hotel_id,
-                "reorder_date": str(reorder_date),
-                "product_type": reorder_product,
-                "quantity": reorder_quantity,
-                "was_proactive": was_proactive,
-                "was_prompted": not was_proactive,
-                "notes": reorder_notes
-            }
-            save_hotel_reorder(data)
-            st.success(f"✅ Reorder recorded for {reorder_hotel}")
-            st.balloons()
-            st.rerun()
-
-# ========== CHEF RELATIONSHIP TRACKING ==========
-st.markdown("---")
-st.markdown("👨‍🍳 Chef Relationship Tracking")
-
-with st.expander("👨‍🍳 Add/Update Chef Relationship", expanded=False):
-    hotels = get_all_hotels()
-    hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        chef_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="chef_hotel")
-        chef_name = st.text_input("Chef Name", key="chef_name")
-        chef_phone = st.text_input("Chef Phone", key="chef_phone")
-    with col2:
-        preferred_product = st.selectbox("Preferred Product", ["100g Bottle", "100g Refill", "Sachet 5", "Sachet 20", "Sachet 40"], key="chef_product")
-        relationship_score = st.slider("Relationship Score (1-10)", 1, 10, 5, key="chef_score")
-        chef_feedback = st.text_area("Feedback/Notes", key="chef_feedback")
-    
-    if st.button("💾 Save Chef Relationship", key="save_chef"):
-        if chef_hotel != "No hotels" and chef_name:
-            hotel_id = hotel_options[chef_hotel]
-            data = {
-                "hotel_id": hotel_id,
-                "chef_name": chef_name,
-                "phone": chef_phone,
-                "preferred_product": preferred_product,
-                "feedback_notes": chef_feedback,
-                "relationship_score": relationship_score
-            }
-            save_hotel_chef(data)
-            st.success(f"✅ Chef {chef_name} saved for {chef_hotel}")
-            st.rerun()
-
-# ========== HOTEL SUCCESS SCORECARD ==========
-st.markdown("---")
-st.markdown("### 🏆 Hotel Success Scorecard")
-
-# Display all hotels with their success metrics
-hotels = get_all_hotels()
-if hotels:
-    scorecard_data = []
-    for hotel in hotels:
-        # Get consumption patterns
-        consumption = get_hotel_consumption(hotel['id'])
-        avg_consumption = sum(c['quantity_per_order'] for c in consumption) / len(consumption) if consumption else 0
-        
-        # Get reorders
-        reorders = get_hotel_reorders(hotel['id'])
-        total_reorders = len(reorders)
-        proactive_reorders = len([r for r in reorders if r.get('was_proactive', False)])
-        
-        # Get chefs
-        chefs = get_hotel_chefs(hotel['id'])
-        
-        # Calculate score (simplified)
-        score = 0
-        if total_reorders > 0:
-            score += min(total_reorders * 5, 30)  # Up to 30 points for reorders
-        if proactive_reorders > 0:
-            score += min(proactive_reorders * 10, 30)  # Up to 30 points for proactive reorders
-        if chefs:
-            score += min(len(chefs) * 10, 20)  # Up to 20 points for chef relationships
-        if avg_consumption > 0:
-            score += min(int(avg_consumption * 2), 20)  # Up to 20 points for consumption
-        
-        scorecard_data.append({
-            "Hotel": hotel['hotel_name'],
-            "Total Reorders": total_reorders,
-            "Proactive Reorders": proactive_reorders,
-            "Chefs": len(chefs),
-            "Avg Consumption": f"{avg_consumption:.1f} units/order",
-            "Success Score": min(score, 100)
-        })
-    
-    df_scorecard = pd.DataFrame(scorecard_data)
-    df_scorecard = df_scorecard.sort_values('Success Score', ascending=False)
-    
-    st.dataframe(
-        df_scorecard,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Hotel": "Hotel Name",
-            "Total Reorders": "Reorders",
-            "Proactive Reorders": "Proactive",
-            "Chefs": "Chefs",
-            "Avg Consumption": "Consumption",
-            "Success Score": st.column_config.ProgressColumn("Score", format="%d", min_value=0, max_value=100)
-        }
-    )
-    
-    # Identify top hotels
-    top_hotels = df_scorecard.head(5)['Hotel'].tolist()
-    if top_hotels:
-        st.success(f"🏆 **Top 5 Hotels:** {', '.join(top_hotels)}")
-        
-    # Hotels needing attention
-    low_score_hotels = df_scorecard[df_scorecard['Success Score'] < 40]['Hotel'].tolist()
-    if low_score_hotels:
-        st.warning(f"⚠️ **Hotels needing attention:** {', '.join(low_score_hotels)}")
-
-        
-    # ========== REFILL PREDICTOR ==========
+    # ========== HOTEL RELATIONSHIP TRACKING ==========
         st.markdown("---")
-        st.markdown("### 🔮 Refill Predictor")
-    
-        if hotels:
-        # Calculate average refill patterns from sales data
-            hotel_sales_from_db = []
-            for hotel in hotels:
-                refills = get_hotel_refills(hotel['id'])
-                for r in refills:
-                    hotel_sales_from_db.append({
-                    'hotel': hotel['hotel_name'],
-                    'date': r['refill_date'],
-                    'quantity': r['quantity']
-                })
-        
-            if len(hotel_sales_from_db) >= 2:
-                df_hotel_sales = pd.DataFrame(hotel_sales_from_db)
-                df_hotel_sales['date'] = pd.to_datetime(df_hotel_sales['date'])
-            
-            # Group by hotel
-                hotel_refill_stats = []
-                for hotel_name in df_hotel_sales['hotel'].unique():
-                    hotel_data = df_hotel_sales[df_hotel_sales['hotel'] == hotel_name].sort_values('date')
-                    if len(hotel_data) >= 2:
-                        dates = hotel_data['date'].tolist()
-                        avg_days = sum((dates[i+1] - dates[i]).days for i in range(len(dates)-1)) / (len(dates)-1)
-                        last_refill = dates[-1]
-                        next_refill = last_refill + timedelta(days=int(avg_days))
-                        days_until = (next_refill - datetime.now()).days
-                    
-                        hotel_refill_stats.append({
-                        "Hotel": hotel_name,
-                        "Avg Days Between": f"{avg_days:.0f} days",
-                        "Last Refill": last_refill.strftime('%Y-%m-%d'),
-                        "Next Refill": next_refill.strftime('%Y-%m-%d'),
-                        "Days Until": days_until,
-                        "Status": "Due Soon" if days_until <= 3 else "OK"
-                    })
-            
-                if hotel_refill_stats:
-                    df_predict = pd.DataFrame(hotel_refill_stats)
-                    st.dataframe(df_predict, use_container_width=True, hide_index=True)
-                
-                # Highlight due hotels
-                    due_hotels = df_predict[df_predict['Days Until'] <= 3]
-                    if not due_hotels.empty:
-                        st.warning(f"🚨 **{len(due_hotels)} hotels due for refill soon!**")
-                        for _, hotel in due_hotels.iterrows():
-                            st.write(f"• {hotel['Hotel']} - due in {hotel['Days Until']} days")
-            else:
-                st.info("Not enough refill data to make predictions. Add at least 2 refills per hotel.")
-        else:
-            st.info("Add hotels and record refills to see predictions.")
-    # ========== HOTEL ANALYTICS DASHBOARD ==========
-st.markdown("---")
-st.markdown("### 🏨 Hotel Analytics Dashboard")
-st.caption("Deep analysis of all 31 hotels - reorder patterns, consumption, and growth potential")
+        st.markdown("### 🤝 Hotel Relationship Tracking")
+        st.caption("Optional deeper tracking: consumption patterns, reorder calls, and chef relationships.")
 
-# ========== HOTEL OVERVIEW METRICS ==========
-st.markdown("#### 📊 Hotel Overview")
+        with st.expander("📝 Record Hotel Consumption Pattern", expanded=False):
+            hotels = get_all_hotels()
+            hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
 
-# Get all hotels
-all_hotels = get_all_hotels()
-total_hotels = len(all_hotels)
-
-# Get all hotel sales from your sales data
-if not sales_df.empty:
-    hotel_sales = sales_df[sales_df['Customer_Type'] == 'Hotel/Restaurant'] if 'Customer_Type' in sales_df.columns else pd.DataFrame()
-    
-    if not hotel_sales.empty:
-        # Calculate hotel metrics
-        hotel_metrics = hotel_sales.groupby('Name').agg({
-            'Total': 'sum',
-            'Quantity': 'sum',
-            'Date': ['count', 'min', 'max']
-        }).reset_index()
-        hotel_metrics.columns = ['Hotel', 'Total Revenue', 'Total Quantity', 'Order Count', 'First Order', 'Last Order']
-        
-        # Calculate days between orders
-        hotel_metrics['Days Active'] = (hotel_metrics['Last Order'] - hotel_metrics['First Order']).dt.days
-        hotel_metrics['Avg Days Between'] = hotel_metrics.apply(
-            lambda x: x['Days Active'] / max(x['Order Count'] - 1, 1) if x['Order Count'] > 1 else 0, axis=1
-        )
-        
-        # Display hotel metrics cards
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("🏨 Total Hotels", total_hotels)
-        with col2:
-            active_hotels = len(hotel_metrics[hotel_metrics['Order Count'] >= 2])
-            st.metric("🔄 Active Hotels (2+ orders)", active_hotels)
-        with col3:
-            reorder_rate = (active_hotels / total_hotels * 100) if total_hotels > 0 else 0
-            st.metric("📈 Reorder Rate", f"{reorder_rate:.0f}%")
-        with col4:
-            avg_orders = hotel_metrics['Order Count'].mean() if not hotel_metrics.empty else 0
-            st.metric("📊 Avg Orders/Hotel", f"{avg_orders:.1f}")
-        
-        # ========== HOTEL RANKING ==========
-        st.markdown("---")
-        st.markdown("#### 🏆 Hotel Ranking & Segmentation")
-        
-        # Create hotel segments
-        def get_hotel_segment(row):
-            if row['Total Revenue'] > 5000 and row['Order Count'] >= 3:
-                return "⭐ VIP (High Value, High Frequency)"
-            elif row['Total Revenue'] > 2000 and row['Order Count'] >= 2:
-                return "💎 Gold (Mid Value, Regular)"
-            elif row['Order Count'] >= 2:
-                return "🥈 Silver (Low Value, Regular)"
-            else:
-                return "🥉 Bronze (New/One-time)"
-        
-        hotel_metrics['Segment'] = hotel_metrics.apply(get_hotel_segment, axis=1)
-        
-        # Count segments
-        segment_counts = hotel_metrics['Segment'].value_counts()
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Segment distribution chart
-            fig = px.pie(
-                values=segment_counts.values,
-                names=segment_counts.index,
-                title='Hotel Segments Distribution',
-                color_discrete_sequence=px.colors.qualitative.Set2,
-                hole=0.3
-            )
-            fig.update_traces(textposition='inside', textinfo='percent+label')
-            st.plotly_chart(fig, width='stretch')
-        
-        with col2:
-            # Top hotels chart
-            top_hotels = hotel_metrics.nlargest(10, 'Total Revenue')[['Hotel', 'Total Revenue']]
-            fig = px.bar(top_hotels, x='Hotel', y='Total Revenue',
-                        title='Top 10 Hotels by Revenue',
-                        color='Total Revenue', color_continuous_scale='Viridis',
-                        text='Total Revenue')
-            fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
-            fig.update_layout(xaxis_tickangle=-45)
-            st.plotly_chart(fig, width='stretch')
-        
-        # ========== HOTEL PERFORMANCE MATRIX ==========
-        st.markdown("---")
-        st.markdown("#### 📊 Hotel Performance Matrix (Frequency vs Revenue)")
-        
-        fig = px.scatter(
-            hotel_metrics,
-            x='Order Count',
-            y='Total Revenue',
-            size='Total Quantity',
-            color='Avg Days Between',
-            hover_name='Hotel',
-            title='Hotel Performance: Frequency vs Revenue',
-            labels={
-                'Order Count': 'Number of Orders',
-                'Total Revenue': 'Total Revenue (KES)',
-                'Avg Days Between': 'Avg Days Between Orders'
-            }
-        )
-        fig.update_layout(height=500)
-        st.plotly_chart(fig, width='stretch')
-        
-        # ========== HOTEL DETAILED TABLE ==========
-        st.markdown("---")
-        st.markdown("#### 📋 Hotel Details")
-        
-        # Prepare display data
-        display_df = hotel_metrics.copy()
-        display_df['Total Revenue'] = display_df['Total Revenue'].apply(lambda x: f"KES {x:,.0f}")
-        display_df['Avg Days Between'] = display_df['Avg Days Between'].apply(lambda x: f"{x:.0f} days" if x > 0 else "N/A")
-        display_df['Last Order'] = display_df['Last Order'].dt.strftime('%Y-%m-%d')
-        display_df['First Order'] = display_df['First Order'].dt.strftime('%Y-%m-%d')
-        
-        st.dataframe(
-            display_df[['Hotel', 'Total Revenue', 'Order Count', 'Avg Days Between', 'Last Order', 'Segment']],
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Hotel": "Hotel Name",
-                "Total Revenue": "Revenue",
-                "Order Count": "Orders",
-                "Avg Days Between": "Frequency",
-                "Last Order": "Last Order",
-                "Segment": "Segment"
-            }
-        )
-        
-        # ========== HOTEL REORDER PATTERNS ==========
-        st.markdown("---")
-        st.markdown("#### 🔄 Reorder Pattern Analysis")
-        
-        if len(hotel_metrics) >= 2:
-            # Calculate reorder rates by segment
-            segment_reorder = hotel_metrics.groupby('Segment').agg({
-                'Hotel': 'count',
-                'Order Count': 'mean',
-                'Total Revenue': 'mean'
-            }).reset_index()
-            segment_reorder.columns = ['Segment', 'Hotels', 'Avg Orders', 'Avg Revenue']
-            
             col1, col2 = st.columns(2)
-            
             with col1:
-                fig = px.bar(segment_reorder, x='Segment', y='Avg Orders',
-                            title='Average Orders by Segment',
-                            color='Avg Orders', color_continuous_scale='Blues',
-                            text='Avg Orders')
-                fig.update_traces(texttemplate='%{text:.1f}', textposition='outside')
-                fig.update_layout(xaxis_tickangle=-45)
-                st.plotly_chart(fig, width='stretch')
-            
+                selected_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="consumption_hotel")
+                product_type = st.selectbox("Product", ["100g Bottle", "100g Refill", "Sachet 5", "Sachet 20", "Sachet 40"], key="consumption_product")
+                quantity_per_order = st.number_input("Quantity per order", min_value=1, step=1, value=5, key="consumption_qty")
             with col2:
-                fig = px.bar(segment_reorder, x='Segment', y='Avg Revenue',
-                            title='Average Revenue by Segment',
-                            color='Avg Revenue', color_continuous_scale='Greens',
-                            text='Avg Revenue')
-                fig.update_traces(texttemplate='KES %{text:,.0f}', textposition='outside')
-                fig.update_layout(xaxis_tickangle=-45)
-                st.plotly_chart(fig, width='stretch')
-        
-        # ========== HOTEL LIFECYCLE ==========
-        st.markdown("---")
-        st.markdown("#### 📈 Hotel Lifecycle Analysis")
-        
-        if not hotel_metrics.empty:
-            # Show when hotels joined
-            hotel_metrics['Join Month'] = hotel_metrics['First Order'].dt.strftime('%B %Y')
-            join_pattern = hotel_metrics.groupby('Join Month').size().reset_index()
-            join_pattern.columns = ['Month', 'New Hotels']
-            
-            fig = px.bar(join_pattern, x='Month', y='New Hotels',
-                        title='New Hotels Added Over Time',
-                        color='New Hotels', color_continuous_scale='Oranges',
-                        text='New Hotels')
-            fig.update_traces(textposition='outside')
-            fig.update_layout(xaxis_tickangle=-45)
-            st.plotly_chart(fig, width='stretch')
-            
-            # Hotels needing attention (last order > 30 days ago)
-            today = date.today()
-            hotel_metrics['Days Since Last'] = (today - hotel_metrics['Last Order']).dt.days
-            inactive_hotels = hotel_metrics[hotel_metrics['Days Since Last'] > 30]
-            
-            if not inactive_hotels.empty:
-                st.warning(f"⚠️ **{len(inactive_hotels)} hotels inactive for 30+ days!**")
-                for _, hotel in inactive_hotels.head(5).iterrows():
-                    st.write(f"• {hotel['Hotel']} - Last order {hotel['Days Since Last']} days ago")
-        
-        # ========== ACTIONABLE INSIGHTS ==========
-        st.markdown("---")
-        st.markdown("#### 🎯 Actionable Hotel Insights")
-        
-        insights = []
-        
-        # VIP hotels (high value, high frequency)
-        vip_hotels = hotel_metrics[hotel_metrics['Segment'] == '⭐ VIP (High Value, High Frequency)']
-        if not vip_hotels.empty:
-            insights.append(f"🌟 **VIP Hotels ({len(vip_hotels)})**: Focus on maintaining these relationships. They generate the most revenue.")
-            for _, hotel in vip_hotels.head(3).iterrows():
-                insights.append(f"   • {hotel['Hotel']}: KES {hotel['Total Revenue']:,.0f} ({hotel['Order Count']} orders)")
-        
-        # Hotels needing attention (low frequency, high potential)
-        high_potential = hotel_metrics[(hotel_metrics['Order Count'] >= 2) & (hotel_metrics['Total Revenue'] > 2000)]
-        if not high_potential.empty:
-            insights.append(f"📈 **High Potential Hotels ({len(high_potential)})**: Increase frequency to move to VIP tier.")
-        
-        # New hotels (one-time)
-        new_hotels = hotel_metrics[hotel_metrics['Order Count'] == 1]
-        if not new_hotels.empty:
-            insights.append(f"🆕 **New Hotels ({len(new_hotels)})**: Focus on converting these to repeat customers.")
-        
-        # Inactive hotels
-        inactive = hotel_metrics[hotel_metrics['Days Since Last'] > 30]
-        if not inactive.empty:
-            insights.append(f"🔄 **Re-engage Hotels ({len(inactive)})**: These hotels haven't ordered in 30+ days.")
-        
-        for insight in insights:
-            if "🌟" in insight or "VIP" in insight:
-                st.success(insight)
-            elif "⚠️" in insight or "attention" in insight:
-                st.warning(insight)
-            else:
-                st.info(insight)
-        
-        # ========== REFILL PREDICTOR ==========
-        st.markdown("---")
-        st.markdown("#### 🔮 Upcoming Refills (7 Days)")
-        
-        # Predict which hotels need refills soon
-        upcoming_refills = []
-        for _, hotel in hotel_metrics.iterrows():
-            if hotel['Avg Days Between'] > 0:
-                days_since = (today - hotel['Last Order']).days
-                days_to_refill = hotel['Avg Days Between'] - days_since
-                if 0 <= days_to_refill <= 7:
-                    upcoming_refills.append({
-                        'Hotel': hotel['Hotel'],
-                        'Days Until': days_to_refill,
-                        'Estimated Quantity': int(hotel['Total Quantity'] / max(hotel['Order Count'], 1)),
-                        'Revenue Potential': hotel['Total Revenue'] / max(hotel['Order Count'], 1)
-                    })
-        
-        if upcoming_refills:
-            df_refills = pd.DataFrame(upcoming_refills)
-            df_refills['Revenue Potential'] = df_refills['Revenue Potential'].apply(lambda x: f"KES {x:,.0f}")
-            st.dataframe(
-                df_refills[['Hotel', 'Days Until', 'Estimated Quantity', 'Revenue Potential']],
-                use_container_width=True,
-                hide_index=True
-            )
-            st.info(f"📞 {len(upcoming_refills)} hotels due for refill in the next 7 days - contact them now!")
-        else:
-            st.success("✅ No hotels due for refill in the next 7 days")
-        
-        # ========== EXPORT HOTEL DATA ==========
-        st.markdown("---")
-        if st.button("📥 Export Hotel Analysis Report", use_container_width=True, type="primary"):
-            csv = hotel_metrics.to_csv(index=False)
-            st.download_button("Download Report", csv, f"hotel_analysis_{date.today()}.csv", "text/csv")
-        
-    else:
-        st.info("No hotel sales data found. Record hotel sales to see analytics.")
-else:
-    st.info("Add sales data to start tracking hotel performance.")
+                order_frequency_days = st.number_input("Order frequency (days)", min_value=1, step=1, value=14, key="consumption_freq")
+                last_order = st.date_input("Last order date", value=date.today(), key="consumption_last")
+                notes = st.text_area("Notes", key="consumption_notes")
 
+            if st.button("💾 Save Consumption Pattern", key="save_consumption"):
+                if selected_hotel != "No hotels":
+                    hotel_id = hotel_options[selected_hotel]
+                    data = {
+                        "hotel_id": hotel_id,
+                        "product_type": product_type,
+                        "quantity_per_order": quantity_per_order,
+                        "order_frequency_days": order_frequency_days,
+                        "average_daily_consumption": quantity_per_order / order_frequency_days,
+                        "last_order_date": str(last_order),
+                        "next_expected_order": str(last_order + timedelta(days=order_frequency_days)),
+                        "notes": notes
+                    }
+                    save_hotel_consumption(data)
+                    st.success(f"✅ Consumption pattern saved for {selected_hotel}")
+                    st.rerun()
+
+        with st.expander("📞 Record Reorder", expanded=False):
+            hotels = get_all_hotels()
+            hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
+
+            col1, col2 = st.columns(2)
+            with col1:
+                reorder_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="reorder_hotel")
+                reorder_date = st.date_input("Reorder Date", value=date.today(), key="reorder_date")
+                reorder_product = st.selectbox("Product", ["100g Bottle", "100g Refill", "Sachet 5", "Sachet 20", "Sachet 40"], key="reorder_product")
+            with col2:
+                reorder_quantity = st.number_input("Quantity", min_value=1, step=1, value=5, key="reorder_qty")
+                was_proactive = st.checkbox("They called us (proactive)", value=False, key="reorder_proactive")
+                reorder_notes = st.text_area("Notes", key="reorder_notes")
+
+            if st.button("💾 Record Reorder", key="save_reorder"):
+                if reorder_hotel != "No hotels":
+                    hotel_id = hotel_options[reorder_hotel]
+                    data = {
+                        "hotel_id": hotel_id,
+                        "reorder_date": str(reorder_date),
+                        "product_type": reorder_product,
+                        "quantity": reorder_quantity,
+                        "was_proactive": was_proactive,
+                        "was_prompted": not was_proactive,
+                        "notes": reorder_notes
+                    }
+                    save_hotel_reorder(data)
+                    st.success(f"✅ Reorder recorded for {reorder_hotel}")
+                    st.rerun()
+
+        with st.expander("👨‍🍳 Add/Update Chef Relationship", expanded=False):
+            hotels = get_all_hotels()
+            hotel_options = {h['hotel_name']: h['id'] for h in hotels} if hotels else {}
+
+            col1, col2 = st.columns(2)
+            with col1:
+                chef_hotel = st.selectbox("Select Hotel", list(hotel_options.keys()) if hotel_options else ["No hotels"], key="chef_hotel")
+                chef_name = st.text_input("Chef Name", key="chef_name")
+                chef_phone = st.text_input("Chef Phone", key="chef_phone")
+            with col2:
+                preferred_product = st.selectbox("Preferred Product", ["100g Bottle", "100g Refill", "Sachet 5", "Sachet 20", "Sachet 40"], key="chef_product")
+                relationship_score = st.slider("Relationship Score (1-10)", 1, 10, 5, key="chef_score")
+                chef_feedback = st.text_area("Feedback/Notes", key="chef_feedback")
+
+            if st.button("💾 Save Chef Relationship", key="save_chef"):
+                if chef_hotel != "No hotels" and chef_name:
+                    hotel_id = hotel_options[chef_hotel]
+                    data = {
+                        "hotel_id": hotel_id,
+                        "chef_name": chef_name,
+                        "phone": chef_phone,
+                        "preferred_product": preferred_product,
+                        "feedback_notes": chef_feedback,
+                        "relationship_score": relationship_score
+                    }
+                    save_hotel_chef(data)
+                    st.success(f"✅ Chef {chef_name} saved for {chef_hotel}")
+                    st.rerun()
+
+    # ========== RELATIONSHIP RETENTION METRICS ==========
+        st.markdown("---")
+        retention_metrics = get_hotel_retention_metrics()
+        if retention_metrics and retention_metrics['total_hotels'] > 0:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("🔄 Reordering Hotels", retention_metrics['reordering_hotels'])
+            with col2:
+                st.metric("📈 Retention Rate", f"{retention_metrics['retention_rate']:.0f}%")
+            with col3:
+                st.metric("📞 Proactive Reorders", retention_metrics['proactive_reorders'])
+            with col4:
+                st.metric("👨‍🍳 Chef Contacts Logged", len(get_hotel_chefs()))
+
+    # ========== HOTEL RELATIONSHIP SCORECARD ==========
+        st.markdown("#### 🏆 Hotel Relationship Scorecard")
+        st.caption("A separate score from Performance above — this one reflects reorder calls, chef relationships and consumption habits you've logged by hand.")
+
+        hotels = get_all_hotels()
+        if hotels:
+            scorecard_data = []
+            for hotel in hotels:
+                consumption = get_hotel_consumption(hotel['id'])
+                avg_consumption = sum(c['quantity_per_order'] for c in consumption) / len(consumption) if consumption else 0
+
+                reorders = get_hotel_reorders(hotel['id'])
+                total_reorders = len(reorders)
+                proactive_reorders = len([r for r in reorders if r.get('was_proactive', False)])
+
+                chefs = get_hotel_chefs(hotel['id'])
+
+                score = 0
+                if total_reorders > 0:
+                    score += min(total_reorders * 5, 30)
+                if proactive_reorders > 0:
+                    score += min(proactive_reorders * 10, 30)
+                if chefs:
+                    score += min(len(chefs) * 10, 20)
+                if avg_consumption > 0:
+                    score += min(int(avg_consumption * 2), 20)
+
+                scorecard_data.append({
+                    "Hotel": hotel['hotel_name'],
+                    "Total Reorders": total_reorders,
+                    "Proactive Reorders": proactive_reorders,
+                    "Chefs": len(chefs),
+                    "Avg Consumption": f"{avg_consumption:.1f} units/order",
+                    "Relationship Score": min(score, 100)
+                })
+
+            df_scorecard = pd.DataFrame(scorecard_data).sort_values('Relationship Score', ascending=False)
+
+            st.dataframe(
+                df_scorecard, use_container_width=True, hide_index=True,
+                column_config={
+                    "Relationship Score": st.column_config.ProgressColumn("Score", format="%d", min_value=0, max_value=100)
+                }
+            )
+        else:
+            st.info("Add hotels above to start building relationship scorecards.")
     with analytics_tab4:
         st.markdown("### 📁 Data Export & Management")
         
