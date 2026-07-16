@@ -1609,7 +1609,16 @@ with tab5:
 
         perf_df = get_hotel_territory_analysis()
 
-        if perf_df.empty:
+        _required_cols = {'total_revenue', 'performance_tier', 'performance_score',
+                           'avg_order_value', 'due_for_visit', 'visit_count'}
+        if not perf_df.empty and not _required_cols.issubset(perf_df.columns):
+            st.error(
+                "⚠️ Your `supabase_client.py` on this server is out of date — "
+                "`get_hotel_territory_analysis()` is missing columns this dashboard needs "
+                f"({', '.join(sorted(_required_cols - set(perf_df.columns)))}). "
+                "Redeploy the updated `supabase_client.py` alongside this `app.py`."
+            )
+        elif perf_df.empty:
             st.info("No hotels added yet. Add your first hotel above!")
         else:
             active_df = perf_df[perf_df['visit_count'] > 0]
