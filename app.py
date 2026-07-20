@@ -776,9 +776,9 @@ with tab2:
 
                 elif customer_type == "Shop/Mama Mboga (B2B)":
         # Mama Mboga special: 36 sachets = KES 100, or 18 sachets = KES 50
-                    price = 2.78  # 100 / 36 = 2.777... or 50 / 18 = 2.777...
-                    min_qty = 18
-                    default_qty = 18
+                    price = 2.55  # 100 / 36 = 2.777... or 50 / 18 = 2.777...
+                    min_qty = 12
+                    default_qty = 12
                     unit = "sachets"
                     product_name = "SpiseUp Spicy Salt Sachet (Wholesale) - Mama Mboga"
                     commission_per_unit = 0
