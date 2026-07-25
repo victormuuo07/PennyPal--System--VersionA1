@@ -776,7 +776,7 @@ with tab2:
 
                 elif customer_type == "Shop/Mama Mboga (B2B)":
         # Mama Mboga special: 36 sachets = KES 100, or 18 sachets = KES 50
-                    price = 2.55  # 100 / 36 = 2.777... or 50 / 18 = 2.777...
+                    price = 2.5  # 100 / 36 = 2.777... or 50 / 18 = 2.777...
                     min_qty = 12
                     default_qty = 12
                     unit = "sachets"
@@ -785,11 +785,11 @@ with tab2:
                     st.info(f"📦 **Mama Mboga Special:** {min_qty} sachets for KES {price * min_qty:.0f} (KES {price:.2f} per sachet)")
                 
                 else:  # Hotel/Restaurant
-                    price = 2.9
-                    min_qty = 18
-                    default_qty = 18
+                    price = 2.5
+                    min_qty = 12
+                    default_qty = 12
                     unit = "sachets"
-                    product_name = "SpiseUp Spicy Salt Sachet (2.9 KES) - Hotel"
+                    product_name = "SpiseUp Spicy Salt Sachet (2.5 KES) - Hotel"
                     commission_per_unit = 0
 
             elif product_main == "Sachet - 20 KES":
@@ -826,7 +826,25 @@ with tab2:
                 product_name = f"SpiseUp Spicy Salt Bottle (100g Refill) - {customer_type}"
                 commission_per_unit = 0
                 st.info("🔄 **REFILL BENEFIT:** Pay KES 120 (save KES 30!)")
-            
+
+            elif product_main == "Bottle (60g Refill)":
+                price = 100.0
+                min_qty = 1
+                default_qty = 1
+                unit = "refills"
+                product_name = f"SpiseUp Spicy Salt Bottle (60g Refill) - {customer_type}"
+                commission_per_unit = 0
+                st.info("🔄 **REFILL BENEFIT:** Pay KES 100 (save KES 20!)")
+
+            elif product_main == "Bottle (30g Refill)":
+                price = 50.0
+                min_qty = 1
+                default_qty = 1
+                unit = "refills"
+                product_name = f"SpiseUp Spicy Salt Bottle (30g Refill) - {customer_type}"
+                commission_per_unit = 0
+                st.info("🔄 **REFILL BENEFIT:** Pay KES 50 (save KES 10!)")
+
             # Show minimum order notice
             if min_qty > 1:
                 st.info(f"📦 Minimum order: {min_qty} {unit}")
@@ -874,7 +892,7 @@ with tab2:
                 st.subheader("🏪 Mama Mboga/Shop Tracking")
                 mama_name = st.text_input("Mama Mboga/Shop Name", placeholder="Enter shop name", key="mama_track")
                 if mama_name:
-                    st.caption("💡 They buy at KES 2.9, sell at KES 5 - KES 2.1 profit per sachet")
+                    st.caption("💡 They buy at KES 2.5, sell at KES 5 - KES 2.5 profit per sachet")
             
             # Payment Status
             payment_status = st.selectbox("Payment Status", ["Cash", "Credit / Pending"])
