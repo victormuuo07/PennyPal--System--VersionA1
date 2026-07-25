@@ -745,7 +745,7 @@ with tab2:
             
             product_main = st.radio(
                 "Product Type",
-                ["Sachet - 5 KES", "Sachet - 20 KES", "Sachet - 40 KES", "Bottle (100g New)", "Bottle (60g Refill)", "Bottle (30g Refill)"],
+                ["Sachet - 5 KES", "Sachet - 20 KES", "Sachet - 40 KES", "Bottle (100g New)", "Bottle (100g Refill)", "Bottle (60g Refill)", "Bottle (30g Refill)"],
                 horizontal=True,
                 key="product_type_main"
             )
