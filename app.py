@@ -173,71 +173,441 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
+    /* =========================================================
+       PennyPal App — Brand Stylesheet
+       Matches SpiseUp website branding
+       ========================================================= */
+    
+    /* ===== BRAND COLORS (from your website) ===== */
+    :root {
+        --maroon: #5c0f10;
+        --red: #a01d1d;
+        --red-bright: #d4291f;
+        --gold: #f2b705;
+        --gold-dark: #b9860a;
+        --cream: #fff8ec;
+        --cream-deep: #fbead2;
+        --ink: #2a1710;
+        --ink-soft: #5c4436;
+        --white: #ffffff;
+        --shadow-soft: 0 10px 30px rgba(92, 15, 16, 0.14);
+        --radius: 14px;
+        --radius-lg: 26px;
+    }
+    
+    /* ===== GLOBAL BACKGROUND ===== */
+    .stApp {
+        background-color: var(--cream) !important;
+    }
+    
+    /* ===== SIDEBAR ===== */
+    .css-1d391kg, .st-emotion-cache-1d391kg {
+        background: linear-gradient(180deg, var(--maroon) 0%, var(--red) 100%) !important;
+        color: var(--cream) !important;
+    }
+    
+    .css-1d391kg .sidebar-content, 
+    .st-emotion-cache-1d391kg .sidebar-content {
+        color: var(--cream) !important;
+    }
+    
+    .sidebar .stSelectbox label,
+    .sidebar .stMultiselect label,
+    .sidebar .stDateInput label,
+    .sidebar .stButton button {
+        color: var(--cream) !important;
+    }
+    
+    .sidebar .stSelectbox div[data-baseweb="select"] {
+        color: var(--ink) !important;
+    }
+    
+    /* ===== MAIN CONTENT ===== */
+    .main {
+        background-color: var(--cream) !important;
+    }
+    
+    /* ===== HEADERS ===== */
     .main-header {
         font-size: 2.8rem !important;
         font-weight: 700;
-        background: linear-gradient(90deg, #D32F2F 0%, #F57C00 100%);
+        font-family: "Baloo 2", "Fredoka", system-ui, sans-serif;
+        background: linear-gradient(120deg, var(--red-bright), var(--red) 60%);
         -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        color: transparent;
         margin-bottom: 0.5rem;
     }
+    
+    .main-header .gold {
+        background: linear-gradient(120deg, var(--gold), #ffd447);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+    
     .sub-header {
-        color: #333333;
+        color: var(--ink-soft);
         font-size: 1.1rem;
         margin-bottom: 2rem;
+        font-weight: 400;
     }
-    .metric-card {
-        background: white;
-        border-radius: 12px;
-        padding: 1.5rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-left: 5px solid #D32F2F;
-        transition: transform 0.3s ease;
-    }
-    .metric-card:hover {
-        transform: translateY(-5px);
-    }
+    
+    /* ===== SECTION HEADERS ===== */
     .section-header {
-        background: linear-gradient(90deg, #1565C0 0%, #1976D2 100%);
-        color: white;
+        background: linear-gradient(120deg, var(--maroon), var(--red) 70%);
+        color: var(--white) !important;
         padding: 1rem 1.5rem;
-        border-radius: 10px;
+        border-radius: var(--radius);
         margin: 1.5rem 0 1rem 0;
         font-weight: 600;
         font-size: 1.2rem;
+        box-shadow: var(--shadow-soft);
+        font-family: "Baloo 2", "Fredoka", system-ui, sans-serif;
     }
-    .stTabs [data-baseweb="tab"] {
-        height: 60px;
-        padding: 0 24px;
-        font-weight: 500;
-        color: #555555;
+    
+    .section-header .gold {
+        color: var(--gold);
     }
-    .stTabs [aria-selected="true"] {
-        color: #D32F2F;
+    
+    /* ===== METRIC CARDS ===== */
+    .metric-card {
+        background: var(--white);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        box-shadow: 0 6px 18px rgba(42, 23, 16, 0.10);
+        border-left: 5px solid var(--gold);
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+        border: 1px solid #f0dcc0;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-6px);
+        box-shadow: var(--shadow-soft);
+    }
+    
+    .metric-card h3 {
+        color: var(--maroon) !important;
+        font-weight: 600;
+        font-family: "Baloo 2", "Fredoka", system-ui, sans-serif;
+    }
+    
+    .metric-card .st-emotion-cache-1fcdlhc {
+        color: var(--maroon) !important;
+    }
+    
+    .metric-card .stMetric div[data-testid="stMetricValue"] {
+        color: var(--red) !important;
         font-weight: 700;
     }
-    .stButton > button {
-        background: linear-gradient(90deg, #D32F2F 0%, #F57C00 100%);
-        color: white !important;
-        border: none;
-        border-radius: 8px;
+    
+    /* ===== TABS ===== */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0px;
+        background-color: var(--white);
+        padding: 0px;
+        border-radius: var(--radius);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border: 1px solid #f0dcc0;
+        overflow: hidden;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        padding: 0 24px;
+        background-color: var(--white);
+        font-weight: 500;
+        color: var(--ink-soft);
+        border-right: 1px solid #f0dcc0;
+        font-family: var(--font-body);
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(120deg, var(--red-bright), var(--red));
+        color: var(--white) !important;
         font-weight: 600;
     }
+    
+    .stTabs [data-baseweb="tab"]:hover:not([aria-selected="true"]) {
+        color: var(--maroon);
+        background-color: var(--cream-deep);
+    }
+    
+    /* ===== BUTTONS ===== */
+    .stButton > button {
+        background: linear-gradient(120deg, var(--red-bright), var(--red));
+        color: var(--white) !important;
+        border: none;
+        border-radius: 999px;
+        padding: 0.5rem 2rem;
+        font-weight: 600;
+        font-family: "Baloo 2", "Fredoka", system-ui, sans-serif;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        box-shadow: var(--shadow-soft);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 30px rgba(160, 29, 29, 0.28);
+        color: var(--white) !important;
+    }
+    
+    .stButton > button:active {
+        transform: scale(0.97);
+    }
+    
+    /* Gold button variant */
+    .stButton.gold-btn > button {
+        background: linear-gradient(120deg, var(--gold), #ffd447) !important;
+        color: var(--maroon) !important;
+        box-shadow: 0 10px 24px rgba(242, 183, 5, 0.35);
+    }
+    
+    .stButton.gold-btn > button:hover {
+        box-shadow: 0 14px 30px rgba(242, 183, 5, 0.45);
+    }
+    
+    /* ===== ALERT BOXES ===== */
     .alert-box {
-        background: linear-gradient(90deg, #FFF3E0 0%, #FFECB3 100%);
-        border-left: 5px solid #FF9800;
+        background: var(--cream-deep);
+        border-left: 5px solid var(--gold-dark);
         padding: 1rem;
-        border-radius: 8px;
+        border-radius: var(--radius);
         margin: 1rem 0;
-        color: #5D4037;
+        color: var(--ink);
+        font-weight: 500;
+        border: 1px solid #eccd93;
+    }
+    
+    .alert-box strong {
+        color: var(--red);
+    }
+    
+    .stAlert {
+        border-radius: var(--radius) !important;
+        border-left: 5px solid var(--red) !important;
+    }
+    
+    .stAlert .stAlert-success {
+        border-left-color: #4CAF50 !important;
+    }
+    
+    .stAlert .stAlert-warning {
+        border-left-color: var(--gold-dark) !important;
+    }
+    
+    .stAlert .stAlert-error {
+        border-left-color: var(--red) !important;
+    }
+    
+    /* ===== EXPANDERS ===== */
+    .streamlit-expanderHeader {
+        background-color: var(--white) !important;
+        border-radius: var(--radius) !important;
+        font-weight: 600 !important;
+        border: 1px solid #f0dcc0 !important;
+        color: var(--maroon) !important;
+        font-family: "Baloo 2", "Fredoka", system-ui, sans-serif;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background-color: var(--cream-deep) !important;
+    }
+    
+    .streamlit-expanderContent {
+        background-color: var(--white) !important;
+        border-radius: 0 0 var(--radius) var(--radius) !important;
+        border: 1px solid #f0dcc0 !important;
+        border-top: none !important;
+        padding: 16px !important;
+    }
+    
+    /* ===== METRICS ===== */
+    .stMetric {
+        color: var(--ink) !important;
+    }
+    
+    .stMetric label {
+        color: var(--ink-soft) !important;
         font-weight: 500;
     }
+    
     .stMetric div[data-testid="stMetricValue"] {
-        color: #333333 !important;
+        color: var(--red) !important;
         font-weight: 700;
+        font-family: "Baloo 2", "Fredoka", system-ui, sans-serif;
     }
+    
+    .stMetric div[data-testid="stMetricDelta"] {
+        color: var(--gold-dark) !important;
+    }
+    
+    /* ===== FORM INPUTS ===== */
+    .stTextInput label, 
+    .stNumberInput label, 
+    .stSelectbox label, 
+    .stDateInput label, 
+    .stTextArea label {
+        color: var(--ink) !important;
+        font-weight: 500;
+    }
+    
+    .stTextInput input, 
+    .stNumberInput input,
+    .stSelectbox div[data-baseweb="select"],
+    .stDateInput input,
+    .stTextArea textarea {
+        border: 1.5px solid #e7d3b8 !important;
+        border-radius: 10px !important;
+        background-color: var(--cream) !important;
+        color: var(--ink) !important;
+        font-family: var(--font-body);
+    }
+    
+    .stTextInput input:focus,
+    .stNumberInput input:focus,
+    .stSelectbox div[data-baseweb="select"]:focus,
+    .stDateInput input:focus,
+    .stTextArea textarea:focus {
+        border-color: var(--red) !important;
+        background-color: var(--white) !important;
+        outline: none !important;
+    }
+    
+    /* ===== SELECTBOX DROPDOWN ===== */
+    .stSelectbox div[data-baseweb="select"] {
+        color: var(--ink) !important;
+    }
+    
+    /* ===== DATAFRAME ===== */
+    .dataframe {
+        border-radius: var(--radius) !important;
+        overflow: hidden !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+    }
+    
+    .dataframe th {
+        background: linear-gradient(120deg, var(--maroon), var(--red) 70%) !important;
+        color: var(--white) !important;
+        font-weight: 600 !important;
+        font-family: "Baloo 2", "Fredoka", system-ui, sans-serif;
+        padding: 12px 16px !important;
+    }
+    
+    .dataframe td {
+        color: var(--ink) !important;
+        padding: 10px 16px !important;
+        border-bottom: 1px solid #f0dcc0 !important;
+    }
+    
+    .dataframe tr:nth-child(even) td {
+        background-color: var(--cream) !important;
+    }
+    
+    .dataframe tr:nth-child(odd) td {
+        background-color: var(--white) !important;
+    }
+    
+    /* ===== CONTAINERS ===== */
+    .stContainer, .stColumn, .stExpander {
+        color: var(--ink) !important;
+    }
+    
+    /* ===== CAPTIONS ===== */
+    .stCaption {
+        color: var(--ink-soft) !important;
+    }
+    
+    /* ===== DIVIDERS ===== */
+    hr {
+        border-color: #eccd93 !important;
+        margin: 2rem 0 !important;
+    }
+    
+    /* ===== HEADINGS ===== */
     h1, h2, h3, h4, h5, h6 {
-        color: #333333 !important;
+        color: var(--maroon) !important;
+        font-family: "Baloo 2", "Fredoka", system-ui, sans-serif;
+    }
+    
+    /* ===== FOOTER ===== */
+    .footer {
+        background: var(--maroon);
+        color: #f4e3cf;
+        border-radius: 28px 28px 0 0;
+        padding: 24px 24px 20px;
+        margin-top: 40px;
+        text-align: center;
+    }
+    
+    .footer a {
+        color: var(--gold) !important;
+    }
+    
+    .footer a:hover {
+        color: var(--white) !important;
+    }
+    
+    /* ===== RESPONSIVE ===== */
+    @media only screen and (max-width: 600px) {
+        .main-header {
+            font-size: 1.8rem !important;
+        }
+        .sub-header {
+            font-size: 0.9rem !important;
+        }
+        .stColumns {
+            flex-direction: column !important;
+        }
+        .stTabs [data-baseweb="tab"] {
+            padding: 0 12px !important;
+            font-size: 0.8rem !important;
+            height: 40px !important;
+        }
+        .section-header {
+            font-size: 1rem !important;
+            padding: 0.8rem 1rem !important;
+        }
+        .metric-card {
+            padding: 1rem !important;
+        }
+    }
+    
+    /* ===== LOADING SPINNER ===== */
+    .stSpinner > div {
+        border-color: var(--red) !important;
+    }
+    
+    /* ===== RADIO BUTTONS ===== */
+    .stRadio label {
+        color: var(--ink) !important;
+    }
+    
+    .stRadio div[role="radiogroup"] {
+        gap: 8px !important;
+    }
+    
+    .stRadio div[role="radiogroup"] label {
+        background-color: var(--cream) !important;
+        border: 1.5px solid #e7d3b8 !important;
+        border-radius: 999px !important;
+        padding: 6px 16px !important;
+        transition: all 0.15s ease !important;
+    }
+    
+    .stRadio div[role="radiogroup"] label[data-checked="true"] {
+        background: linear-gradient(120deg, var(--red-bright), var(--red)) !important;
+        border-color: var(--red) !important;
+        color: var(--white) !important;
+    }
+    
+    /* ===== CHECKBOXES ===== */
+    .stCheckbox label {
+        color: var(--ink) !important;
+    }
+    
+    .stCheckbox input[type="checkbox"]:checked {
+        accent-color: var(--red) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -247,7 +617,7 @@ col1, col2 = st.columns([1, 5])
 with col1:
     st.image("spicyup.jpeg", width=80)
 with col2:
-    st.markdown('<h1 class="main-header">PennyPal System</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">💰 PennyPal <span class="gold">Finance</span> Tracker</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Track sales, expenses, salespeople, distribution, and net profit in real-time!</p>', unsafe_allow_html=True)
 
 st.markdown("---")
