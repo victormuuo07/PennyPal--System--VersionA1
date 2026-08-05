@@ -14,6 +14,9 @@
 
 # Enable XSRF protection
 # enableXsrfProtection = true
+enableStaticServing = true
+headless = true
+runOnSave = false
 
 # Path to the static assets directory
 # staticFolder = "./static"

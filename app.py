@@ -13,6 +13,9 @@ import pandas as pd
 import requests
 import urllib.parse
 
+# Force disable GZip compression
+os.environ['STREAMLIT_SERVER_ENABLE_GZIP'] = 'false'
+
 st.error("🚨 DEPLOY TEST: If you see this, the latest push is live. Timestamp: 2026-07-03-1")
 
 APP_VERSION = "2.0.0"
